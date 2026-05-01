@@ -27,7 +27,7 @@ do_start() {
     echo "ALLOW_ANY_CHANNEL=$ALLOW_ANY_CHANNEL"
   fi
 
-  nohup npx deno run --allow-all index.ts > "$LOG_FILE" 2>&1 &
+  nohup npx --yes deno run --allow-all index.ts > "$LOG_FILE" 2>&1 &
 
   PID=$!
   echo "$PID" > "$PID_FILE"
