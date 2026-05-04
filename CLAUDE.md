@@ -64,12 +64,12 @@ npx deno fmt            # format
 - **Status line:** Single editable Discord message that tracks hidden tool activity, auto-repositions below new visible content (`claude/discord-sender.ts`)
 - **Thread auto-resume:** Plain text in a session thread triggers automatic Claude resume via Message Content Intent (`index.ts`)
 - **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown
-- **Auto-upload screenshots:** After generating a screenshot or exported file, the bot auto-detects the file path in your response and uploads it to Discord. **Always `echo` the absolute file path after taking a screenshot**, e.g.:
+- **Auto-upload screenshots:** After generating a screenshot or exported file, the bot auto-detects the file path and shows a clickable button in Discord. **Always save screenshots to `./screenshots/`**, e.g.:
   ```
-  screencapture -x /tmp/screenshot.png
-  echo /tmp/screenshot.png
+  screencapture -x ./screenshots/screenshot.png
+  echo ./screenshots/screenshot.png
   ```
-  This ensures the file path appears in the tool result output, triggering the auto-upload.
+  For Playwright MCP screenshots, use `filename: "screenshots/screenshot.png"`. This ensures the file path appears in the tool result output, triggering the auto-upload button.
 
 ## Environment Variables
 
