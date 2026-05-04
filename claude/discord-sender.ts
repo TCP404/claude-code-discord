@@ -214,6 +214,19 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
 
   return async function sendClaudeMessages(messages: ClaudeMessage[]) {
   for (const msg of messages) {
+    // Auto-upload: detect file paths in tool_result even when hidden
+    if (msg.type === 'tool_result' && msg.content) {
+      const filePathMatches = msg.content.match(/(?:\/[\w.~-]+)*\/[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
+      for (const p of filePathMatches) {
+        const cleanPath = p.replace(/[`()"']/g, '');
+        if (existsSync(cleanPath)) {
+          console.log(`[Auto-Upload from hidden tool_result] Detected: ${cleanPath}`);
+          visibleSentSinceStatus = true;
+          await sender.sendMessage({ files: [{ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' }] });
+        }
+      }
+    }
+
     // Check display filter — hidden types get routed to live status
     if (msg.type === 'system') {
       const subkey = msg.metadata?.subtype === 'completion' ? 'system:completion' : 'system';
@@ -377,27 +390,15 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
           break;
         }
         
-        // [NEW] Auto-detect local file paths in tool results and attach them to Discord
-        const filePaths = cleanContent.match(/(?:\/[\w.~-]+)*\/[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
-        const filesToAttach: { path: string; name: string }[] = [];
-        for (const p of filePaths) {
-          const cleanPath = p.replace(/[`()"']/g, '');
-          if (existsSync(cleanPath)) {
-            filesToAttach.push({ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' });
-            console.log(`[Auto-Upload] Detected: ${cleanPath}`);
-          }
-        }
-
         const { preview, isTruncated, totalLines } = truncateContent(cleanContent);
-        
+
         const messageContent: MessageContent = {
           embeds: [{
             color: 0x00ffff,
             title: `✅ Tool Result${isTruncated ? ` (+${totalLines - 15} more lines)` : ''}`,
             description: `\`\`\`\n${preview}\n\`\`\``,
             timestamp: true
-          }],
-          files: filesToAttach.length > 0 ? filesToAttach : undefined
+          }]
         };
         
         // Add expand button if content was truncated
