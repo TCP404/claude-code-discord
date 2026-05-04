@@ -20,6 +20,9 @@ export interface TrackedMessage {
 // Store full content for expand functionality
 export const expandableContent = new Map<string, string>();
 
+// Store file paths for button-triggered uploads
+export const pendingFileUploads = new Map<string, { path: string; name: string }>();
+
 // Message types that are hidden by default — toggled via /show_system, /show_tool_details
 // Key = message type (or "system:init" for non-completion system messages)
 export const hiddenMessageTypes = new Set<string>([
@@ -215,7 +218,7 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
 
   return async function sendClaudeMessages(messages: ClaudeMessage[]) {
   for (const msg of messages) {
-    // Auto-upload: detect file paths in tool_result even when hidden
+    // Auto-upload: detect file paths in tool_result even when hidden, show as button
     if (msg.type === 'tool_result' && msg.content) {
       const filePathMatches = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
       for (const p of filePathMatches) {
@@ -224,9 +227,29 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
           cleanPath = resolve(Deno.cwd(), cleanPath);
         }
         if (existsSync(cleanPath)) {
-          console.log(`[Auto-Upload from tool_result] Detected: ${cleanPath}`);
+          const fileName = cleanPath.split('/').pop() || 'attachment';
+          const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
+          console.log(`[Auto-Upload] File ready: ${cleanPath} (button: ${fileId})`);
           visibleSentSinceStatus = true;
-          await sender.sendMessage({ files: [{ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' }] });
+          const ext = fileName.split('.').pop()?.toLowerCase() || '';
+          const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+          await sender.sendMessage({
+            embeds: [{
+              color: 0x2b82d4,
+              title: `${isImage ? '🖼️' : '📎'} ${fileName}`,
+              timestamp: true
+            }],
+            components: [{
+              type: 'actionRow',
+              components: [{
+                type: 'button',
+                customId: `file:${fileId}`,
+                label: isImage ? '📷 查看图片' : '📥 下载文件',
+                style: 'primary'
+              }]
+            }]
+          });
         }
       }
     }
@@ -252,27 +275,46 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
       case 'text': {
         const chunks = splitText(msg.content, 2000);
         
-        // Auto-detect local file paths in text messages and attach them
+        // Auto-detect local file paths in text messages and show as buttons
         const filePaths = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
-        const filesToAttach: { path: string; name: string }[] = [];
+        const fileButtons: { id: string; name: string; isImage: boolean }[] = [];
         for (const p of filePaths) {
           let cleanPath = p.replace(/[`()\"']/g, '');
           if (!cleanPath.startsWith('/')) {
             cleanPath = resolve(Deno.cwd(), cleanPath);
           }
           if (existsSync(cleanPath)) {
-            filesToAttach.push({ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' });
-            console.log(`[Auto-Upload from text] Detected: ${cleanPath}`);
+            const fileName = cleanPath.split('/').pop() || 'attachment';
+            const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
+            const ext = fileName.split('.').pop()?.toLowerCase() || '';
+            fileButtons.push({ id: fileId, name: fileName, isImage: ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) });
+            console.log(`[Auto-Upload from text] File ready: ${cleanPath} (button: ${fileId})`);
           }
         }
 
         for (const chunk of chunks) {
           await sender.sendMessage({ content: chunk });
         }
-        
-        // Send files as separate messages after the text (so they appear as actual images, not links)
-        for (const file of filesToAttach) {
-          await sender.sendMessage({ files: [file] });
+
+        // Send file buttons after the text
+        for (const fb of fileButtons) {
+          await sender.sendMessage({
+            embeds: [{
+              color: 0x2b82d4,
+              title: `${fb.isImage ? '🖼️' : '📎'} ${fb.name}`,
+              timestamp: true
+            }],
+            components: [{
+              type: 'actionRow',
+              components: [{
+                type: 'button',
+                customId: `file:${fb.id}`,
+                label: fb.isImage ? '📷 查看图片' : '📥 下载文件',
+                style: 'primary'
+              }]
+            }]
+          });
         }
         break;
       }

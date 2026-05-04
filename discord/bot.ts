@@ -14,10 +14,12 @@ import {
   TextChannel,
   EmbedBuilder,
   Message,
+  AttachmentBuilder,
 } from "npm:discord.js@14.14.1";
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
+import { pendingFileUploads } from "../claude/index.ts";
 import { checkCommandPermission } from "../core/rbac.ts";
 import { SETTINGS_ACTIONS, SETTINGS_VALUES } from "../settings/unified-settings.ts";
 import { BOT_VERSION } from "../util/version-check.ts";
@@ -446,6 +448,37 @@ export async function createDiscordBot(
         });
       } catch (error) {
         console.error(`Error handling copy-session button:`, error);
+      }
+      return;
+    }
+
+    // Handle file upload button: "file:fileId"
+    if (buttonId.startsWith('file:')) {
+      const fileId = buttonId.substring(5);
+      const fileInfo = pendingFileUploads.get(fileId);
+      if (!fileInfo) {
+        try {
+          await interaction.reply({
+            content: '⚠️ 文件已过期，请重新生成。',
+            ephemeral: true
+          });
+        } catch { /* ignore */ }
+        return;
+      }
+      try {
+        const attachment = new AttachmentBuilder(fileInfo.path, { name: fileInfo.name });
+        await interaction.reply({
+          files: [attachment],
+          ephemeral: false
+        });
+      } catch (error) {
+        console.error(`[File Upload] Error:`, error);
+        try {
+          await interaction.reply({
+            content: `❌ 文件上传失败: ${error instanceof Error ? error.message : String(error)}`,
+            ephemeral: true
+          });
+        } catch { /* ignore */ }
       }
       return;
     }
