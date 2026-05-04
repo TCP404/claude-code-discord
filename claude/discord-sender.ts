@@ -217,10 +217,9 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
   for (const msg of messages) {
     // Auto-upload: detect file paths in tool_result even when hidden
     if (msg.type === 'tool_result' && msg.content) {
-      const filePathMatches = msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
+      const filePathMatches = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
       for (const p of filePathMatches) {
         let cleanPath = p.replace(/[`()"']/g, '');
-        // Resolve relative paths against cwd
         if (!cleanPath.startsWith('/')) {
           cleanPath = resolve(Deno.cwd(), cleanPath);
         }
@@ -254,7 +253,7 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
         const chunks = splitText(msg.content, 2000);
         
         // Auto-detect local file paths in text messages and attach them
-        const filePaths = msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
+        const filePaths = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
         const filesToAttach: { path: string; name: string }[] = [];
         for (const p of filePaths) {
           let cleanPath = p.replace(/[`()\"']/g, '');
