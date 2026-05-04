@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { splitText } from "../discord/utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 import type { MessageContent, EmbedData, ComponentData } from "../discord/types.ts";
@@ -216,11 +217,15 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
   for (const msg of messages) {
     // Auto-upload: detect file paths in tool_result even when hidden
     if (msg.type === 'tool_result' && msg.content) {
-      const filePathMatches = msg.content.match(/(?:\/[\w.~-]+)*\/[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
+      const filePathMatches = msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
       for (const p of filePathMatches) {
-        const cleanPath = p.replace(/[`()"']/g, '');
+        let cleanPath = p.replace(/[`()"']/g, '');
+        // Resolve relative paths against cwd
+        if (!cleanPath.startsWith('/')) {
+          cleanPath = resolve(Deno.cwd(), cleanPath);
+        }
         if (existsSync(cleanPath)) {
-          console.log(`[Auto-Upload from hidden tool_result] Detected: ${cleanPath}`);
+          console.log(`[Auto-Upload from tool_result] Detected: ${cleanPath}`);
           visibleSentSinceStatus = true;
           await sender.sendMessage({ files: [{ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' }] });
         }
@@ -249,10 +254,13 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
         const chunks = splitText(msg.content, 2000);
         
         // Auto-detect local file paths in text messages and attach them
-        const filePaths = msg.content.match(/(?:\/[\w.~-]+)*\/[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
+        const filePaths = msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [];
         const filesToAttach: { path: string; name: string }[] = [];
         for (const p of filePaths) {
-          const cleanPath = p.replace(/[`()\"']/g, '');
+          let cleanPath = p.replace(/[`()\"']/g, '');
+          if (!cleanPath.startsWith('/')) {
+            cleanPath = resolve(Deno.cwd(), cleanPath);
+          }
           if (existsSync(cleanPath)) {
             filesToAttach.push({ path: cleanPath, name: cleanPath.split('/').pop() || 'attachment' });
             console.log(`[Auto-Upload from text] Detected: ${cleanPath}`);
