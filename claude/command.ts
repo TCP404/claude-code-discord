@@ -74,6 +74,8 @@ export const claudeCommands = [
 
 export interface ClaudeHandlerDeps {
   workDir: string;
+  /** Resolve workDir dynamically by channelId (falls back to workDir if unset) */
+  resolveWorkDir?: (channelId: string) => string;
   getClaudeController: () => AbortController | null;
   setClaudeController: (controller: AbortController | null) => void;
   /** Get session ID for a specific channel/thread (per-channel tracking) */
@@ -93,7 +95,7 @@ export interface ClaudeHandlerDeps {
 }
 
 export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
-  const { workDir, sendClaudeMessages } = deps;
+  const { workDir, resolveWorkDir, sendClaudeMessages } = deps;
 
   return {
     /**
@@ -141,8 +143,10 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
         }]
       });
 
+      const effectiveWorkDir = resolveWorkDir?.(channelId) ?? workDir;
+
       const result = await sendToClaudeCode(
-        workDir,
+        effectiveWorkDir,
         prompt,
         controller,
         activeSessionId, // resume if present, new session if undefined
@@ -171,7 +175,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
      * /claude-thread — Start a brand-new session in a dedicated Discord thread.
      */
     // deno-lint-ignore no-explicit-any
-    async onClaudeThread(ctx: any, prompt: string, threadName?: string): Promise<ClaudeResponse> {
+    async onClaudeThread(ctx: any, prompt: string, channelId: string, threadName?: string): Promise<ClaudeResponse> {
       const existingController = deps.getClaudeController();
       if (existingController) {
         existingController.abort();
@@ -210,10 +214,12 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
         }]
       });
 
+      const effectiveWorkDir = resolveWorkDir?.(channelId) ?? workDir;
+
       let result;
       try {
         result = await sendToClaudeCode(
-          workDir,
+          effectiveWorkDir,
           prompt,
           controller,
           undefined, // always a new session
@@ -254,7 +260,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
      * If that session has a thread, output goes there.
      */
     // deno-lint-ignore no-explicit-any
-    async onContinue(ctx: any, prompt?: string): Promise<ClaudeResponse> {
+    async onContinue(ctx: any, prompt?: string, channelId?: string): Promise<ClaudeResponse> {
       const existingController = deps.getClaudeController();
       if (existingController) {
         existingController.abort();
@@ -301,8 +307,10 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
 
       await ctx.editReply({ embeds: [embedData] });
 
+      const effectiveWorkDir = (channelId && resolveWorkDir?.(channelId)) || workDir;
+
       const result = await sendToClaudeCode(
-        workDir,
+        effectiveWorkDir,
         actualPrompt,
         controller,
         undefined,

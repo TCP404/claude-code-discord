@@ -305,15 +305,16 @@ export function createClaudeCommandHandlers(
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt', true)!;
         const threadName = ctx.getString('name') || undefined;
+        const channelId = ctx.getChannelId();
         addToHistory(prompt);
-        await claudeHandlers.onClaudeThread(ctx, prompt, threadName);
+        await claudeHandlers.onClaudeThread(ctx, prompt, channelId, threadName);
       }
     }],
     ['resume', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt');
         if (prompt) addToHistory(prompt);
-        await claudeHandlers.onContinue(ctx, prompt || undefined);
+        await claudeHandlers.onContinue(ctx, prompt || undefined, ctx.getChannelId());
       }
     }],
     ['claude-cancel', {

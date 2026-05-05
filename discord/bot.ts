@@ -248,6 +248,16 @@ export async function createDiscordBot(
 
       getChannelId(): string {
         return interaction.channelId ?? '';
+      },
+
+      getSubcommand(): string | null {
+        if (interaction.isCommand && interaction.isCommand()) {
+          try {
+            // deno-lint-ignore no-explicit-any
+            return (interaction as any).options.getSubcommand(false) ?? null;
+          } catch { return null; }
+        }
+        return null;
       }
     };
   }
@@ -255,17 +265,27 @@ export async function createDiscordBot(
   // Helper: check if an interaction belongs to our bot channel or a thread inside it
   function isOurChannel(channelId: string): boolean {
     const envVal = Deno.env.get("ALLOW_ANY_CHANNEL");
-    console.log(`[isOurChannel] ALLOW_ANY_CHANNEL="${envVal}" channelId="${channelId}"`);
     // [NEW] Allow commands in any channel if env var is set
     if (envVal === "true") {
-      console.log(`[isOurChannel] ALLOW_ANY_CHANNEL matched, returning true`);
       return true;
     }
     if (!myChannel) return false;
     if (channelId === myChannel.id) return true;
-    // Check if the interaction is inside a thread whose parent is our channel
+
+    // Check workspace-managed channels
+    const managedIds = dependencies.getManagedChannelIds?.();
+    if (managedIds?.has(channelId)) return true;
+
+    // Check if the interaction is inside a thread whose parent is a managed channel
     const channel = client.channels.cache.get(channelId);
-    return !!(channel && (channel as any).parentId === myChannel.id);
+    // deno-lint-ignore no-explicit-any
+    if (channel && (channel as any).parentId) {
+      // deno-lint-ignore no-explicit-any
+      const parentId = (channel as any).parentId;
+      if (parentId === myChannel.id) return true;
+      if (managedIds?.has(parentId)) return true;
+    }
+    return false;
   }
 
   // Command handler - completely generic
@@ -275,7 +295,7 @@ export async function createDiscordBot(
     }
 
     // [Multi-channel] Redirect Claude output to the invoking channel
-    if (Deno.env.get("ALLOW_ANY_CHANNEL") === "true" && dependencies.setResponseChannel) {
+    if (dependencies.setResponseChannel && interaction.channelId !== myChannel?.id) {
       const channel = client.channels.cache.get(interaction.channelId) || interaction.channel;
       dependencies.setResponseChannel(channel);
     }
@@ -701,6 +721,12 @@ export async function createDiscordBot(
     client,
     getChannel() {
       return myChannel;
+    },
+    getGuild() {
+      return myChannel?.guild ?? null;
+    },
+    getCategory() {
+      return myCategory;
     },
     updateBotSettings(settings: { mentionEnabled: boolean; mentionUserId: string | null }) {
       botSettings.mentionEnabled = settings.mentionEnabled;

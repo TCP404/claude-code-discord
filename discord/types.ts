@@ -51,6 +51,8 @@ export interface InteractionContext {
   getUserId(): string;
   /** Returns the channel or thread ID the interaction was sent in */
   getChannelId(): string;
+  /** Returns the subcommand name if the command has subcommands */
+  getSubcommand(): string | null;
 }
 
 export interface BotConfig {
@@ -131,4 +133,6 @@ export interface BotDependencies {
   onThreadMessage?: (channelId: string, content: string) => Promise<void>;
   /** Set the channel where Claude output should be sent (multi-channel support) */
   setResponseChannel?: (channel: any) => void;
+  /** Returns set of channel IDs managed by workspace system (checked by isOurChannel) */
+  getManagedChannelIds?: () => Set<string>;
 }

@@ -50,10 +50,12 @@ import {
   cleanSessionId,
   createButtonHandlers,
   createAllCommandHandlers,
+  WorkspaceManager,
   type BotManagers,
   type AllHandlers,
   type MessageHistoryOps,
 } from "./core/index.ts";
+import { createWorkspaceHandlers } from "./workspace/index.ts";
 
 // Re-export for backward compatibility
 export { getGitInfo, executeGitCommand } from "./git/index.ts";
@@ -126,6 +128,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Load persisted sessions so conversations survive restarts.
   const sessionThreadManager = new SessionThreadManager();
   await sessionThreadManager.loadFromDisk();
+
+  // Workspace manager — maps channels to project working directories
+  const workspaceManager = new WorkspaceManager(workDir);
+  await workspaceManager.loadFromDisk();
 
   // Session thread callbacks — used by claude/command.ts for /claude-thread and /resume.
   // The callbacks are closures over `bot` (late-bound) and `sessionThreadManager`.
@@ -227,6 +233,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   const allHandlers: AllHandlers = createAllHandlers(
     {
       workDir,
+      resolveWorkDir: (channelId: string) => workspaceManager.resolve(channelId),
       repoName,
       branchName,
       categoryName: actualCategoryName,
@@ -271,6 +278,18 @@ export async function createClaudeCodeBot(config: BotConfig) {
     cleanupInterval,
   });
 
+  // Workspace command handlers (late-bound — needs guild/category from bot)
+  const workspaceHandlers = createWorkspaceHandlers({
+    workspaceManager,
+    getGuild: () => bot?.getGuild?.() ?? null,
+    getCategory: () => bot?.getCategory?.() ?? null,
+  });
+  handlers.set('workspace', {
+    execute: async (ctx) => {
+      await workspaceHandlers.onWorkspace(ctx);
+    },
+  });
+
   // Create button handlers using the button handler factory
   const buttonHandlers: ButtonHandlers = createButtonHandlers(
     {
@@ -292,6 +311,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     commands: getAllCommands(),
     cleanSessionId,
     botSettings,
+    getManagedChannelIds: () => workspaceManager.getManagedChannelIds(),
     onContinueSession: async (ctx) => {
       await allHandlers.claude.onContinue(ctx);
     },
@@ -351,9 +371,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
       const controller = new AbortController();
       claudeController = controller;
 
+      // Resolve workDir from thread's parent channel
+      const parentChannelId = (thread as any).parentId ?? threadChannelId;
+      const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
+
       try {
         const result = await sendToClaudeCode(
-          workDir,
+          effectiveWorkDir,
           content,
           controller,
           sessionId, // resume existing session
@@ -389,6 +413,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   const mainChannel = bot.getChannel() as TextChannel | null;
   if (mainChannel) {
     await sessionThreadManager.restoreThreadChannels(mainChannel);
+    workspaceManager.setDefaultChannelId(mainChannel.id);
   }
 
   // Create Discord sender for Claude messages

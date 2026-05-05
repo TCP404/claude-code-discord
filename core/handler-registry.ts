@@ -26,6 +26,7 @@ import { systemCommands, createSystemHandlers } from "../system/index.ts";
 import { helpCommand, createHelpHandlers } from "../help/index.ts";
 import { agentCommand, createAgentHandlers } from "../agent/index.ts";
 import { screenshotCommands, createScreenshotHandlers } from "../screenshot/index.ts";
+import { workspaceCommands } from "../workspace/index.ts";
 import { infoCommands, createInfoCommandHandlers } from "../claude/index.ts";
 import { cleanSessionId, ClaudeSessionManager } from "../claude/index.ts";
 import type { SessionThreadCallbacks } from "../claude/index.ts";
@@ -146,8 +147,10 @@ export interface AllHandlers {
  * Dependencies for handler registry creation.
  */
 export interface HandlerRegistryDeps {
-  /** Working directory */
+  /** Working directory (default fallback) */
   workDir: string;
+  /** Resolve workDir dynamically by channelId (returns workDir if no mapping) */
+  resolveWorkDir?: (channelId: string) => string;
   /** Repository name */
   repoName: string;
   /** Branch name */
@@ -514,6 +517,7 @@ export function createAllHandlers(
 
   const claudeHandlers = createClaudeHandlers({
     workDir,
+    resolveWorkDir: deps.resolveWorkDir,
     getClaudeController: claudeSession.getController,
     setClaudeController: claudeSession.setController,
     getSessionForChannel: (channelId: string) => channelSessionMap.get(channelId),
@@ -673,6 +677,7 @@ export function getAllCommands() {
     ...systemCommands,
     ...screenshotCommands,
     ...infoCommands,
+    ...workspaceCommands,
     helpCommand,
     ...displayToggleCommands,
   ];
