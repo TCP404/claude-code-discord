@@ -46,6 +46,7 @@ import {
   setupPeriodicCleanup,
   createBotSettings,
   createAllHandlers,
+  createClaudeSession,
   getAllCommands,
   cleanSessionId,
   createButtonHandlers,
@@ -74,9 +75,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Determine category name (use repository name if not specified)
   const actualCategoryName = categoryName || repoName;
 
-  // Claude Code session management (closures needed for handler state)
-  let claudeController: AbortController | null = null;
-  let claudeSessionId: string | undefined;
+  // Claude Code session management — per-channel controllers and session IDs
+  const claudeSessionOps = createClaudeSession();
 
   // Message history for navigation
   const messageHistoryOps: MessageHistoryOps = createMessageHistory(50);
@@ -136,9 +136,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Session thread callbacks — used by claude/command.ts for /claude-thread and /resume.
   // The callbacks are closures over `bot` (late-bound) and `sessionThreadManager`.
   const sessionThreadCallbacks: SessionThreadCallbacks = {
-    async createThreadSender(prompt: string, sessionId?: string, threadName?: string) {
+    async createThreadSender(prompt: string, sessionId?: string, threadName?: string, channelId?: string) {
       // [Multi-channel] Create thread in the invoking channel, not the bot's dedicated channel
-      const channel = (commandChannel || bot?.getChannel()) as TextChannel | null;
+      const channel = (channelId && commandChannels.get(channelId)) || bot?.getChannel() as TextChannel | null;
       if (!channel) throw new Error('Bot channel not ready');
 
       // If a session ID was provided, check for an existing thread to reuse
@@ -257,12 +257,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       },
       sessionThreads: sessionThreadCallbacks,
     },
-    {
-      getController: () => claudeController,
-      setController: (controller) => { claudeController = controller; },
-      getSessionId: () => claudeSessionId,
-      setSessionId: (sessionId) => { claudeSessionId = sessionId; },
-    },
+    claudeSessionOps,
     settingsOps
   );
 
@@ -270,8 +265,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
   const handlers: CommandHandlers = createAllCommandHandlers({
     handlers: allHandlers,
     messageHistory: messageHistoryOps,
-    getClaudeController: () => claudeController,
-    getClaudeSessionId: () => claudeSessionId,
+    getClaudeController: () => claudeSessionOps.getController(),
+    getClaudeSessionId: () => claudeSessionOps.getSessionId(),
     crashHandler,
     healthMonitor,
     botSettings,
@@ -295,7 +290,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     {
       messageHistory: messageHistoryOps,
       handlers: allHandlers,
-      getClaudeSessionId: () => claudeSessionId,
+      getClaudeSessionId: () => claudeSessionOps.getSessionId(),
       sendClaudeMessages,
       workDir,
     },
@@ -375,7 +370,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
       const threadSender = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
       const controller = new AbortController();
-      claudeController = controller;
+      // Use the thread's channel ID as the key for per-channel session tracking
+      const threadKey = threadChannelId;
+      claudeSessionOps.setController(controller, threadKey);
 
       // Resolve workDir from thread's parent channel
       const parentChannelId = (thread as any).parentId ?? threadChannelId;
@@ -398,21 +395,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
         );
 
         if (result.sessionId) {
-          claudeSessionId = result.sessionId;
+          claudeSessionOps.setSessionId(result.sessionId, threadKey);
         }
       } catch (error) {
         console.error(`[ThreadMessage] Failed to resume session ${sessionId}:`, error);
         const errMsg = error instanceof Error ? error.message : String(error);
         await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
       } finally {
-        claudeController = null;
+        claudeSessionOps.setController(null, threadKey);
         try { await thinkingMsg.delete(); } catch { /* ignore */ }
       }
     },
-    // [Multi-channel] Allow redirecting Claude output to the invoking channel
+    // [Multi-channel] Allow redirecting Claude output to the invoking channel (per-channel)
     setResponseChannel: (ch: any) => {
-      responseChannel = ch;
-      commandChannel = ch;
+      const chId = ch?.id;
+      if (chId) {
+        responseChannels.set(chId, ch);
+        commandChannels.set(chId, ch);
+      }
     },
   };
 
@@ -453,8 +453,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // If there's an active session thread, use that; otherwise fall back to main channel.
   const getActiveSessionChannel = () => {
     // Try to find the thread for the current session
-    if (claudeSessionId) {
-      const thread = sessionThreadManager.getThread(claudeSessionId);
+    const currentSessionId = claudeSessionOps.getSessionId();
+    if (currentSessionId) {
+      const thread = sessionThreadManager.getThread(currentSessionId);
       if (thread) return thread;
     }
     // Also check for any pending (placeholder-keyed) threads
@@ -523,7 +524,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
   setupSignalHandlers({
     managers,
     allHandlers,
-    getClaudeController: () => claudeController,
+    getClaudeController: () => claudeSessionOps.getController(),
+    abortAllSessions: () => claudeSessionOps.abortAll(),
     claudeSender,
     actualCategoryName,
     repoName,
@@ -614,25 +616,33 @@ async function sendMessageContentTracked(channel: any, content: MessageContent):
 }
 
 /**
- * Shared state for multi-channel support — which channel Claude output should go to.
+ * Per-channel output routing — maps channelId to the Discord channel object.
+ * Each workspace command sets its own entry without clobbering others.
  */
 // deno-lint-ignore no-explicit-any
-let responseChannel: any = null;
+const responseChannels = new Map<string, any>();
 
 /**
- * The channel where the current slash command was invoked (for thread creation).
+ * Per-channel command source — maps channelId to the channel where the command was invoked.
  */
 // deno-lint-ignore no-explicit-any
-let commandChannel: any = null;
+const commandChannels = new Map<string, any>();
 
 /**
  * Create Discord sender adapter from bot instance.
+ * Falls back to bot's default channel if no per-channel routing is set.
  */
 // deno-lint-ignore no-explicit-any
 function createDiscordSenderAdapter(bot: any): DiscordSender {
   return {
     async sendMessage(content) {
-      const channel = responseChannel || bot.getChannel();
+      // Use the most recently set response channel, or fall back to bot default
+      // In practice, thread-based flows use createChannelSenderAdapter directly
+      let channel = bot.getChannel();
+      // If there's only one active response channel, use it (backward compat for single-workspace)
+      if (responseChannels.size === 1) {
+        channel = responseChannels.values().next().value || channel;
+      }
       if (channel) {
         await sendMessageContent(channel, content);
       }
@@ -870,6 +880,7 @@ function setupSignalHandlers(ctx: {
   managers: BotManagers;
   allHandlers: AllHandlers;
   getClaudeController: () => AbortController | null;
+  abortAllSessions?: () => void;
   claudeSender: ((messages: ClaudeMessage[]) => Promise<void>) | null;
   actualCategoryName: string;
   repoName: string;
@@ -878,7 +889,7 @@ function setupSignalHandlers(ctx: {
   // deno-lint-ignore no-explicit-any
   bot: any;
 }) {
-  const { managers, allHandlers, getClaudeController, claudeSender, actualCategoryName, repoName, branchName, cleanupInterval, bot } = ctx;
+  const { managers, allHandlers, getClaudeController, abortAllSessions, claudeSender, actualCategoryName, repoName, branchName, cleanupInterval, bot } = ctx;
   const { crashHandler, healthMonitor } = managers;
   const { shell: shellHandlers, git: gitHandlers } = allHandlers;
 
@@ -890,10 +901,14 @@ function setupSignalHandlers(ctx: {
       shellHandlers.killAllProcesses();
       gitHandlers.killAllWorktreeBots();
 
-      // Cancel Claude Code session
-      const claudeController = getClaudeController();
-      if (claudeController) {
-        claudeController.abort();
+      // Cancel all active Claude Code sessions
+      if (abortAllSessions) {
+        abortAllSessions();
+      } else {
+        const claudeController = getClaudeController();
+        if (claudeController) {
+          claudeController.abort();
+        }
       }
 
       // Send shutdown message

@@ -182,8 +182,8 @@ export const additionalClaudeCommands = [
 
 export interface AdditionalClaudeHandlerDeps {
   workDir: string;
-  getClaudeController: () => AbortController | null;
-  setClaudeController: (controller: AbortController | null) => void;
+  getClaudeController: (channelId?: string) => AbortController | null;
+  setClaudeController: (controller: AbortController | null, channelId?: string) => void;
   sendClaudeMessages: (messages: any[]) => Promise<void>;
   sessionManager: any;
   crashHandler: any;

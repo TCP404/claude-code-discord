@@ -72,27 +72,30 @@ export interface MessageHistoryOps {
 }
 
 /**
- * Claude session state.
+ * Claude session state — per-channel controllers and session IDs.
  */
 export interface ClaudeSessionState {
-  /** Abort controller for cancellation */
-  controller: AbortController | null;
-  /** Current session ID */
-  sessionId: string | undefined;
+  /** Per-channel abort controllers */
+  controllers: Map<string, AbortController>;
+  /** Per-channel session IDs */
+  sessionIds: Map<string, string>;
 }
 
 /**
  * Claude session operations.
+ * Controllers and session IDs are tracked per-channel to allow concurrent workspace sessions.
  */
 export interface ClaudeSessionOps {
-  /** Get current controller */
-  getController: () => AbortController | null;
-  /** Set controller */
-  setController: (controller: AbortController | null) => void;
-  /** Get session ID */
-  getSessionId: () => string | undefined;
-  /** Set session ID */
-  setSessionId: (sessionId: string | undefined) => void;
+  /** Get controller for a channel (or any active one if channelId omitted) */
+  getController: (channelId?: string) => AbortController | null;
+  /** Set controller for a channel */
+  setController: (controller: AbortController | null, channelId?: string) => void;
+  /** Get session ID for a channel (or most recent if channelId omitted) */
+  getSessionId: (channelId?: string) => string | undefined;
+  /** Set session ID for a channel */
+  setSessionId: (sessionId: string | undefined, channelId?: string) => void;
+  /** Abort all active controllers (for shutdown) */
+  abortAll: () => void;
 }
 
 /**
@@ -275,16 +278,52 @@ export function createMessageHistory(maxSize: number = 50): MessageHistoryOps {
  * @returns Claude session operations
  */
 export function createClaudeSession(): ClaudeSessionOps {
+  const DEFAULT_KEY = '__default__';
   const state: ClaudeSessionState = {
-    controller: null,
-    sessionId: undefined,
+    controllers: new Map(),
+    sessionIds: new Map(),
   };
 
   return {
-    getController: () => state.controller,
-    setController: (controller) => { state.controller = controller; },
-    getSessionId: () => state.sessionId,
-    setSessionId: (sessionId) => { state.sessionId = sessionId; },
+    getController: (channelId?: string) => {
+      if (channelId) return state.controllers.get(channelId) ?? null;
+      // No channelId: return any active controller (for backward compat / shutdown)
+      for (const ctrl of state.controllers.values()) {
+        return ctrl;
+      }
+      return null;
+    },
+    setController: (controller, channelId?: string) => {
+      const key = channelId || DEFAULT_KEY;
+      if (controller) {
+        state.controllers.set(key, controller);
+      } else {
+        state.controllers.delete(key);
+      }
+    },
+    getSessionId: (channelId?: string) => {
+      if (channelId) return state.sessionIds.get(channelId);
+      // No channelId: return most recent (last set)
+      let last: string | undefined;
+      for (const sid of state.sessionIds.values()) {
+        last = sid;
+      }
+      return last;
+    },
+    setSessionId: (sessionId, channelId?: string) => {
+      const key = channelId || DEFAULT_KEY;
+      if (sessionId) {
+        state.sessionIds.set(key, sessionId);
+      } else {
+        state.sessionIds.delete(key);
+      }
+    },
+    abortAll: () => {
+      for (const ctrl of state.controllers.values()) {
+        ctrl.abort();
+      }
+      state.controllers.clear();
+    },
   };
 }
 
