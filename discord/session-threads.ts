@@ -253,6 +253,20 @@ export class SessionThreadManager {
     );
   }
 
+  /**
+   * List session threads whose parent channel matches the given channelId.
+   */
+  getSessionsByChannel(channelId: string): SessionThread[] {
+    const results: SessionThread[] = [];
+    for (const [sessionId, meta] of this.threads) {
+      const thread = this.threadChannels.get(sessionId);
+      if (thread && (thread as unknown as { parentId: string }).parentId === channelId) {
+        results.push(meta);
+      }
+    }
+    return results;
+  }
+
   // ───────────────────── Update ─────────────────────
 
   /**

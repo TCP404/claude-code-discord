@@ -276,6 +276,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Workspace command handlers (late-bound — needs guild/category from bot)
   const workspaceHandlers = createWorkspaceHandlers({
     workspaceManager,
+    sessionThreadManager,
     getGuild: () => bot?.getGuild?.() ?? null,
     getCategory: () => bot?.getCategory?.() ?? null,
   });

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChannelType } from "npm:discord.js@14.14.1";
 import type { WorkspaceManager } from "../core/workspace-manager.ts";
+import type { SessionThreadManager } from "../discord/session-threads.ts";
 import { sanitizeChannelName } from "../discord/utils.ts";
 
 export const workspaceCommands = [
@@ -26,11 +27,15 @@ export const workspaceCommands = [
         .addStringOption(opt =>
           opt.setName('name')
             .setDescription('Workspace name to remove')
-            .setRequired(true))),
+            .setRequired(true)))
+    .addSubcommand(sub =>
+      sub.setName('list-sessions')
+        .setDescription('List all session threads in the current channel')),
 ];
 
 export interface WorkspaceHandlerDeps {
   workspaceManager: WorkspaceManager;
+  sessionThreadManager: SessionThreadManager;
   // deno-lint-ignore no-explicit-any
   getGuild: () => any;
   // deno-lint-ignore no-explicit-any
@@ -38,7 +43,7 @@ export interface WorkspaceHandlerDeps {
 }
 
 export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
-  const { workspaceManager, getGuild, getCategory } = deps;
+  const { workspaceManager, sessionThreadManager, getGuild, getCategory } = deps;
 
   return {
     // deno-lint-ignore no-explicit-any
@@ -51,6 +56,8 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
         await handleList(ctx);
       } else if (subcommand === 'remove') {
         await handleRemove(ctx);
+      } else if (subcommand === 'list-sessions') {
+        await handleListSessions(ctx);
       }
     },
   };
@@ -178,4 +185,49 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
       }],
     });
   }
+
+  // deno-lint-ignore no-explicit-any
+  async function handleListSessions(ctx: any) {
+    const channelId = ctx.getChannelId();
+    const sessions = sessionThreadManager.getSessionsByChannel(channelId);
+
+    if (sessions.length === 0) {
+      await ctx.reply({
+        content: 'No session threads in this channel.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Sort by last activity (most recent first)
+    sessions.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+
+    const fields = sessions.map(s => {
+      const age = formatAge(s.lastActivity);
+      return {
+        name: s.threadName || s.sessionId.substring(0, 12),
+        value: `Session: \`${s.sessionId.substring(0, 12)}…\`\nThread: <#${s.threadId}>\nMessages: ${s.messageCount} | Last active: ${age}`,
+        inline: false,
+      };
+    });
+
+    await ctx.reply({
+      embeds: [{
+        color: 0x5865f2,
+        title: `Session Threads (${sessions.length})`,
+        fields: fields.slice(0, 25), // Discord embed limit
+      }],
+    });
+  }
+}
+
+function formatAge(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
