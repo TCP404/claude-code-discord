@@ -163,7 +163,8 @@ export async function sendToClaudeCode(
   // deno-lint-ignore no-explicit-any
   onStreamJson?: (json: any) => void,
   continueMode?: boolean,
-  modelOptions?: ClaudeModelOptions
+  modelOptions?: ClaudeModelOptions,
+  onTyping?: () => void
 ): Promise<{
   response: string;
   sessionId?: string;
@@ -191,6 +192,7 @@ export async function sendToClaudeCode(
 
   // Wrap with comprehensive error handling
   const executeWithErrorHandling = async (overrideModel?: string) => {
+    let typingInterval: ReturnType<typeof setInterval> | undefined;
     try {
       // Determine which model to use
       const modelToUse = overrideModel || modelOptions?.model;
@@ -332,12 +334,19 @@ export async function sendToClaudeCode(
       // Store query reference for mid-session controls (interrupt, rewind, info)
       setActiveQuery(iterator);
       clearTrackedMessages();
-      
+
       const currentMessages: SDKMessage[] = [];
       let currentResponse = "";
       let currentSessionId: string | undefined;
       let turnCount = 0;
-      
+
+      if (onTyping) {
+        try { onTyping(); } catch { /* non-critical */ }
+        typingInterval = setInterval(() => {
+          try { onTyping(); } catch { /* non-critical */ }
+        }, 8000);
+      }
+
       for await (const message of iterator) {
         // Check AbortSignal to stop iteration
         if (controller.signal.aborted) {
@@ -383,10 +392,11 @@ export async function sendToClaudeCode(
           currentSessionId = message.session_id;
         }
       }
-      
+
       // Clear active query when done
       setActiveQuery(null);
-      
+      clearInterval(typingInterval);
+
       return {
         messages: currentMessages,
         response: currentResponse,
@@ -398,6 +408,7 @@ export async function sendToClaudeCode(
     } catch (error: any) {
       // Clear active query on error
       setActiveQuery(null);
+      clearInterval(typingInterval);
       // Properly handle process exit code 143 (SIGTERM) and AbortError
       if (error.name === 'AbortError' || 
           controller.signal.aborted || 
