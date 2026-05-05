@@ -130,6 +130,18 @@ export async function deleteWorkspace(deps: AdminDeps, name: string): Promise<Re
     return json({ error: `Workspace "${name}" not found` }, 404);
   }
   await deps.workspaceManager.saveToDisk();
+
+  // Delete the Discord channel
+  const guild = deps.discordClient.guilds.cache.first();
+  if (guild) {
+    try {
+      const channel = guild.channels.cache.get(removed.channelId);
+      if (channel) await channel.delete(`Workspace "${name}" removed`);
+    } catch (err) {
+      console.warn(`[Workspace] Failed to delete channel ${removed.channelId}:`, err);
+    }
+  }
+
   return json({ ok: true, removed });
 }
 

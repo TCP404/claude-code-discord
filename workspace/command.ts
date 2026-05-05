@@ -22,15 +22,11 @@ export const workspaceCommands = [
         .setDescription('List all registered workspaces'))
     .addSubcommand(sub =>
       sub.setName('remove')
-        .setDescription('Remove a workspace mapping')
+        .setDescription('Remove a workspace and its channel')
         .addStringOption(opt =>
           opt.setName('name')
             .setDescription('Workspace name to remove')
-            .setRequired(true))
-        .addBooleanOption(opt =>
-          opt.setName('delete_channel')
-            .setDescription('Also delete the Discord channel')
-            .setRequired(false))),
+            .setRequired(true))),
 ];
 
 export interface WorkspaceHandlerDeps {
@@ -151,7 +147,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
   // deno-lint-ignore no-explicit-any
   async function handleRemove(ctx: any) {
     const name = ctx.getString('name', true);
-    const deleteChannel = ctx.getBoolean('delete_channel') ?? false;
 
     await ctx.deferReply();
 
@@ -163,15 +158,13 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
     await workspaceManager.saveToDisk();
 
-    // Optionally delete the Discord channel
-    if (deleteChannel) {
-      const guild = getGuild();
-      if (guild) {
-        try {
-          const channel = guild.channels.cache.get(removed.channelId);
-          if (channel) await channel.delete(`Workspace "${name}" removed`);
-        } catch { /* channel may already be deleted */ }
-      }
+    // Always delete the Discord channel (workspace = channel)
+    const guild = getGuild();
+    if (guild) {
+      try {
+        const channel = guild.channels.cache.get(removed.channelId);
+        if (channel) await channel.delete(`Workspace "${name}" removed`);
+      } catch { /* channel may already be deleted */ }
     }
 
     await ctx.editReply({
@@ -181,7 +174,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
         fields: [
           { name: 'Name', value: removed.name, inline: true },
           { name: 'Path', value: `\`${removed.path}\``, inline: true },
-          { name: 'Channel Deleted', value: deleteChannel ? 'Yes' : 'No', inline: true },
         ],
       }],
     });

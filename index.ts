@@ -414,7 +414,27 @@ export async function createClaudeCodeBot(config: BotConfig) {
   if (mainChannel) {
     await sessionThreadManager.restoreThreadChannels(mainChannel);
     workspaceManager.setDefaultChannelId(mainChannel.id);
+
+    // Cleanup orphan workspaces — remove entries whose channel no longer exists
+    const guild = mainChannel.guild;
+    const orphans = workspaceManager.list().filter(w => !guild.channels.cache.has(w.channelId));
+    if (orphans.length > 0) {
+      for (const o of orphans) {
+        console.log(`[Workspace] Removing orphan workspace "${o.name}" (channel ${o.channelId} no longer exists)`);
+        workspaceManager.remove(o.name);
+      }
+      await workspaceManager.saveToDisk();
+    }
   }
+
+  // Start admin web UI (localhost only)
+  const { startAdminServer } = await import("./admin/index.ts");
+  startAdminServer({
+    workspaceManager,
+    sessionThreadManager,
+    discordClient: bot.client,
+    botStartTime: Date.now(),
+  });
 
   // Create Discord sender for Claude messages
   claudeSender = createClaudeSender(createDiscordSenderAdapter(bot));
@@ -540,9 +560,7 @@ async function sendMessageContent(channel: any, content: MessageContent): Promis
       // deno-lint-ignore no-explicit-any
       const actionRow = new ActionRowBuilder<any>();
       row.components.forEach(comp => {
-        const button = new ButtonBuilder()
-          .setCustomId(comp.customId)
-          .setLabel(comp.label);
+        const button = new ButtonBuilder().setLabel(comp.label);
 
         switch (comp.style) {
           case 'primary': button.setStyle(ButtonStyle.Primary); break;
@@ -550,6 +568,12 @@ async function sendMessageContent(channel: any, content: MessageContent): Promis
           case 'success': button.setStyle(ButtonStyle.Success); break;
           case 'danger': button.setStyle(ButtonStyle.Danger); break;
           case 'link': button.setStyle(ButtonStyle.Link); break;
+        }
+
+        if (comp.style === 'link' && comp.url) {
+          button.setURL(comp.url);
+        } else if (comp.customId) {
+          button.setCustomId(comp.customId);
         }
 
         actionRow.addComponents(button);
