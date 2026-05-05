@@ -649,9 +649,13 @@ export async function createDiscordBot(
       if (message.content.startsWith('/')) return;
       if (!message.content.trim()) return;
 
-      // Only handle messages inside threads that belong to our channel
+      // Only handle messages inside threads that belong to a managed channel
       if (!message.channel.isThread()) return;
-      if (!myChannel || message.channel.parentId !== myChannel.id) return;
+      const parentId = message.channel.parentId;
+      if (!parentId) return;
+      const managedIds = dependencies.getManagedChannelIds?.();
+      const isManaged = parentId === myChannel?.id || managedIds?.has(parentId);
+      if (!isManaged) return;
 
       try {
         await onThreadMessage(message.channelId, message.content);
