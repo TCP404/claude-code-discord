@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { splitText } from "../discord/utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 import type { MessageContent, EmbedData, ComponentData } from "../discord/types.ts";
+import { generatePreview } from "./file-preview.ts";
 
 // Discord sender interface for dependency injection
 export interface DiscordSender {
@@ -218,38 +219,45 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
 
   return async function sendClaudeMessages(messages: ClaudeMessage[]) {
   for (const msg of messages) {
-    // Auto-upload: detect file paths in tool_result even when hidden, show as button
+    // Auto-upload: detect file paths in tool_result even when hidden, show preview or button
     if (msg.type === 'tool_result' && msg.content) {
-      const filePathMatches = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
+      const filePathMatches = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi) || [])];
       for (const p of filePathMatches) {
         let cleanPath = p.replace(/[`()"']/g, '');
         if (!cleanPath.startsWith('/')) {
           cleanPath = resolve(Deno.cwd(), cleanPath);
         }
         if (existsSync(cleanPath)) {
-          const fileName = cleanPath.split('/').pop() || 'attachment';
-          const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
-          console.log(`[Auto-Upload] File ready: ${cleanPath} (button: ${fileId})`);
-          visibleSentSinceStatus = true;
-          const ext = fileName.split('.').pop()?.toLowerCase() || '';
-          const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
-          await sender.sendMessage({
-            embeds: [{
-              color: 0x2b82d4,
-              title: `${isImage ? '🖼️' : '📎'} ${fileName}`,
-              timestamp: true
-            }],
-            components: [{
-              type: 'actionRow',
+          const preview = await generatePreview(cleanPath);
+          if (preview) {
+            visibleSentSinceStatus = true;
+            await sender.sendMessage(preview.content);
+          } else {
+            // Fallback to existing button behavior for unsupported types
+            const fileName = cleanPath.split('/').pop() || 'attachment';
+            const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
+            console.log(`[Auto-Upload] File ready: ${cleanPath} (button: ${fileId})`);
+            visibleSentSinceStatus = true;
+            const ext = fileName.split('.').pop()?.toLowerCase() || '';
+            const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+            await sender.sendMessage({
+              embeds: [{
+                color: 0x2b82d4,
+                title: `${isImage ? '🖼️' : '📎'} ${fileName}`,
+                timestamp: true
+              }],
               components: [{
-                type: 'button',
-                customId: `file:${fileId}`,
-                label: isImage ? '📷 查看图片' : '📥 下载文件',
-                style: 'primary'
+                type: 'actionRow',
+                components: [{
+                  type: 'button',
+                  customId: `file:${fileId}`,
+                  label: isImage ? '📷 查看图片' : '📥 下载文件',
+                  style: 'primary'
+                }]
               }]
-            }]
-          });
+            });
+          }
         }
       }
     }
@@ -274,47 +282,48 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
     switch (msg.type) {
       case 'text': {
         const chunks = splitText(msg.content, 2000);
-        
-        // Auto-detect local file paths in text messages and show as buttons
-        const filePaths = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv)/gi) || [])];
-        const fileButtons: { id: string; name: string; isImage: boolean }[] = [];
-        for (const p of filePaths) {
-          let cleanPath = p.replace(/[`()\"']/g, '');
-          if (!cleanPath.startsWith('/')) {
-            cleanPath = resolve(Deno.cwd(), cleanPath);
-          }
-          if (existsSync(cleanPath)) {
-            const fileName = cleanPath.split('/').pop() || 'attachment';
-            const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
-            const ext = fileName.split('.').pop()?.toLowerCase() || '';
-            fileButtons.push({ id: fileId, name: fileName, isImage: ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) });
-            console.log(`[Auto-Upload from text] File ready: ${cleanPath} (button: ${fileId})`);
-          }
-        }
+
+        // Auto-detect local file paths in text messages
+        const filePaths = [...new Set(msg.content.match(/(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi) || [])];
 
         for (const chunk of chunks) {
           await sender.sendMessage({ content: chunk });
         }
 
-        // Send file buttons after the text
-        for (const fb of fileButtons) {
-          await sender.sendMessage({
-            embeds: [{
-              color: 0x2b82d4,
-              title: `${fb.isImage ? '🖼️' : '📎'} ${fb.name}`,
-              timestamp: true
-            }],
-            components: [{
-              type: 'actionRow',
-              components: [{
-                type: 'button',
-                customId: `file:${fb.id}`,
-                label: fb.isImage ? '📷 查看图片' : '📥 下载文件',
-                style: 'primary'
-              }]
-            }]
-          });
+        // Show file previews after the text
+        for (const p of filePaths) {
+          let cleanPath = p.replace(/[`()"']/g, '');
+          if (!cleanPath.startsWith('/')) {
+            cleanPath = resolve(Deno.cwd(), cleanPath);
+          }
+          if (existsSync(cleanPath)) {
+            const preview = await generatePreview(cleanPath);
+            if (preview) {
+              await sender.sendMessage(preview.content);
+            } else {
+              const fileName = cleanPath.split('/').pop() || 'attachment';
+              const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
+              const ext = fileName.split('.').pop()?.toLowerCase() || '';
+              const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+              await sender.sendMessage({
+                embeds: [{
+                  color: 0x2b82d4,
+                  title: `${isImage ? '🖼️' : '📎'} ${fileName}`,
+                  timestamp: true
+                }],
+                components: [{
+                  type: 'actionRow',
+                  components: [{
+                    type: 'button',
+                    customId: `file:${fileId}`,
+                    label: isImage ? '📷 查看图片' : '📥 下载文件',
+                    style: 'primary'
+                  }]
+                }]
+              });
+            }
+          }
         }
         break;
       }
