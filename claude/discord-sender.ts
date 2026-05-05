@@ -4,6 +4,7 @@ import { splitText } from "../discord/utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 import type { MessageContent, EmbedData, ComponentData } from "../discord/types.ts";
 import { generatePreview } from "./file-preview.ts";
+import { getUsage } from "./session-usage.ts";
 
 // Discord sender interface for dependency injection
 export interface DiscordSender {
@@ -180,8 +181,9 @@ function toStatusLine(msg: ClaudeMessage): string | null {
 }
 
 // Create sendClaudeMessages function with dependency injection
-export function createClaudeSender(sender: DiscordSender, options?: { isThread?: boolean }) {
+export function createClaudeSender(sender: DiscordSender, options?: { isThread?: boolean; sessionId?: string }) {
   const isThread = options?.isThread ?? false;
+  let currentSessionId = options?.sessionId;
   // Live status message — single message that gets edited in place
   let statusMsg: TrackedMessage | null = null;
   let statusStartTime = 0;
@@ -217,7 +219,7 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
     }
   }
 
-  return async function sendClaudeMessages(messages: ClaudeMessage[]) {
+  const sendClaudeMessages = async function(messages: ClaudeMessage[]) {
   for (const msg of messages) {
     // Auto-upload: detect file paths in tool_result even when hidden, show preview or button
     if (msg.type === 'tool_result' && msg.content) {
@@ -515,10 +517,18 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
           embedData.fields!.push({ name: 'Model', value: msg.metadata.model, inline: true });
         }
         if (msg.metadata?.total_cost_usd !== undefined) {
-          embedData.fields!.push({ name: 'Cost', value: `$${msg.metadata.total_cost_usd.toFixed(4)}`, inline: true });
+          const sessionUsage = currentSessionId ? getUsage(currentSessionId) : undefined;
+          const costStr = sessionUsage && sessionUsage.queryCount > 1
+            ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${sessionUsage.totalCost.toFixed(4)} / ${sessionUsage.queryCount} queries)`
+            : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
+          embedData.fields!.push({ name: 'Cost', value: costStr, inline: true });
         }
         if (msg.metadata?.duration_ms !== undefined) {
-          embedData.fields!.push({ name: 'Duration', value: `${(msg.metadata.duration_ms / 1000).toFixed(2)}s`, inline: true });
+          const sessionUsage = currentSessionId ? getUsage(currentSessionId) : undefined;
+          const durStr = sessionUsage && sessionUsage.queryCount > 1
+            ? `${(msg.metadata.duration_ms / 1000).toFixed(2)}s (session: ${(sessionUsage.totalDuration / 1000).toFixed(1)}s)`
+            : `${(msg.metadata.duration_ms / 1000).toFixed(2)}s`;
+          embedData.fields!.push({ name: 'Duration', value: durStr, inline: true });
         }
         
         // Display stop reason — why Claude finished (v0.2.31+ SDK feature)
@@ -659,5 +669,10 @@ export function createClaudeSender(sender: DiscordSender, options?: { isThread?:
       }
     }
   }
+  };
+
+  return {
+    send: sendClaudeMessages,
+    setSessionId: (id: string) => { currentSessionId = id; }
   };
 }
