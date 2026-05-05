@@ -315,4 +315,18 @@ export class SessionThreadManager {
     if (removed > 0) this.schedulePersist();
     return removed;
   }
+
+  /**
+   * Delete a specific session by ID.
+   * Returns the thread ID if found (caller can use it to delete the Discord thread).
+   */
+  deleteSession(sessionId: string): string | undefined {
+    const meta = this.threads.get(sessionId);
+    if (!meta) return undefined;
+    const threadId = meta.threadId;
+    this.threads.delete(sessionId);
+    this.threadChannels.delete(sessionId);
+    this.schedulePersist();
+    return threadId;
+  }
 }

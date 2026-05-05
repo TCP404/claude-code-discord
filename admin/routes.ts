@@ -174,6 +174,27 @@ export async function cleanupSessions(deps: AdminDeps, req: Request): Promise<Re
   return json({ ok: true, removed });
 }
 
+export async function deleteSession(deps: AdminDeps, sessionId: string): Promise<Response> {
+  const threadId = deps.sessionThreadManager.deleteSession(sessionId);
+  if (!threadId) {
+    return json({ error: "Session not found" }, 404);
+  }
+
+  // Try to delete the Discord thread as well
+  let threadDeleted = false;
+  try {
+    const channel = await deps.discordClient.channels.fetch(threadId);
+    if (channel) {
+      await channel.delete();
+      threadDeleted = true;
+    }
+  } catch {
+    // Thread may already be deleted in Discord — that's fine
+  }
+
+  return json({ ok: true, threadId, threadDeleted });
+}
+
 // ─── Channels ─────────────────────────────────────────
 
 export function listChannels(deps: AdminDeps): Response {

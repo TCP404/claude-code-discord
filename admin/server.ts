@@ -11,6 +11,7 @@ import {
   type AdminDeps,
   cleanupSessions,
   createWorkspace,
+  deleteSession,
   deleteWorkspace,
   getStatus,
   listChannels,
@@ -73,6 +74,13 @@ export function startAdminServer(options: AdminServerOptions): Deno.HttpServer |
     }
     if (path === "/api/sessions/cleanup" && method === "POST") {
       return await cleanupSessions(deps, req);
+    }
+
+    // /api/sessions/:id
+    const sessMatch = path.match(/^\/api\/sessions\/(.+)$/);
+    if (sessMatch && method === "DELETE") {
+      const sessionId = decodeURIComponent(sessMatch[1]);
+      return await deleteSession(deps, sessionId);
     }
 
     if (path === "/api/channels" && method === "GET") {

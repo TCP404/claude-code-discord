@@ -77,7 +77,7 @@ tr:hover { background: #2d2d44; }
     <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>24h)</button>
   </div>
   <table>
-    <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th></tr></thead>
+    <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th></th></tr></thead>
     <tbody id="sess-tbody"></tbody>
   </table>
 </div>
@@ -193,14 +193,24 @@ async function loadSessions() {
   const res = await fetch('/api/sessions');
   const list = await res.json();
   const tbody = $('#sess-tbody');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No active sessions</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No active sessions</td></tr>'; return; }
   tbody.innerHTML = list.map(s => \`<tr>
     <td>\${s.threadName}</td>
     <td class="mono">\${s.sessionId.substring(0, 8)}...</td>
     <td>\${timeAgo(s.createdAt)}</td>
     <td>\${timeAgo(s.lastActivity)}</td>
     <td>\${s.messageCount}</td>
+    <td><button class="btn btn-danger" onclick="deleteSession('\${s.sessionId}')">Delete</button></td>
   </tr>\`).join('');
+}
+
+async function deleteSession(sessionId) {
+  if (!confirm('Delete this session and its Discord thread?')) return;
+  const res = await fetch('/api/sessions/' + encodeURIComponent(sessionId), { method: 'DELETE' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error, true); return; }
+  toast(d.threadDeleted ? 'Session and thread deleted' : 'Session removed (thread already gone)');
+  loadSessions();
 }
 
 async function cleanupSessions() {
