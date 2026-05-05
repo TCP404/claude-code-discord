@@ -1,11 +1,11 @@
 // File preview generation for different file types
 import { existsSync } from "node:fs";
-import { extname, basename } from "node:path";
+import { basename, extname } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import type { MessageContent } from "../discord/types.ts";
 
 export interface PreviewResult {
-  type: 'inline_file' | 'embed' | 'button';
+  type: "inline_file" | "embed" | "button";
   content: MessageContent;
 }
 
@@ -26,10 +26,10 @@ export async function generatePreview(filePath: string): Promise<PreviewResult |
   const fileSizeBytes = stats.size;
 
   // Images: inline if under 10MB
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
     if (fileSizeBytes < 10 * 1024 * 1024) {
       return {
-        type: 'inline_file',
+        type: "inline_file",
         content: {
           files: [{
             path: filePath,
@@ -42,12 +42,34 @@ export async function generatePreview(filePath: string): Promise<PreviewResult |
   }
 
   // PDF: Try to convert first page to PNG on macOS
-  if (ext === 'pdf') {
+  if (ext === "pdf") {
     return await previewPdf(filePath, fileName);
   }
 
   // Code files: show first 20 lines as embed
-  const codeExts = ['ts', 'js', 'py', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'sh', 'sql', 'json', 'yaml', 'yml', 'toml', 'md', 'html', 'css', 'rb', 'swift', 'kt'];
+  const codeExts = [
+    "ts",
+    "js",
+    "py",
+    "go",
+    "rs",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "sh",
+    "sql",
+    "json",
+    "yaml",
+    "yml",
+    "toml",
+    "md",
+    "html",
+    "css",
+    "rb",
+    "swift",
+    "kt",
+  ];
   if (codeExts.includes(ext)) {
     if (fileSizeBytes > 100 * 1024) {
       return null; // Skip large files
@@ -56,13 +78,13 @@ export async function generatePreview(filePath: string): Promise<PreviewResult |
   }
 
   // CSV: parse first 5 rows into markdown table
-  if (ext === 'csv') {
+  if (ext === "csv") {
     if (fileSizeBytes > 50 * 1024) {
       // For large CSVs, just show row count
-      const content = await readFile(filePath, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
+      const content = await readFile(filePath, "utf-8");
+      const lines = content.split("\n").filter((line) => line.trim());
       return {
-        type: 'embed',
+        type: "embed",
         content: {
           embeds: [{
             title: `📊 ${fileName}`,
@@ -95,7 +117,7 @@ async function previewPdf(filePath: string, fileName: string): Promise<PreviewRe
 
     if (result.success && existsSync("/tmp/pdf-preview.png")) {
       return {
-        type: 'inline_file',
+        type: "inline_file",
         content: {
           embeds: [{
             title: `📄 ${fileName} (first page)`,
@@ -114,7 +136,7 @@ async function previewPdf(filePath: string, fileName: string): Promise<PreviewRe
 
   // Fallback: text embed
   return {
-    type: 'embed',
+    type: "embed",
     content: {
       embeds: [{
         title: `📄 ${fileName}`,
@@ -128,17 +150,23 @@ async function previewPdf(filePath: string, fileName: string): Promise<PreviewRe
 /**
  * Preview code file by showing first 20 lines in a fenced code block.
  */
-async function previewCode(filePath: string, fileName: string, ext: string): Promise<PreviewResult> {
+async function previewCode(
+  filePath: string,
+  fileName: string,
+  ext: string,
+): Promise<PreviewResult> {
   try {
-    const content = await readFile(filePath, 'utf-8');
-    const lines = content.split('\n');
-    const preview = lines.slice(0, 20).join('\n');
+    const content = await readFile(filePath, "utf-8");
+    const lines = content.split("\n");
+    const preview = lines.slice(0, 20).join("\n");
     const hasMore = lines.length > 20;
 
-    const description = `\`\`\`${ext}\n${preview}\n\`\`\`${hasMore ? `\n\n...and ${lines.length - 20} more lines` : ''}`;
+    const description = `\`\`\`${ext}\n${preview}\n\`\`\`${
+      hasMore ? `\n\n...and ${lines.length - 20} more lines` : ""
+    }`;
 
     return {
-      type: 'embed',
+      type: "embed",
       content: {
         embeds: [{
           title: `📝 ${fileName}`,
@@ -149,7 +177,7 @@ async function previewCode(filePath: string, fileName: string, ext: string): Pro
     };
   } catch {
     return {
-      type: 'embed',
+      type: "embed",
       content: {
         embeds: [{
           title: `📝 ${fileName}`,
@@ -166,13 +194,13 @@ async function previewCode(filePath: string, fileName: string, ext: string): Pro
  */
 async function previewCsv(filePath: string, fileName: string): Promise<PreviewResult> {
   try {
-    const content = await readFile(filePath, 'utf-8');
-    const lines = content.split('\n').filter(line => line.trim());
+    const content = await readFile(filePath, "utf-8");
+    const lines = content.split("\n").filter((line) => line.trim());
     const rows = lines.slice(0, 5).map(parseCsvLine);
 
     if (rows.length === 0) {
       return {
-        type: 'embed',
+        type: "embed",
         content: {
           embeds: [{
             title: `📊 ${fileName}`,
@@ -188,7 +216,7 @@ async function previewCsv(filePath: string, fileName: string): Promise<PreviewRe
     const description = `${table}\n\nTotal rows: ${totalRows}`;
 
     return {
-      type: 'embed',
+      type: "embed",
       content: {
         embeds: [{
           title: `📊 ${fileName}`,
@@ -199,7 +227,7 @@ async function previewCsv(filePath: string, fileName: string): Promise<PreviewRe
     };
   } catch {
     return {
-      type: 'embed',
+      type: "embed",
       content: {
         embeds: [{
           title: `📊 ${fileName}`,
@@ -215,14 +243,14 @@ async function previewCsv(filePath: string, fileName: string): Promise<PreviewRe
  * Convert CSV rows to a markdown table.
  */
 function csvToMarkdownTable(rows: string[][]): string {
-  if (rows.length === 0) return '';
+  if (rows.length === 0) return "";
 
   const colCount = rows[0].length;
-  const header = rows[0].map(cell => cell.slice(0, 20)).join(' | '); // Truncate cells
-  const separator = Array(colCount).fill('---').join(' | ');
-  const body = rows.slice(1).map(row =>
-    row.map(cell => cell.slice(0, 20)).join(' | ')
-  ).join('\n');
+  const header = rows[0].map((cell) => cell.slice(0, 20)).join(" | "); // Truncate cells
+  const separator = Array(colCount).fill("---").join(" | ");
+  const body = rows.slice(1).map((row) => row.map((cell) => cell.slice(0, 20)).join(" | ")).join(
+    "\n",
+  );
 
   return `${header}\n${separator}\n${body}`;
 }
@@ -233,7 +261,7 @@ function csvToMarkdownTable(rows: string[][]): string {
  */
 function parseCsvLine(line: string): string[] {
   const fields: string[] = [];
-  let current = '';
+  let current = "";
   let inQuotes = false;
 
   for (let i = 0; i < line.length; i++) {
@@ -241,9 +269,9 @@ function parseCsvLine(line: string): string[] {
 
     if (char === '"') {
       inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === "," && !inQuotes) {
       fields.push(current.trim());
-      current = '';
+      current = "";
     } else {
       current += char;
     }
