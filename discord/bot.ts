@@ -14,12 +14,14 @@ import {
   TextChannel,
   EmbedBuilder,
   Message,
+  MessageFlags,
   AttachmentBuilder,
 } from "npm:discord.js@14.14.1";
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
 import { pendingFileUploads } from "../claude/index.ts";
+import { isVoiceTranscriptionEnabled, transcribeAudio } from "../voice/transcribe.ts";
 import { checkCommandPermission } from "../core/rbac.ts";
 import { SETTINGS_ACTIONS, SETTINGS_VALUES } from "../settings/unified-settings.ts";
 import { BOT_VERSION } from "../util/version-check.ts";
@@ -620,21 +622,48 @@ export async function createDiscordBot(
     }
   });
 
-  // Auto-resume: plain text messages in session threads trigger Claude
+  // Auto-resume: plain text or voice messages in session threads trigger Claude
   if (dependencies.onThreadMessage) {
     const onThreadMessage = dependencies.onThreadMessage;
     client.on(Events.MessageCreate, async (message: Message) => {
       // Ignore bot messages and slash commands
       if (message.author.bot) return;
       if (message.content.startsWith('/')) return;
-      if (!message.content.trim()) return;
 
       // Only handle messages inside threads that belong to our channel
       if (!message.channel.isThread()) return;
       if (!myChannel || message.channel.parentId !== myChannel.id) return;
 
+      // Check if this is a voice message
+      const isVoiceMessage = message.flags.has(MessageFlags.IsVoiceMessage);
+      let textContent = message.content.trim();
+
+      if (isVoiceMessage) {
+        const audioAttachment = message.attachments.find(a =>
+          a.contentType?.startsWith("audio/")
+        );
+        if (!audioAttachment) return;
+
+        if (!isVoiceTranscriptionEnabled()) {
+          await message.reply("⚠️ Voice transcription is not configured. Set `OPENAI_API_KEY` to enable.");
+          return;
+        }
+
+        try {
+          await message.react("🎙️");
+          textContent = await transcribeAudio(audioAttachment.url);
+          await message.reply(`🎙️ *Transcribed:* ${textContent}`);
+        } catch (error) {
+          console.error('[Voice] Transcription failed:', error);
+          await message.reply("❌ Voice transcription failed. Please try again or type your message.");
+          return;
+        }
+      }
+
+      if (!textContent) return;
+
       try {
-        await onThreadMessage(message.channelId, message.content);
+        await onThreadMessage(message.channelId, textContent);
       } catch (error) {
         console.error('[ThreadMessage] Error handling thread message:', error);
       }
