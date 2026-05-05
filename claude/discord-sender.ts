@@ -4,7 +4,7 @@ import { splitText } from "../discord/utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 import type { ComponentData, EmbedData, MessageContent } from "../discord/types.ts";
 import { generatePreview } from "./file-preview.ts";
-import { getUsage } from "./session-usage.ts";
+import { getUsage, recordUsage } from "./session-usage.ts";
 
 // Discord sender interface for dependency injection
 export interface DiscordSender {
@@ -563,6 +563,7 @@ export function createClaudeSender(
             });
           }
           if (msg.metadata?.session_id) {
+            if (!currentSessionId) currentSessionId = msg.metadata.session_id;
             embedData.fields!.push({
               name: "Session ID",
               value: `\`${msg.metadata.session_id}\``,
@@ -572,8 +573,13 @@ export function createClaudeSender(
           if (msg.metadata?.model) {
             embedData.fields!.push({ name: "Model", value: msg.metadata.model, inline: true });
           }
+          // Record usage NOW so cumulative data is available for the embed below
+          const activeSessionId = currentSessionId || msg.metadata?.session_id;
+          if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
+            recordUsage(activeSessionId, msg.metadata.total_cost_usd, msg.metadata?.duration_ms ?? 0);
+          }
           if (msg.metadata?.total_cost_usd !== undefined) {
-            const sessionUsage = currentSessionId ? getUsage(currentSessionId) : undefined;
+            const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
             const costStr = sessionUsage && sessionUsage.queryCount > 1
               ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
                 sessionUsage.totalCost.toFixed(4)
@@ -582,7 +588,7 @@ export function createClaudeSender(
             embedData.fields!.push({ name: "Cost", value: costStr, inline: true });
           }
           if (msg.metadata?.duration_ms !== undefined) {
-            const sessionUsage = currentSessionId ? getUsage(currentSessionId) : undefined;
+            const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
             const durStr = sessionUsage && sessionUsage.queryCount > 1
               ? `${(msg.metadata.duration_ms / 1000).toFixed(2)}s (session: ${
                 (sessionUsage.totalDuration / 1000).toFixed(1)

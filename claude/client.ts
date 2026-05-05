@@ -11,7 +11,6 @@ import {
 import { clearTrackedMessages, setActiveQuery, trackMessageId } from "./query-manager.ts";
 import type { AskUserCallback, AskUserQuestionInput } from "./user-question.ts";
 import type { PermissionRequestCallback } from "./permission-request.ts";
-import { recordUsage } from "./session-usage.ts";
 import * as path from "https://deno.land/std@0.208.0/path/mod.ts";
 
 // Load MCP server configs from .claude/mcp.json
@@ -510,17 +509,6 @@ export async function sendToClaudeCode(
     // Extract permission denials from result messages
     const permissionDenials = extractPermissionDenials(messages);
 
-    // Record usage for this query
-    const finalCost = "total_cost_usd" in lastMessage
-      ? lastMessage.total_cost_usd as number
-      : undefined;
-    const finalDuration = "duration_ms" in lastMessage
-      ? lastMessage.duration_ms as number
-      : undefined;
-    if (resultSessionId && finalCost !== undefined) {
-      recordUsage(resultSessionId, finalCost, finalDuration ?? 0);
-    }
-
     return {
       response: fullResponse || "No response received",
       sessionId: resultSessionId,
@@ -548,17 +536,6 @@ export async function sendToClaudeCode(
         // Get information from the last message
         const lastRetryMessage = retryResult.messages[retryResult.messages.length - 1];
         const retryDenials = extractPermissionDenials(retryResult.messages);
-
-        // Record usage for retry query
-        const retryCost = "total_cost_usd" in lastRetryMessage
-          ? lastRetryMessage.total_cost_usd as number
-          : undefined;
-        const retryDuration = "duration_ms" in lastRetryMessage
-          ? lastRetryMessage.duration_ms as number
-          : undefined;
-        if (retryResult.sessionId && retryCost !== undefined) {
-          recordUsage(retryResult.sessionId, retryCost, retryDuration ?? 0);
-        }
 
         return {
           response: retryResult.response || "No response received",
