@@ -353,7 +353,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
     // Auto-resume: plain text in session threads triggers Claude
     onThreadMessage: async (threadChannelId: string, content: string) => {
       const sessionId = sessionThreadManager.findSessionByThreadId(threadChannelId);
-      if (!sessionId) return;
+      if (!sessionId) {
+        console.warn(`[ThreadMessage] No session found for thread ${threadChannelId}, ignoring`);
+        return;
+      }
 
       // Skip if the session is still being created or failed before getting a real ID
       if (sessionId.startsWith('pending_') || sessionId.startsWith('failed_')) {
@@ -362,7 +365,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
 
       const thread = sessionThreadManager.getThread(sessionId);
-      if (!thread) return;
+      if (!thread) {
+        console.warn(`[ThreadMessage] Thread channel not resolved for session ${sessionId}, cannot resume`);
+        return;
+      }
 
       // Post a "thinking" indicator
       const thinkingMsg = await thread.send('`Claude is thinking...`');
@@ -394,6 +400,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
         if (result.sessionId) {
           claudeSessionId = result.sessionId;
         }
+      } catch (error) {
+        console.error(`[ThreadMessage] Failed to resume session ${sessionId}:`, error);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
       } finally {
         claudeController = null;
         try { await thinkingMsg.delete(); } catch { /* ignore */ }

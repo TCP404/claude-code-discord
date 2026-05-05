@@ -13,7 +13,8 @@ export interface EmbedData {
 
 export interface ComponentData {
   type: 'button';
-  customId: string;
+  customId?: string;
+  url?: string;
   label: string;
   style: 'primary' | 'secondary' | 'success' | 'danger' | 'link';
   disabled?: boolean;

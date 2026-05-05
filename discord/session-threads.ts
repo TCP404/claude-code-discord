@@ -104,19 +104,22 @@ export class SessionThreadManager {
 
   /**
    * After Discord client is ready, resolve threadId → ThreadChannel for restored sessions.
+   * Uses guild.channels.fetch() so threads in ANY channel can be restored (multi-workspace).
    * Sessions whose threads can't be found are removed.
    */
   async restoreThreadChannels(channel: TextChannel): Promise<number> {
     let restored = 0;
     const toRemove: string[] = [];
+    const guild = channel.guild;
 
     for (const [sessionId, meta] of this.threads) {
       // Skip if we already have a live channel reference
       if (this.threadChannels.has(sessionId)) continue;
       try {
-        const thread = await channel.threads.fetch(meta.threadId);
-        if (thread) {
-          this.threadChannels.set(sessionId, thread);
+        // Fetch from guild directly — works for threads in any channel
+        const fetched = await guild.channels.fetch(meta.threadId);
+        if (fetched && fetched.isThread()) {
+          this.threadChannels.set(sessionId, fetched as unknown as ThreadChannel);
           restored++;
         } else {
           toRemove.push(sessionId);

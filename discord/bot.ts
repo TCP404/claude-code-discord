@@ -61,9 +61,7 @@ function convertMessageContent(content: MessageContent): any {
     payload.components = content.components.map(row => {
       const actionRow = new ActionRowBuilder<ButtonBuilder>();
       row.components.forEach(comp => {
-        const button = new ButtonBuilder()
-          .setCustomId(comp.customId)
-          .setLabel(comp.label);
+        const button = new ButtonBuilder().setLabel(comp.label);
 
         switch (comp.style) {
           case 'primary': button.setStyle(ButtonStyle.Primary); break;
@@ -71,6 +69,12 @@ function convertMessageContent(content: MessageContent): any {
           case 'success': button.setStyle(ButtonStyle.Success); break;
           case 'danger': button.setStyle(ButtonStyle.Danger); break;
           case 'link': button.setStyle(ButtonStyle.Link); break;
+        }
+
+        if (comp.style === 'link' && comp.url) {
+          button.setURL(comp.url);
+        } else if (comp.customId) {
+          button.setCustomId(comp.customId);
         }
 
         actionRow.addComponents(button);
@@ -619,6 +623,7 @@ export async function createDiscordBot(
               { type: 'button', customId: 'startup:sessions', label: '📂 Sessions', style: 'secondary' },
               { type: 'button', customId: 'workflow:git-status', label: '📋 Git Status', style: 'secondary' },
               { type: 'button', customId: 'startup:system-info', label: '💻 System Info', style: 'secondary' },
+              { type: 'button', url: `http://localhost:${Number(Deno.env.get("ADMIN_PORT")) || 7860}`, label: '🌐 Admin Web', style: 'link' },
             ]
           }]
         }));
@@ -649,13 +654,8 @@ export async function createDiscordBot(
       if (message.content.startsWith('/')) return;
       if (!message.content.trim()) return;
 
-      // Only handle messages inside threads that belong to a managed channel
+      // Only handle messages inside threads
       if (!message.channel.isThread()) return;
-      const parentId = message.channel.parentId;
-      if (!parentId) return;
-      const managedIds = dependencies.getManagedChannelIds?.();
-      const isManaged = parentId === myChannel?.id || managedIds?.has(parentId);
-      if (!isManaged) return;
 
       try {
         await onThreadMessage(message.channelId, message.content);
