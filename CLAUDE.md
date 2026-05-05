@@ -16,12 +16,14 @@ Discord slash command
 
 Key directories:
 - `claude/` — SDK integration: query execution, streaming, model fetching, permissions, MCP loading
-- `core/` — Bot infrastructure: command routing, signal handling, RBAC, button handlers
+- `core/` — Bot infrastructure: command routing, signal handling, RBAC, button handlers, workspace manager
 - `discord/` — Discord layer: message formatting, session-thread persistence, pagination
 - `settings/` — Unified settings state and `/settings` command handlers
 - `system/` — System monitoring commands (processes, disk, network, etc.)
 - `shell/` — Shell command execution via Discord
 - `agent/` — Built-in agent definitions (code-review, debug, architect, etc.)
+- `workspace/` — Multi-workspace slash command handlers (`/workspace add|remove|list`)
+- `admin/` — Local HTTP admin server (localhost:7860) for workspace management UI
 
 ## Config Injection
 
@@ -49,6 +51,16 @@ npx deno lint           # lint
 npx deno fmt            # format
 ```
 
+## Multi-Workspace
+
+A single bot instance can manage multiple project channels, each with its own working directory:
+
+- **Workspace registry:** `core/workspace-manager.ts` — maps channelId → workDir, persisted in `.bot-data/workspaces.json`
+- **Commands:** `/workspace add <name> <path>`, `/workspace remove <name>`, `/workspace list`
+- **Admin UI:** HTTP server on `localhost:7860` for workspace CRUD (no auth, localhost only)
+- **Per-channel session state:** `ClaudeSessionOps` tracks controllers and session IDs per-channel via Maps (not global singletons), enabling safe concurrent sessions across workspaces
+- **Thread auto-resume:** Works in all workspace channels, resolves workDir from the thread's parent channel
+
 ## Code Conventions
 
 - TypeScript strict mode, Deno APIs (not Node.js unless unavoidable)
@@ -57,13 +69,15 @@ npx deno fmt            # format
 - Permission mode default: `acceptEdits` (allows file edits, prompts for others)
 - Hidden message types: system, tool_use, tool_result, tool_progress are hidden by default, shown via `/show-*` toggle commands
 - Session persistence: thread mappings stored in `.bot-data/session-threads.json`
+- Workspace persistence: workspace registry stored in `.bot-data/workspaces.json`
 
 ## Important Patterns
 
 - **MCP auto-allow:** Any tool starting with `mcp__` is auto-approved in `canUseTool` callback (`claude/client.ts:263`)
 - **Status line:** Single editable Discord message that tracks hidden tool activity, auto-repositions below new visible content (`claude/discord-sender.ts`)
-- **Thread auto-resume:** Plain text in a session thread triggers automatic Claude resume via Message Content Intent (`index.ts`)
-- **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown
+- **Thread auto-resume:** Plain text in a session thread triggers automatic Claude resume via Message Content Intent (`index.ts`). Works across all workspace channels.
+- **Workspace routing:** `workspaceManager.resolve(channelId)` resolves the correct working directory for any channel. Falls back to default `WORK_DIR`.
+- **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown (calls `abortAll()` to cancel all active sessions)
 - **Auto-upload screenshots:** After generating a screenshot or exported file, the bot auto-detects the file path and shows a clickable button in Discord. **Always save screenshots to `./screenshots/`**, e.g.:
   ```
   screencapture -x ./screenshots/screenshot.png

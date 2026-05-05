@@ -104,19 +104,22 @@ export class SessionThreadManager {
 
   /**
    * After Discord client is ready, resolve threadId → ThreadChannel for restored sessions.
+   * Uses guild.channels.fetch() so threads in ANY channel can be restored (multi-workspace).
    * Sessions whose threads can't be found are removed.
    */
   async restoreThreadChannels(channel: TextChannel): Promise<number> {
     let restored = 0;
     const toRemove: string[] = [];
+    const guild = channel.guild;
 
     for (const [sessionId, meta] of this.threads) {
       // Skip if we already have a live channel reference
       if (this.threadChannels.has(sessionId)) continue;
       try {
-        const thread = await channel.threads.fetch(meta.threadId);
-        if (thread) {
-          this.threadChannels.set(sessionId, thread);
+        // Fetch from guild directly — works for threads in any channel
+        const fetched = await guild.channels.fetch(meta.threadId);
+        if (fetched && fetched.isThread()) {
+          this.threadChannels.set(sessionId, fetched as unknown as ThreadChannel);
           restored++;
         } else {
           toRemove.push(sessionId);
@@ -250,6 +253,20 @@ export class SessionThreadManager {
     );
   }
 
+  /**
+   * List session threads whose parent channel matches the given channelId.
+   */
+  getSessionsByChannel(channelId: string): SessionThread[] {
+    const results: SessionThread[] = [];
+    for (const [sessionId, meta] of this.threads) {
+      const thread = this.threadChannels.get(sessionId);
+      if (thread && (thread as unknown as { parentId: string }).parentId === channelId) {
+        results.push(meta);
+      }
+    }
+    return results;
+  }
+
   // ───────────────────── Update ─────────────────────
 
   /**
@@ -311,5 +328,19 @@ export class SessionThreadManager {
     }
     if (removed > 0) this.schedulePersist();
     return removed;
+  }
+
+  /**
+   * Delete a specific session by ID.
+   * Returns the thread ID if found (caller can use it to delete the Discord thread).
+   */
+  deleteSession(sessionId: string): string | undefined {
+    const meta = this.threads.get(sessionId);
+    if (!meta) return undefined;
+    const threadId = meta.threadId;
+    this.threads.delete(sessionId);
+    this.threadChannels.delete(sessionId);
+    this.schedulePersist();
+    return threadId;
   }
 }
