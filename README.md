@@ -33,6 +33,8 @@ Run Claude Code through Discord without giving up anything you've already config
 | Granular sandbox | Full SDK sandbox with network rules, filesystem ACLs, and excluded commands |
 | Role-based access control | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles |
 | Interactive permission prompts | Allow/Deny buttons when Claude wants to use unapproved tools |
+| Multi-workspace | Single bot instance manages multiple project channels, each with its own working directory |
+| Admin UI | Local HTTP server (localhost:7860) for workspace management |
 | Channel monitoring | Watch a channel for bot/webhook messages and auto-investigate in a thread |
 | Audit trail | Channel history provides a searchable record of who ran what and when |
 
@@ -195,3 +197,21 @@ Automatically investigate alerts from other bots or webhooks. When a monitored b
    - Read Messages
    - Create Public Threads
    - Send Messages in Threads
+
+## Multi-Workspace
+
+A single bot instance can serve multiple project directories, each mapped to its own Discord channel.
+
+### Commands
+
+```
+/workspace add name:myproject path:/home/user/projects/myproject
+/workspace remove name:myproject
+/workspace list
+```
+
+Adding a workspace creates a dedicated Discord channel under the bot's category. All slash commands and thread auto-resume in that channel use the mapped working directory.
+
+### Admin UI
+
+A local HTTP server runs on `localhost:7860` for workspace management (create, delete, list workspaces, view sessions). No authentication — accessible only from localhost.

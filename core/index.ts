@@ -113,3 +113,9 @@ export {
   createShellCommandHandlers,
   createUtilityCommandHandlers,
 } from "./git-shell-handlers.ts";
+
+// Workspace manager
+export {
+  type WorkspaceEntry,
+  WorkspaceManager,
+} from "./workspace-manager.ts";

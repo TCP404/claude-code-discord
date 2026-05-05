@@ -90,8 +90,8 @@ export const enhancedClaudeCommands = [
 
 export interface EnhancedClaudeHandlerDeps {
   workDir: string;
-  getClaudeController: () => AbortController | null;
-  setClaudeController: (controller: AbortController | null) => void;
+  getClaudeController: (channelId?: string) => AbortController | null;
+  setClaudeController: (controller: AbortController | null, channelId?: string) => void;
   setClaudeSessionId: (sessionId: string | undefined) => void;
   sendClaudeMessages: (messages: any[]) => Promise<void>;
   sessionManager: any;
