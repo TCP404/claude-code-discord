@@ -232,6 +232,23 @@ export function createClaudeSender(
     } catch { /* message may have been deleted */ }
   }
 
+  async function finalizeStatus(content: string) {
+    if (!sender.sendTracked) return;
+    try {
+      if (statusMsg && !visibleSentSinceStatus) {
+        await statusMsg.edit({ content });
+      } else {
+        if (statusMsg) {
+          try {
+            await statusMsg.delete();
+          } catch { /* ignore */ }
+        }
+        statusMsg = await sender.sendTracked({ content });
+        visibleSentSinceStatus = false;
+      }
+    } catch { /* ignore */ }
+  }
+
   async function clearStatus() {
     if (statusMsg) {
       try {
@@ -296,8 +313,35 @@ export function createClaudeSender(
       if (msg.type === "system") {
         const subkey = msg.metadata?.subtype === "completion" ? "system:completion" : "system";
         if (hiddenMessageTypes.has(subkey)) {
-          const line = toStatusLine(msg);
-          if (line) await updateStatus(line);
+          // Special handling for completion: record usage and show cost in status line
+          if (msg.metadata?.subtype === "completion") {
+            const activeSessionId = currentSessionId || msg.metadata?.session_id;
+            if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
+              recordUsage(
+                activeSessionId,
+                msg.metadata.total_cost_usd,
+                msg.metadata?.duration_ms ?? 0,
+              );
+            }
+            const showCost = Deno.env.get("SHOW_COST") !== "false";
+            if (showCost && msg.metadata?.total_cost_usd !== undefined) {
+              const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
+              const costPart = sessionUsage && sessionUsage.queryCount > 1
+                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
+                  sessionUsage.totalCost.toFixed(4)
+                } / ${sessionUsage.queryCount} queries)`
+                : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
+              const durPart = msg.metadata?.duration_ms !== undefined
+                ? ` | ${(msg.metadata.duration_ms / 1000).toFixed(1)}s`
+                : "";
+              await finalizeStatus(`✅ Complete | ${costPart}${durPart}`);
+            } else {
+              await clearStatus();
+            }
+          } else {
+            const line = toStatusLine(msg);
+            if (line) await updateStatus(line);
+          }
           continue;
         }
       } else if (hiddenMessageTypes.has(msg.type)) {
@@ -576,9 +620,14 @@ export function createClaudeSender(
           // Record usage NOW so cumulative data is available for the embed below
           const activeSessionId = currentSessionId || msg.metadata?.session_id;
           if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
-            recordUsage(activeSessionId, msg.metadata.total_cost_usd, msg.metadata?.duration_ms ?? 0);
+            recordUsage(
+              activeSessionId,
+              msg.metadata.total_cost_usd,
+              msg.metadata?.duration_ms ?? 0,
+            );
           }
-          if (msg.metadata?.total_cost_usd !== undefined) {
+          const showCost = Deno.env.get("SHOW_COST") !== "false";
+          if (showCost && msg.metadata?.total_cost_usd !== undefined) {
             const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
             const costStr = sessionUsage && sessionUsage.queryCount > 1
               ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
@@ -587,7 +636,7 @@ export function createClaudeSender(
               : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
             embedData.fields!.push({ name: "Cost", value: costStr, inline: true });
           }
-          if (msg.metadata?.duration_ms !== undefined) {
+          if (showCost && msg.metadata?.duration_ms !== undefined) {
             const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
             const durStr = sessionUsage && sessionUsage.queryCount > 1
               ? `${(msg.metadata.duration_ms / 1000).toFixed(2)}s (session: ${
