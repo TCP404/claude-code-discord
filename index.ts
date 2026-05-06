@@ -122,7 +122,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Bot instance placeholder
   // deno-lint-ignore no-explicit-any prefer-const
   let bot: any;
-  let claudeSender: ((messages: ClaudeMessage[]) => Promise<void>) | null = null;
+  let claudeSender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void } | null = null;
 
   // Session thread manager — maps each Claude session to a dedicated Discord thread
   // Load persisted sessions so conversations survive restarts.
@@ -208,7 +208,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create sendClaudeMessages function that uses the sender when available
   const sendClaudeMessages = async (messages: ClaudeMessage[]) => {
     if (claudeSender) {
-      await claudeSender(messages);
+      await claudeSender.send(messages);
     }
   };
 
@@ -326,10 +326,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
           ].join("\n");
 
           // Create a sender bound to the alert thread, not the bot's main channel
-          const threadSender = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
+          const { send: threadSender, setSessionId } = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
 
           const controller = new AbortController();
-          await sendToClaudeCode(
+          const result = await sendToClaudeCode(
             workDir,
             prompt,
             controller,
@@ -342,7 +342,16 @@ export async function createClaudeCodeBot(config: BotConfig) {
               }
             },
             false,
+            undefined,
+            () => {
+              try {
+                thread.sendTyping();
+              } catch { /* ignore */ }
+            }
           );
+          if (result.sessionId) {
+            setSessionId(result.sessionId);
+          }
         },
       },
     }),
@@ -369,7 +378,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       // Post a "thinking" indicator
       const thinkingMsg = await thread.send('`Claude is thinking...`');
 
-      const threadSender = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
+      const { send: threadSender, setSessionId } = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true, sessionId });
       const controller = new AbortController();
       // Use the thread's channel ID as the key for per-channel session tracking
       const threadKey = threadChannelId;
@@ -393,10 +402,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
             }
           },
           false,
+          undefined,
+          () => {
+            try {
+              thread.sendTyping();
+            } catch { /* ignore */ }
+          }
         );
 
         if (result.sessionId) {
           claudeSessionOps.setSessionId(result.sessionId, threadKey);
+          setSessionId(result.sessionId);
         }
       } catch (error) {
         console.error(`[ThreadMessage] Failed to resume session ${sessionId}:`, error);
@@ -882,7 +898,7 @@ function setupSignalHandlers(ctx: {
   allHandlers: AllHandlers;
   getClaudeController: () => AbortController | null;
   abortAllSessions?: () => void;
-  claudeSender: ((messages: ClaudeMessage[]) => Promise<void>) | null;
+  claudeSender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void } | null;
   actualCategoryName: string;
   repoName: string;
   branchName: string;
@@ -914,7 +930,7 @@ function setupSignalHandlers(ctx: {
 
       // Send shutdown message
       if (claudeSender) {
-        await claudeSender([{
+        await claudeSender.send([{
           type: 'system',
           content: '',
           metadata: {

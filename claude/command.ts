@@ -15,7 +15,7 @@ export interface SessionThreadCallbacks {
    * @returns Object with the thread-bound sender and a placeholder session key
    */
   createThreadSender(prompt: string, sessionId?: string, threadName?: string, channelId?: string): Promise<{
-    sender: (messages: ClaudeMessage[]) => Promise<void>;
+    sender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void };
     threadSessionKey: string;
     threadChannelId: string;
   }>;
@@ -24,7 +24,7 @@ export interface SessionThreadCallbacks {
    * Returns undefined if the session has no thread.
    */
   getThreadSender(sessionId: string): Promise<{
-    sender: (messages: ClaudeMessage[]) => Promise<void>;
+    sender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void };
     threadSessionKey: string;
   } | undefined>;
   /**
@@ -122,11 +122,13 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
 
       // Pick the right sender — if this channel has a thread, use it
       let activeSender = sendClaudeMessages;
+      let senderSetSessionId: ((id: string) => void) | null = null;
       if (activeSessionId && deps.sessionThreads) {
         try {
           const existing = await deps.sessionThreads.getThreadSender(activeSessionId);
           if (existing) {
-            activeSender = existing.sender;
+            activeSender = existing.sender.send;
+            senderSetSessionId = existing.sender.setSessionId;
           }
         } catch { /* fallback to main sender */ }
       }
@@ -158,12 +160,20 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
           }
         },
         false,
-        deps.getQueryOptions?.()
+        deps.getQueryOptions?.(),
+        () => {
+          try {
+            ctx.channel?.sendTyping();
+          } catch { /* ignore */ }
+        }
       );
 
       // Track session per-channel and globally
       if (result.sessionId) {
         deps.setSessionForChannel(channelId, result.sessionId);
+        if (senderSetSessionId) {
+          senderSetSessionId(result.sessionId);
+        }
       }
       deps.setClaudeSessionId(result.sessionId, channelId);
       deps.setClaudeController(null, channelId);
@@ -188,13 +198,15 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
 
       // Create a dedicated thread for this session
       let activeSender = sendClaudeMessages;
+      let senderSetSessionId: ((id: string) => void) | null = null;
       let threadSessionKey: string | undefined;
       let threadChannelId: string | undefined;
 
       if (deps.sessionThreads) {
         try {
           const threadResult = await deps.sessionThreads.createThreadSender(prompt, undefined, threadName, channelId);
-          activeSender = threadResult.sender;
+          activeSender = threadResult.sender.send;
+          senderSetSessionId = threadResult.sender.setSessionId;
           threadSessionKey = threadResult.threadSessionKey;
           threadChannelId = threadResult.threadChannelId;
         } catch (err) {
@@ -231,7 +243,12 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
             }
           },
           false,
-          deps.getQueryOptions?.()
+          deps.getQueryOptions?.(),
+          () => {
+            try {
+              ctx.channel?.sendTyping();
+            } catch { /* ignore */ }
+          }
         );
       } catch (err) {
         // Clean up the pending placeholder so thread messages don't try to resume it
@@ -250,6 +267,9 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
       }
       if (threadChannelId && result.sessionId) {
         deps.setSessionForChannel(threadChannelId, result.sessionId);
+        if (senderSetSessionId) {
+          senderSetSessionId(result.sessionId);
+        }
       }
 
       return result;
@@ -275,6 +295,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
 
       // Check if the most recent session has a thread — if so, reuse it
       let activeSender = sendClaudeMessages;
+      let senderSetSessionId: ((id: string) => void) | null = null;
       let isReusingThread = false;
 
       if (deps.sessionThreads) {
@@ -283,7 +304,8 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
           try {
             const existing = await deps.sessionThreads.getThreadSender(currentSessionId);
             if (existing) {
-              activeSender = existing.sender;
+              activeSender = existing.sender.send;
+              senderSetSessionId = existing.sender.setSessionId;
               isReusingThread = true;
             }
           } catch (err) {
@@ -322,10 +344,18 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
           }
         },
         true, // continueMode = true
-        deps.getQueryOptions?.()
+        deps.getQueryOptions?.(),
+        () => {
+          try {
+            ctx.channel?.sendTyping();
+          } catch { /* ignore */ }
+        }
       );
 
       deps.setClaudeSessionId(result.sessionId, channelId);
+      if (result.sessionId && senderSetSessionId) {
+        senderSetSessionId(result.sessionId);
+      }
       deps.setClaudeController(null, channelId);
 
       return result;

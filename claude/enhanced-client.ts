@@ -180,7 +180,8 @@ export async function enhancedClaudeQuery(
     onChunk,
     onStreamJson,
     continueMode,
-    modelOptions
+    modelOptions,
+    undefined // no typing callback in enhanced client
   );
   
   // Record API usage for tracking

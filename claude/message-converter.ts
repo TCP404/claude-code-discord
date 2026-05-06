@@ -4,98 +4,98 @@ import type { ClaudeMessage } from "./types.ts";
 // deno-lint-ignore no-explicit-any
 export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
   const messages: ClaudeMessage[] = [];
-  
-  if (jsonData.type === 'assistant') {
+
+  if (jsonData.type === "assistant") {
     if (jsonData.message?.content) {
       const textContent = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type === 'text')
+        .filter((c: any) => c.type === "text")
         // deno-lint-ignore no-explicit-any
         .map((c: any) => c.text)
-        .join('');
-      
+        .join("");
+
       if (textContent) {
-        messages.push({ type: 'text', content: textContent });
+        messages.push({ type: "text", content: textContent });
       }
-      
+
       // Process tool_use individually
       const toolUseContent = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type === 'tool_use');
-      
+        .filter((c: any) => c.type === "tool_use");
+
       for (const tool of toolUseContent) {
         messages.push({
-          type: 'tool_use',
-          content: '',
-          metadata: tool
+          type: "tool_use",
+          content: "",
+          metadata: tool,
         });
       }
-      
+
       // Process thinking content
       const thinkingContent = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type === 'thinking');
-      
+        .filter((c: any) => c.type === "thinking");
+
       for (const thinking of thinkingContent) {
         if (thinking.thinking) {
           messages.push({
-            type: 'thinking',
-            content: thinking.thinking
+            type: "thinking",
+            content: thinking.thinking,
           });
         }
       }
-      
+
       // Process other content
       const otherContent = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type !== 'text' && c.type !== 'tool_use' && c.type !== 'thinking');
-      
+        .filter((c: any) => c.type !== "text" && c.type !== "tool_use" && c.type !== "thinking");
+
       for (const other of otherContent) {
         messages.push({
-          type: 'other',
+          type: "other",
           content: JSON.stringify(other, null, 2),
-          metadata: other
+          metadata: other,
         });
       }
     }
-  } else if (jsonData.type === 'user') {
+  } else if (jsonData.type === "user") {
     if (jsonData.message?.content) {
       const toolResults = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type === 'tool_result');
-      
+        .filter((c: any) => c.type === "tool_result");
+
       for (const result of toolResults) {
         // result.content can be a string or an array of content blocks
         let textContent: string;
-        if (typeof result.content === 'string') {
+        if (typeof result.content === "string") {
           textContent = result.content;
         } else if (Array.isArray(result.content)) {
           textContent = result.content
-            .filter((b: any) => b.type === 'text')
+            .filter((b: any) => b.type === "text")
             .map((b: any) => b.text)
-            .join('\n');
+            .join("\n");
         } else {
           textContent = JSON.stringify(result, null, 2);
         }
         messages.push({
-          type: 'tool_result',
-          content: textContent
+          type: "tool_result",
+          content: textContent,
         });
       }
-      
+
       const otherContent = jsonData.message.content
         // deno-lint-ignore no-explicit-any
-        .filter((c: any) => c.type !== 'tool_result');
-      
+        .filter((c: any) => c.type !== "tool_result");
+
       for (const other of otherContent) {
         messages.push({
-          type: 'other',
+          type: "other",
           content: JSON.stringify(other, null, 2),
-          metadata: other
+          metadata: other,
         });
       }
     }
-  } else if (jsonData.type === 'result') {
+  } else if (jsonData.type === "result") {
     // Handle result messages — surface permission denials and errors
     if (jsonData.permission_denials && jsonData.permission_denials.length > 0) {
       // Deduplicate by tool_name — the SDK may report the same tool multiple times
@@ -105,13 +105,13 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
         if (seenTools.has(denial.tool_name)) continue;
         seenTools.add(denial.tool_name);
         messages.push({
-          type: 'permission_denied',
+          type: "permission_denied",
           content: `Tool "${denial.tool_name}" was denied by permission mode`,
           metadata: {
             toolName: denial.tool_name,
             toolUseId: denial.tool_use_id,
             toolInput: denial.tool_input,
-          }
+          },
         });
       }
     }
@@ -119,70 +119,68 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
     // Preserve the original SDK subtype (e.g. 'error_max_turns', 'error_budget')
     // alongside the simplified display subtype ('completion' | 'error')
     messages.push({
-      type: 'system',
-      content: '',
+      type: "system",
+      content: "",
       metadata: {
         ...jsonData,
-        subtype: jsonData.subtype === 'success' ? 'completion' : 'error',
+        subtype: jsonData.subtype === "success" ? "completion" : "error",
         sdkSubtype: jsonData.subtype, // Original SDK subtype for detailed display
-      }
+      },
     });
-  } else if (jsonData.type === 'system') {
+  } else if (jsonData.type === "system") {
     // Task notifications from subagents
-    if (jsonData.subtype === 'task_notification') {
+    if (jsonData.subtype === "task_notification") {
       messages.push({
-        type: 'task_notification',
-        content: jsonData.summary || '',
+        type: "task_notification",
+        content: jsonData.summary || "",
         metadata: {
           taskId: jsonData.task_id,
           status: jsonData.status,
           outputFile: jsonData.output_file,
           summary: jsonData.summary,
-        }
+        },
       });
-    }
-    // Task started notifications
-    else if (jsonData.subtype === 'task_started') {
+    } // Task started notifications
+    else if (jsonData.subtype === "task_started") {
       messages.push({
-        type: 'task_started',
-        content: jsonData.description || '',
+        type: "task_started",
+        content: jsonData.description || "",
         metadata: {
           taskId: jsonData.task_id,
           description: jsonData.description,
           taskType: jsonData.task_type,
-        }
+        },
       });
-    }
-    // Generic system messages
+    } // Generic system messages
     else {
       messages.push({
-        type: 'system',
-        content: '',
-        metadata: jsonData
+        type: "system",
+        content: "",
+        metadata: jsonData,
       });
     }
-  } else if (jsonData.type === 'tool_progress') {
+  } else if (jsonData.type === "tool_progress") {
     // Tool progress updates (long-running tools)
     messages.push({
-      type: 'tool_progress',
+      type: "tool_progress",
       content: `${jsonData.tool_name}: ${jsonData.elapsed_time_seconds}s`,
       metadata: {
         toolUseId: jsonData.tool_use_id,
         toolName: jsonData.tool_name,
         elapsedSeconds: jsonData.elapsed_time_seconds,
-      }
+      },
     });
-  } else if (jsonData.type === 'tool_use_summary') {
+  } else if (jsonData.type === "tool_use_summary") {
     // Tool use summary messages
     messages.push({
-      type: 'tool_summary',
-      content: jsonData.summary || '',
+      type: "tool_summary",
+      content: jsonData.summary || "",
       metadata: {
         summary: jsonData.summary,
         toolUseIds: jsonData.preceding_tool_use_ids,
-      }
+      },
     });
   }
-  
+
   return messages;
 }
