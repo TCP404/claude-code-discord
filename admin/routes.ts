@@ -160,7 +160,7 @@ export function listSessions(deps: AdminDeps): Response {
 }
 
 export async function cleanupSessions(deps: AdminDeps, req: Request): Promise<Response> {
-  let maxAgeMs = 24 * 3_600_000; // default 24h
+  let maxAgeMs = 72 * 3_600_000; // default 72h
   try {
     const body = await req.json();
     if (body.maxAgeMs && typeof body.maxAgeMs === "number") {

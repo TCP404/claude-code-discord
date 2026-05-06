@@ -74,7 +74,7 @@ tr:hover { background: #2d2d44; }
 <!-- Sessions Panel -->
 <div id="sessions" class="panel">
   <div style="margin-bottom: 12px;">
-    <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>24h)</button>
+    <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>72h)</button>
   </div>
   <table>
     <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th></th></tr></thead>

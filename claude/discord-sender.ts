@@ -6,6 +6,10 @@ import type { ComponentData, EmbedData, MessageContent } from "../discord/types.
 import { generatePreview } from "./file-preview.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
 
+// Regex to detect file paths that start with ./, /, or .dotdir/ (avoids bare filenames)
+const FILE_PATH_REGEX =
+  /(?:\.\/|\/|\.[\w-]+\/)(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpeg|jpg|gif|webp|pdf|zip|csv|tsx|jsx|ts|js|py|go|rs|java|cpp|c|h|sh|sql|json|yaml|yml|toml|md|html|scss|css)\b/gi;
+
 // Discord sender interface for dependency injection
 export interface DiscordSender {
   sendMessage(content: MessageContent): Promise<void>;
@@ -264,9 +268,7 @@ export function createClaudeSender(
       if (msg.type === "tool_result" && msg.content) {
         const filePathMatches = [
           ...new Set(
-            msg.content.match(
-              /(?:\.\/|\/)+(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
-            ) || [],
+            msg.content.match(FILE_PATH_REGEX) || [],
           ),
         ];
         for (const p of filePathMatches) {
@@ -362,7 +364,7 @@ export function createClaudeSender(
           const filePaths = [
             ...new Set(
               msg.content.match(
-                /(?:\.\/|\/)+(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
+                /(?:\.\/|\/|\.[\w-]+\/)(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpeg|jpg|gif|webp|pdf|zip|csv|tsx|jsx|ts|js|py|go|rs|java|cpp|c|h|sh|sql|json|yaml|yml|toml|md|html|scss|css)\b/gi,
               ) || [],
             ),
           ];
