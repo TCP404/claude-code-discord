@@ -111,7 +111,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Setup periodic cleanup tasks
   const cleanupInterval = setupPeriodicCleanup(managers, 3600000, [
     cleanupPaginationStates,
-    () => { sessionThreadManager.cleanup(); },
   ]);
 
   // Initialize bot settings
