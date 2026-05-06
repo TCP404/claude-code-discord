@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.4.1
+
+### PR #4 — UX Enhancements (@jj0012006)
+
+- feat: multi-type inline file preview (images, PDF, code, CSV) replaces button-only upload
+- feat: session usage tracking — cumulative cost/duration shown in completion embed
+- feat: typing indicator during Claude SDK queries (8s interval)
+- feat: `createClaudeSender` returns `{ send, setSessionId }` for per-session cost tracking
+- chore: format all files with `deno fmt` (single→double quotes, trailing commas)
+
+### Bugfix
+
+- fix: tighten file path regex to require `./` or `/` prefix, avoiding false positive previews on bare filenames
+- fix: skip `node_modules` paths in auto-upload file detection
+- fix: remove unused variables (`embedData`, `fileInfo`) in discord-sender
+
 ## v2.4.0
 
 ### PR #3 — Multi-Workspace Support (@PengWei)
