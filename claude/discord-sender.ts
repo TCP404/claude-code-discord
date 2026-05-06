@@ -265,7 +265,7 @@ export function createClaudeSender(
         const filePathMatches = [
           ...new Set(
             msg.content.match(
-              /(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
+              /(?:\.\/|\/)+(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
             ) || [],
           ),
         ];
@@ -274,6 +274,7 @@ export function createClaudeSender(
           if (!cleanPath.startsWith("/")) {
             cleanPath = resolve(Deno.cwd(), cleanPath);
           }
+          if (cleanPath.includes("/node_modules/")) continue;
           if (existsSync(cleanPath)) {
             const preview = await generatePreview(cleanPath);
             if (preview) {
@@ -357,11 +358,11 @@ export function createClaudeSender(
         case "text": {
           const chunks = splitText(msg.content, 2000);
 
-          // Auto-detect local file paths in text messages
+          // Auto-detect local file paths in text messages (must start with ./ or /)
           const filePaths = [
             ...new Set(
               msg.content.match(
-                /(?:\.\/|\/)?(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
+                /(?:\.\/|\/)+(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpg|jpeg|gif|webp|pdf|zip|csv|ts|js|py|go|rs|java|c|cpp|h|sh|sql|json|yaml|yml|toml|md|html|css)/gi,
               ) || [],
             ),
           ];
@@ -376,6 +377,7 @@ export function createClaudeSender(
             if (!cleanPath.startsWith("/")) {
               cleanPath = resolve(Deno.cwd(), cleanPath);
             }
+            if (cleanPath.includes("/node_modules/")) continue;
             if (existsSync(cleanPath)) {
               const preview = await generatePreview(cleanPath);
               if (preview) {
@@ -448,14 +450,12 @@ export function createClaudeSender(
           } else {
             // Use simplified consistent formatting for all tools
             const toolName = msg.metadata?.name || "Unknown";
-            let embedData;
 
             // Special handling for Edit tool to keep "Replacing/With" functionality
             if (toolName === "Edit") {
               const filePath = msg.metadata.input?.file_path || "Unknown file";
               const oldString = msg.metadata.input?.old_string || "";
               const newString = msg.metadata.input?.new_string || "";
-              const fileInfo = getFileTypeInfo(filePath);
 
               const fields = [
                 { name: "📁 File Path", value: `\`${filePath}\``, inline: false },
