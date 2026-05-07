@@ -23,6 +23,7 @@ import type { TextChannel } from "npm:discord.js@14.14.1";
 
 import { getGitInfo } from "./git/index.ts";
 import { createClaudeSender, expandableContent, sendToClaudeCode, convertToClaudeMessages, type DiscordSender, type ClaudeMessage, type SessionThreadCallbacks } from "./claude/index.ts";
+import { BOT_SYSTEM_PROMPT } from "./claude/bot-system-prompt.ts";
 import { buildQuestionMessages, parseAskUserButtonId, parseAskUserConfirmId, type AskUserQuestionInput } from "./claude/index.ts";
 import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCallback } from "./claude/index.ts";
 import { claudeCommands, enhancedClaudeCommands } from "./claude/index.ts";
@@ -401,7 +402,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             }
           },
           false,
-          undefined,
+          { appendSystemPrompt: BOT_SYSTEM_PROMPT },
           () => {
             try {
               thread.sendTyping();

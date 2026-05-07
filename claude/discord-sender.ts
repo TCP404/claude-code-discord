@@ -6,9 +6,8 @@ import type { ComponentData, EmbedData, MessageContent } from "../discord/types.
 import { generatePreview } from "./file-preview.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
 
-// Regex to detect file paths that start with ./, /, or .dotdir/ (avoids bare filenames)
-const FILE_PATH_REGEX =
-  /(?:\.\/|\/|\.[\w-]+\/)(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpeg|jpg|gif|webp|pdf|zip|csv|tsx|jsx|ts|js|py|go|rs|java|cpp|c|h|sh|sql|json|yaml|yml|toml|md|html|scss|css)\b/gi;
+// Marker pattern: model outputs [FILE:/path/to/file] to explicitly deliver a file to the user
+const FILE_MARKER_REGEX = /\[FILE:((?:\/|\.\/)[^\]]+)\]/g;
 
 // Discord sender interface for dependency injection
 export interface DiscordSender {
@@ -262,32 +261,29 @@ export function createClaudeSender(
     }
   }
 
+  // Deduplicate file previews within a single query
+  const sentFilePaths = new Set<string>();
+
   const sendClaudeMessages = async function (messages: ClaudeMessage[]) {
     for (const msg of messages) {
-      // Auto-upload: detect file paths in tool_result even when hidden, show preview or button
+      // Auto-upload: detect [FILE:/path] markers in tool_result (even when hidden)
       if (msg.type === "tool_result" && msg.content) {
-        const filePathMatches = [
-          ...new Set(
-            msg.content.match(FILE_PATH_REGEX) || [],
-          ),
-        ];
-        for (const p of filePathMatches) {
-          let cleanPath = p.replace(/[`()"']/g, "");
+        for (const match of msg.content.matchAll(FILE_MARKER_REGEX)) {
+          let cleanPath = match[1].replace(/[`()"']/g, "");
           if (!cleanPath.startsWith("/")) {
             cleanPath = resolve(Deno.cwd(), cleanPath);
           }
-          if (cleanPath.includes("/node_modules/")) continue;
+          if (sentFilePaths.has(cleanPath)) continue;
           if (existsSync(cleanPath)) {
+            sentFilePaths.add(cleanPath);
             const preview = await generatePreview(cleanPath);
             if (preview) {
               visibleSentSinceStatus = true;
               await sender.sendMessage(preview.content);
             } else {
-              // Fallback to existing button behavior for unsupported types
               const fileName = cleanPath.split("/").pop() || "attachment";
               const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
               pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
-              console.log(`[Auto-Upload] File ready: ${cleanPath} (button: ${fileId})`);
               visibleSentSinceStatus = true;
               const ext = fileName.split(".").pop()?.toLowerCase() || "";
               const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
@@ -358,29 +354,29 @@ export function createClaudeSender(
 
       switch (msg.type) {
         case "text": {
-          const chunks = splitText(msg.content, 2000);
+          // Detect [FILE:/path] markers, strip them from display text, and deliver files
+          const fileMarkers: string[] = [];
+          const displayText = msg.content.replace(FILE_MARKER_REGEX, (_, path) => {
+            fileMarkers.push(path);
+            return ""; // Remove marker from visible text
+          }).trim();
 
-          // Auto-detect local file paths in text messages (must start with ./ or /)
-          const filePaths = [
-            ...new Set(
-              msg.content.match(
-                /(?:\.\/|\/|\.[\w-]+\/)(?:[\w.~-]+\/)*[\w-]+\.(?:png|jpeg|jpg|gif|webp|pdf|zip|csv|tsx|jsx|ts|js|py|go|rs|java|cpp|c|h|sh|sql|json|yaml|yml|toml|md|html|scss|css)\b/gi,
-              ) || [],
-            ),
-          ];
-
-          for (const chunk of chunks) {
-            await sender.sendMessage({ content: chunk });
+          if (displayText) {
+            const chunks = splitText(displayText, 2000);
+            for (const chunk of chunks) {
+              await sender.sendMessage({ content: chunk });
+            }
           }
 
-          // Show file previews after the text
-          for (const p of filePaths) {
+          // Deliver marked files
+          for (const p of fileMarkers) {
             let cleanPath = p.replace(/[`()"']/g, "");
             if (!cleanPath.startsWith("/")) {
               cleanPath = resolve(Deno.cwd(), cleanPath);
             }
-            if (cleanPath.includes("/node_modules/")) continue;
+            if (sentFilePaths.has(cleanPath)) continue;
             if (existsSync(cleanPath)) {
+              sentFilePaths.add(cleanPath);
               const preview = await generatePreview(cleanPath);
               if (preview) {
                 await sender.sendMessage(preview.content);

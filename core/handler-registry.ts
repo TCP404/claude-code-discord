@@ -32,6 +32,7 @@ import { cleanSessionId, ClaudeSessionManager } from "../claude/index.ts";
 import type { SessionThreadCallbacks } from "../claude/index.ts";
 import type { ClaudeModelOptions } from "../claude/index.ts";
 import type { AskUserCallback } from "../claude/index.ts";
+import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
 import type { PermissionRequestCallback } from "../claude/index.ts";
 import { buildHooks } from "../claude/hooks.ts";
 import type { HookEvent_Discord } from "../claude/hooks.ts";
@@ -464,10 +465,10 @@ export function createAllHandlers(
       opts.maxBudgetUsd = s.maxBudgetUsd;
     }
 
-    // System prompt
-    if (s.defaultSystemPrompt) {
-      opts.appendSystemPrompt = s.defaultSystemPrompt;
-    }
+    // System prompt: bot-level instructions + user-configured prompt
+    opts.appendSystemPrompt = s.defaultSystemPrompt
+      ? `${BOT_SYSTEM_PROMPT}\n\n${s.defaultSystemPrompt}`
+      : BOT_SYSTEM_PROMPT;
 
     // Proxy settings → env vars
     if (s.proxyEnabled && s.proxyUrl) {

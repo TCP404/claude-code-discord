@@ -78,12 +78,7 @@ A single bot instance can manage multiple project channels, each with its own wo
 - **Thread auto-resume:** Plain text in a session thread triggers automatic Claude resume via Message Content Intent (`index.ts`). Works across all workspace channels.
 - **Workspace routing:** `workspaceManager.resolve(channelId)` resolves the correct working directory for any channel. Falls back to default `WORK_DIR`.
 - **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown (calls `abortAll()` to cancel all active sessions)
-- **Auto-upload screenshots:** After generating a screenshot or exported file, the bot auto-detects the file path and shows a clickable button in Discord. **Always save screenshots to `./screenshots/`**, e.g.:
-  ```
-  screencapture -x ./screenshots/screenshot.png
-  echo ./screenshots/screenshot.png
-  ```
-  For Playwright MCP screenshots, use `filename: "screenshots/screenshot.png"`. This ensures the file path appears in the tool result output, triggering the auto-upload button.
+- **File delivery via marker:** The model outputs `[FILE:/absolute/path]` markers when the user asks for a file. The Discord sender detects these markers, strips them from displayed text, and delivers the file as an attachment or preview. Implementation: `claude/discord-sender.ts` (regex + preview logic), `claude/bot-system-prompt.ts` (model instructions, injected as `appendSystemPrompt` on every query).
 
 ## Environment Variables
 
