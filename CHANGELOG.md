@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.4.2
+
+- refactor: replace auto file detection with explicit `[FILE:]` marker system
+- fix: improve file path detection and extend cleanup threshold
+- fix: remove automatic session thread cleanup
+
 ## v2.4.1
 
 ### PR #4 — UX Enhancements (@jj0012006)
