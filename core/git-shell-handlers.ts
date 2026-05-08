@@ -603,20 +603,60 @@ export function createUtilityCommandHandlers(
             timestamp: true
           }]
         });
-        
+
         shellHandlers.killAllProcesses();
         gitHandlers.killAllWorktreeBots();
-        
+
         const claudeController = getClaudeController();
         if (claudeController) {
           claudeController.abort();
         }
-        
+
         healthMonitor.stopAll();
         crashHandler.cleanup();
         cleanupPaginationStates();
         clearInterval(cleanupInterval);
-        
+
+        setTimeout(() => {
+          Deno.exit(0);
+        }, 1000);
+      }
+    }],
+    ['restart', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await ctx.editReply({
+          embeds: [{
+            color: 0xffaa00,
+            title: 'Restart',
+            description: 'Restarting bot...',
+            timestamp: true
+          }]
+        });
+
+        shellHandlers.killAllProcesses();
+        gitHandlers.killAllWorktreeBots();
+
+        const claudeController = getClaudeController();
+        if (claudeController) {
+          claudeController.abort();
+        }
+
+        healthMonitor.stopAll();
+        crashHandler.cleanup();
+        cleanupPaginationStates();
+        clearInterval(cleanupInterval);
+
+        const scriptPath = new URL("../start.sh", import.meta.url).pathname;
+        const pid = Deno.pid;
+        const child = new Deno.Command("bash", {
+          args: ["-c", `while kill -0 ${pid} 2>/dev/null; do sleep 0.5; done; exec "${scriptPath}" start`],
+          stdin: "null",
+          stdout: "null",
+          stderr: "null",
+        }).spawn();
+        child.unref();
+
         setTimeout(() => {
           Deno.exit(0);
         }, 1000);
