@@ -71,10 +71,21 @@ At session start, the SDK query loads:
 ```bash
 npx deno task start     # run bot
 npx deno task dev       # run with hot reload
+npx deno task test      # run all unit tests
 npx deno check index.ts # type check
 npx deno lint           # lint
 npx deno fmt            # format
 ```
+
+## Pre-Commit Requirement
+
+Before committing any code change, you MUST run `npx deno task test` and confirm all tests pass. Do not commit if any test fails — fix the failure first.
+
+**Test maintenance rules:**
+1. If you modify a function that has existing tests in a colocated `*_test.ts` file, update or add test cases to cover the new behavior.
+2. If you add a new exported function that is pure (no Discord/SDK side effects), you MUST add tests for it in the colocated `*_test.ts` file (create it if it doesn't exist).
+3. If you change a function's signature or return type, verify all its existing tests still pass and update assertions as needed.
+4. If you fix a bug, add a regression test that would have caught the bug.
 
 ## Multi-Workspace
 
@@ -91,10 +102,21 @@ A single bot instance can manage multiple project channels, each with its own wo
 - TypeScript strict mode, Deno APIs (not Node.js unless unavoidable)
 - Imports: `npm:` specifiers in `deno.json`, Deno std via URL imports
 - No third-party packages beyond discord.js and claude-agent-sdk
+- Every file starts with `/** @module <path> — <one-line description> */` JSDoc header
+- Direct imports only — import from source files, not barrel `index.ts` re-exports
+- Shared types live in per-layer `types.ts` files (`claude/types.ts`, `discord/types.ts`)
 - Permission mode default: `acceptEdits` (allows file edits, prompts for others)
 - Hidden message types: system, tool_use, tool_result, tool_progress are hidden by default, shown via `/show-*` toggle commands
 - Session persistence: thread mappings stored in `.bot-data/session-threads.json`
 - Workspace persistence: workspace registry stored in `.bot-data/workspaces.json`
+
+## Testing
+
+- Framework: `Deno.test` + `assertEquals` from `https://deno.land/std@0.208.0/assert/mod.ts`
+- Convention: colocated test files named `*_test.ts` next to source (e.g. `claude/sender-utils_test.ts`)
+- Run: `npx deno task test` (executes `deno test --allow-all --no-lock`)
+- Test discovery: configured in `deno.json` → `"test": { "include": ["**/*_test.ts"] }`
+- Coverage: pure utility functions (`sender-utils`, `formatting`, `discord/utils`), data transforms (`message-converter`), and core state (`workspace-manager`)
 
 ## Important Patterns
 

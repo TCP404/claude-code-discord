@@ -112,7 +112,14 @@ claude-code-discord/
 │   └── updating.md             # Update instructions
 │
 ├── start.sh                    # Production daemon (start/stop/restart)
-└── CLAUDE.md                   # Project instructions for Claude Code
+├── CLAUDE.md                   # Project instructions for Claude Code
+│
+│   # Test files (colocated, pattern: *_test.ts)
+│   # claude/sender-utils_test.ts
+│   # claude/message-converter_test.ts
+│   # discord/utils_test.ts
+│   # discord/formatting_test.ts
+│   # core/workspace-manager_test.ts
 ```
 
 ## SDK Integration
