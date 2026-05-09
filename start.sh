@@ -42,8 +42,22 @@ do_stop() {
 
   PID=$(cat "$PID_FILE")
   if kill -0 "$PID" 2>/dev/null; then
-    kill "$PID"
-    echo "Stopped PID $PID"
+    # Kill child processes then the main process
+    pkill -P "$PID" 2>/dev/null
+    kill "$PID" 2>/dev/null
+    # Wait up to 5 seconds for graceful shutdown
+    for i in $(seq 1 10); do
+      kill -0 "$PID" 2>/dev/null || break
+      sleep 0.5
+    done
+    # Force kill if still alive
+    if kill -0 "$PID" 2>/dev/null; then
+      pkill -9 -P "$PID" 2>/dev/null
+      kill -9 "$PID" 2>/dev/null
+      echo "Force killed PID $PID"
+    else
+      echo "Stopped PID $PID"
+    fi
   else
     echo "Process $PID not running."
   fi
@@ -53,6 +67,6 @@ do_stop() {
 case "${1:-start}" in
   start)   do_start ;;
   stop)    do_stop ;;
-  restart) do_stop; sleep 1; do_start ;;
+  restart) do_stop; do_start ;;
   *)       echo "Usage: $0 {start|stop|restart}" ;;
 esac

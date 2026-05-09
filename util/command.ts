@@ -15,6 +15,10 @@ export const utilsCommands = [
   new SlashCommandBuilder()
     .setName('shutdown')
     .setDescription('Shutdown the bot'),
+
+  new SlashCommandBuilder()
+    .setName('restart')
+    .setDescription('Restart the bot'),
 ];
 
 export { createUtilsHandlers, type UtilsHandlerDeps } from "./handler.ts";

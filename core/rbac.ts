@@ -19,7 +19,7 @@ const RESTRICTED_COMMANDS: Record<string, string[]> = {
   /** System information exposure */
   system: ['env-vars', 'port-scan', 'system-logs'],
   /** Bot lifecycle */
-  admin: ['shutdown'],
+  admin: ['shutdown', 'restart'],
 };
 
 /** Flat set of all restricted command names for fast lookup */
