@@ -658,6 +658,17 @@ export async function createDiscordBot(
       // Only handle messages inside threads
       if (!message.channel.isThread()) return;
 
+      // Multi-bot coexistence: if the message mentions another bot but not us, skip
+      const mentionedUsers = message.mentions.users;
+      const mentionsMe = mentionedUsers.has(client.user!.id);
+      if (mentionedUsers.size > 0) {
+        const mentionsOtherBot = mentionedUsers.some(u => u.bot && u.id !== client.user!.id);
+        if (mentionsOtherBot && !mentionsMe) return;
+      }
+
+      // THREAD_MENTION_ONLY mode: only respond when explicitly @mentioned
+      if (Deno.env.get("THREAD_MENTION_ONLY") === "true" && !mentionsMe) return;
+
       // Check if this is a voice message
       const isVoiceMessage = message.flags.has(MessageFlags.IsVoiceMessage);
       let textContent = message.content.trim();
