@@ -10,57 +10,67 @@
  */
 
 import {
-  createDiscordBot,
   type BotConfig,
-  type InteractionContext,
-  type CommandHandlers,
-  type ButtonHandlers,
   type BotDependencies,
+  type ButtonHandlers,
+  type CommandHandlers,
+  createDiscordBot,
   type MessageContent,
   SessionThreadManager,
 } from "./discord/index.ts";
 import type { TextChannel } from "npm:discord.js@14.14.1";
 
 import { getGitInfo } from "./git/index.ts";
-import { createClaudeSender, expandableContent, sendToClaudeCode, convertToClaudeMessages, type DiscordSender, type ClaudeMessage, type SessionThreadCallbacks } from "./claude/index.ts";
+import {
+  type ClaudeMessage,
+  convertToClaudeMessages,
+  createClaudeSender,
+  type DiscordSender,
+  expandableContent,
+  sendToClaudeCode,
+  type SessionThreadCallbacks,
+} from "./claude/index.ts";
 import { BOT_SYSTEM_PROMPT } from "./claude/bot-system-prompt.ts";
-import { buildQuestionMessages, parseAskUserButtonId, parseAskUserConfirmId, type AskUserQuestionInput } from "./claude/index.ts";
-import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCallback } from "./claude/index.ts";
-import { claudeCommands, enhancedClaudeCommands } from "./claude/index.ts";
-import { additionalClaudeCommands } from "./claude/additional-index.ts";
+import {
+  type AskUserQuestionInput,
+  parseAskUserButtonId,
+  parseAskUserConfirmId,
+} from "./claude/index.ts";
+import {
+  buildPermissionEmbed,
+  parsePermissionButtonId,
+  type PermissionRequestCallback,
+} from "./claude/index.ts";
 import { initModels } from "./claude/enhanced-client.ts";
-import { advancedSettingsCommands, DEFAULT_SETTINGS, unifiedSettingsCommands, UNIFIED_DEFAULT_SETTINGS } from "./settings/index.ts";
-import { gitCommands } from "./git/index.ts";
-import { shellCommands } from "./shell/index.ts";
-import { utilsCommands } from "./util/index.ts";
-import { systemCommands } from "./system/index.ts";
-import { helpCommand } from "./help/index.ts";
-import { agentCommand } from "./agent/index.ts";
+import {
+  DEFAULT_SETTINGS,
+  UNIFIED_DEFAULT_SETTINGS,
+} from "./settings/index.ts";
 import { cleanupPaginationStates } from "./discord/index.ts";
-import { runVersionCheck, startPeriodicUpdateCheck, BOT_VERSION } from "./util/version-check.ts";
+import { BOT_VERSION, runVersionCheck, startPeriodicUpdateCheck } from "./util/version-check.ts";
 
 // Core modules - now handle most of the heavy lifting
 import {
-  parseArgs,
-  createMessageHistory,
-  createBotManagers,
-  setupPeriodicCleanup,
-  createBotSettings,
-  createAllHandlers,
-  createClaudeSession,
-  getAllCommands,
-  cleanSessionId,
-  createButtonHandlers,
-  createAllCommandHandlers,
-  WorkspaceManager,
-  type BotManagers,
   type AllHandlers,
+  type BotManagers,
+  cleanSessionId,
+  createAllCommandHandlers,
+  createAllHandlers,
+  createBotManagers,
+  createBotSettings,
+  createButtonHandlers,
+  createClaudeSession,
+  createMessageHistory,
+  getAllCommands,
   type MessageHistoryOps,
+  parseArgs,
+  setupPeriodicCleanup,
+  WorkspaceManager,
 } from "./core/index.ts";
 import { createWorkspaceHandlers } from "./workspace/index.ts";
 
 // Re-export for backward compatibility
-export { getGitInfo, executeGitCommand } from "./git/index.ts";
+export { executeGitCommand, getGitInfo } from "./git/index.ts";
 export { sendToClaudeCode } from "./claude/index.ts";
 
 // ================================
@@ -71,7 +81,15 @@ export { sendToClaudeCode } from "./claude/index.ts";
  * Create Claude Code Discord Bot with all handlers and integrations.
  */
 export async function createClaudeCodeBot(config: BotConfig) {
-  const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
+  const {
+    discordToken,
+    applicationId,
+    workDir,
+    repoName,
+    branchName,
+    categoryName,
+    defaultMentionUserId,
+  } = config;
 
   // Determine category name (use repository name if not specified)
   const actualCategoryName = categoryName || repoName;
@@ -99,12 +117,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
       notifyOnCrash: true,
       // deno-lint-ignore require-await
       onCrashNotification: async (report) => {
-        console.warn(`Process crash: ${report.processType} ${report.processId || ''} - ${report.error.message}`);
+        console.warn(
+          `Process crash: ${report.processType} ${
+            report.processId || ""
+          } - ${report.error.message}`,
+        );
       },
     },
   });
 
-  const { shellManager, worktreeBotManager, crashHandler, healthMonitor, claudeSessionManager } = managers;
+  const { shellManager, worktreeBotManager, crashHandler, healthMonitor, claudeSessionManager } =
+    managers;
 
   // Initialize dynamic model fetching (uses ANTHROPIC_API_KEY if available)
   initModels();
@@ -115,14 +138,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
   ]);
 
   // Initialize bot settings
-  const settingsOps = createBotSettings(defaultMentionUserId, DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS);
+  const settingsOps = createBotSettings(
+    defaultMentionUserId,
+    DEFAULT_SETTINGS,
+    UNIFIED_DEFAULT_SETTINGS,
+  );
   const currentSettings = settingsOps.getSettings();
   const botSettings = currentSettings.legacy;
 
   // Bot instance placeholder
   // deno-lint-ignore no-explicit-any prefer-const
   let bot: any;
-  let claudeSender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void } | null = null;
+  let claudeSender: {
+    send: (messages: ClaudeMessage[]) => Promise<void>;
+    setSessionId: (id: string) => void;
+  } | null = null;
 
   // Session thread manager — maps each Claude session to a dedicated Discord thread
   // Load persisted sessions so conversations survive restarts.
@@ -136,10 +166,16 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Session thread callbacks — used by claude/command.ts for /claude-thread and /resume.
   // The callbacks are closures over `bot` (late-bound) and `sessionThreadManager`.
   const sessionThreadCallbacks: SessionThreadCallbacks = {
-    async createThreadSender(prompt: string, sessionId?: string, threadName?: string, channelId?: string) {
+    async createThreadSender(
+      prompt: string,
+      sessionId?: string,
+      threadName?: string,
+      channelId?: string,
+    ) {
       // [Multi-channel] Create thread in the invoking channel, not the bot's dedicated channel
-      const channel = (channelId && commandChannels.get(channelId)) || bot?.getChannel() as TextChannel | null;
-      if (!channel) throw new Error('Bot channel not ready');
+      const channel = (channelId && commandChannels.get(channelId)) ||
+        bot?.getChannel() as TextChannel | null;
+      if (!channel) throw new Error("Bot channel not ready");
 
       // If a session ID was provided, check for an existing thread to reuse
       if (sessionId) {
@@ -149,31 +185,34 @@ export async function createClaudeCodeBot(config: BotConfig) {
             await existingThread.setArchived(false);
           }
           sessionThreadManager.recordActivity(sessionId);
-          const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), { isThread: true });
-          return { sender: threadSender, threadSessionKey: sessionId, threadChannelId: existingThread.id };
+          const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), {
+            isThread: true,
+          });
+          return {
+            sender: threadSender,
+            threadSessionKey: sessionId,
+            threadChannelId: existingThread.id,
+          };
         }
       }
 
       // Generate a placeholder key until the real SDK session ID arrives
       const placeholderKey = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+      // Generate thread name before creating the thread
+      const effectiveThreadName = threadName || await generateThreadNameFromPrompt(prompt);
+
       // Create a thread in the main channel
-      const thread = await sessionThreadManager.createSessionThread(channel, placeholderKey, prompt, threadName);
+      const thread = await sessionThreadManager.createSessionThread(
+        channel,
+        placeholderKey,
+        prompt,
+        effectiveThreadName,
+      );
 
-      // Post a summary embed in the main channel pointing to the thread
-      await sendMessageContent(channel, {
-        embeds: [{
-          color: 0x5865F2,
-          title: '🧵 New Claude Session',
-          description: `A new session thread has been created.\n\n**Prompt:** \`${prompt.substring(0, 200)}${prompt.length > 200 ? '...' : ''}\``,
-          fields: [
-            { name: 'Thread', value: `<#${thread.id}>`, inline: true },
-          ],
-          timestamp: true,
-        }],
+      const threadSender = createClaudeSender(createChannelSenderAdapter(thread), {
+        isThread: true,
       });
-
-      const threadSender = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
       return { sender: threadSender, threadSessionKey: placeholderKey, threadChannelId: thread.id };
     },
 
@@ -185,7 +224,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await existingThread.setArchived(false);
       }
       sessionThreadManager.recordActivity(sessionId);
-      const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), { isThread: true });
+      const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), {
+        isThread: true,
+      });
       return { sender: threadSender, threadSessionKey: sessionId };
     },
 
@@ -198,7 +239,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // When Claude needs clarification mid-session, this sends buttons to Discord
   // and waits for the user's click.
   // Uses an object wrapper so TypeScript doesn't narrow the closure to `never`.
-  const askUserState: { handler: ((input: AskUserQuestionInput) => Promise<Record<string, string>>) | null } = { handler: null };
+  const askUserState: {
+    handler: ((input: AskUserQuestionInput) => Promise<Record<string, string>>) | null;
+  } = { handler: null };
 
   // Late-bound PermissionRequest handler — set after bot is created.
   // When Claude wants to use a tool that isn't pre-approved, this shows
@@ -215,7 +258,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create onAskUser wrapper — delegates to askUserState.handler once bot is ready
   const onAskUser = async (input: AskUserQuestionInput): Promise<Record<string, string>> => {
     if (!askUserState.handler) {
-      throw new Error('AskUserQuestion handler not initialized — bot not ready');
+      throw new Error("AskUserQuestion handler not initialized — bot not ready");
     }
     return await askUserState.handler(input);
   };
@@ -223,7 +266,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create onPermissionRequest wrapper — delegates to permReqState.handler once bot is ready
   const onPermissionRequest: PermissionRequestCallback = async (toolName, toolInput) => {
     if (!permReqState.handler) {
-      console.warn('[PermissionRequest] Handler not initialized — auto-denying');
+      console.warn("[PermissionRequest] Handler not initialized — auto-denying");
       return false;
     }
     return await permReqState.handler(toolName, toolInput);
@@ -258,7 +301,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       sessionThreads: sessionThreadCallbacks,
     },
     claudeSessionOps,
-    settingsOps
+    settingsOps,
   );
 
   // Create command handlers using the wrapper factory
@@ -280,7 +323,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     getGuild: () => bot?.getGuild?.() ?? null,
     getCategory: () => bot?.getCategory?.() ?? null,
   });
-  handlers.set('workspace', {
+  handlers.set("workspace", {
     execute: async (ctx) => {
       await workspaceHandlers.onWorkspace(ctx);
     },
@@ -295,12 +338,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
       sendClaudeMessages,
       workDir,
     },
-    expandableContent
+    expandableContent,
   );
 
   // Channel monitoring for auto-responding to bot/webhook messages
   const monitorChannelId = Deno.env.get("MONITOR_CHANNEL_ID");
-  const monitorBotIds = Deno.env.get("MONITOR_BOT_IDS")?.split(",").map(s => s.trim()).filter(Boolean);
+  const monitorBotIds = Deno.env.get("MONITOR_BOT_IDS")?.split(",").map((s) => s.trim()).filter(
+    Boolean,
+  );
 
   // Create dependencies object for Discord bot
   const dependencies: BotDependencies = {
@@ -326,7 +371,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
           ].join("\n");
 
           // Create a sender bound to the alert thread, not the bot's main channel
-          const { send: threadSender, setSessionId } = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
+          const { send: threadSender, setSessionId } = createClaudeSender(
+            createChannelSenderAdapter(thread),
+            { isThread: true },
+          );
 
           const controller = new AbortController();
           const result = await sendToClaudeCode(
@@ -347,7 +395,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
               try {
                 thread.sendTyping();
               } catch { /* ignore */ }
-            }
+            },
           );
           if (result.sessionId) {
             setSessionId(result.sessionId);
@@ -364,21 +412,28 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
 
       // Skip if the session is still being created or failed before getting a real ID
-      if (sessionId.startsWith('pending_') || sessionId.startsWith('failed_')) {
-        console.warn(`[ThreadMessage] Session not ready (${sessionId.slice(0, 20)}…), ignoring message`);
+      if (sessionId.startsWith("pending_") || sessionId.startsWith("failed_")) {
+        console.warn(
+          `[ThreadMessage] Session not ready (${sessionId.slice(0, 20)}…), ignoring message`,
+        );
         return;
       }
 
       const thread = sessionThreadManager.getThread(sessionId);
       if (!thread) {
-        console.warn(`[ThreadMessage] Thread channel not resolved for session ${sessionId}, cannot resume`);
+        console.warn(
+          `[ThreadMessage] Thread channel not resolved for session ${sessionId}, cannot resume`,
+        );
         return;
       }
 
       // Post a "thinking" indicator
-      const thinkingMsg = await thread.send('`Claude is thinking...`');
+      const thinkingMsg = await thread.send("`Claude is thinking...`");
 
-      const { send: threadSender, setSessionId } = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true, sessionId });
+      const { send: threadSender, setSessionId } = createClaudeSender(
+        createChannelSenderAdapter(thread),
+        { isThread: true, sessionId },
+      );
       const controller = new AbortController();
       // Use the thread's channel ID as the key for per-channel session tracking
       const threadKey = threadChannelId;
@@ -407,7 +462,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             try {
               thread.sendTyping();
             } catch { /* ignore */ }
-          }
+          },
         );
 
         if (result.sessionId) {
@@ -420,7 +475,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
       } finally {
         claudeSessionOps.setController(null, threadKey);
-        try { await thinkingMsg.delete(); } catch { /* ignore */ }
+        try {
+          await thinkingMsg.delete();
+        } catch { /* ignore */ }
       }
     },
     // [Multi-channel] Allow redirecting Claude output to the invoking channel (per-channel)
@@ -429,6 +486,106 @@ export async function createClaudeCodeBot(config: BotConfig) {
       if (chId) {
         responseChannels.set(chId, ch);
         commandChannels.set(chId, ch);
+      }
+    },
+    isAutoThreadChannel: (channelId: string) => workspaceManager.isAutoThreadChannel(channelId),
+    // Auto-thread: plain text in a workspace channel (with autoThread enabled) spawns a new
+    // Claude session in a fresh thread. Thread is named from the prompt, then renamed after
+    // the first turn using a Claude-generated topic.
+    onWorkspaceMessage: async (channelId: string, content: string) => {
+      const channel = commandChannels.get(channelId) ??
+        bot?.getGuild?.()?.channels.cache.get(channelId);
+      if (!channel) {
+        console.warn(`[WorkspaceMessage] Channel ${channelId} not found, ignoring`);
+        return;
+      }
+
+      // Register the channel for routing (so future Claude output lands here)
+      commandChannels.set(channelId, channel);
+      responseChannels.set(channelId, channel);
+
+      // Create the thread (uses prompt-based temporary name)
+      let threadResult;
+      try {
+        threadResult = await sessionThreadCallbacks.createThreadSender(
+          content,
+          undefined,
+          undefined,
+          channelId,
+        );
+      } catch (err) {
+        console.error("[WorkspaceMessage] Failed to create thread:", err);
+        return;
+      }
+
+      const { sender, threadSessionKey, threadChannelId } = threadResult;
+      const thread = sessionThreadManager.getThread(threadSessionKey);
+
+      const controller = new AbortController();
+      claudeSessionOps.setController(controller, threadChannelId);
+
+      // Post "thinking" indicator inside the thread
+      // deno-lint-ignore no-explicit-any
+      let thinkingMsg: any = null;
+      if (thread) {
+        try {
+          thinkingMsg = await thread.send("`Claude is thinking...`");
+        } catch { /* ignore */ }
+      }
+
+      const effectiveWorkDir = workspaceManager.resolve(channelId);
+
+      try {
+        const result = await sendToClaudeCode(
+          effectiveWorkDir,
+          content,
+          controller,
+          undefined, // fresh session
+          undefined,
+          (jsonData) => {
+            const claudeMessages = convertToClaudeMessages(jsonData);
+            if (claudeMessages.length > 0) {
+              sender.send(claudeMessages).catch(() => {});
+            }
+          },
+          false,
+          { appendSystemPrompt: BOT_SYSTEM_PROMPT },
+          () => {
+            try {
+              thread?.sendTyping();
+            } catch { /* ignore */ }
+          },
+        );
+
+        if (result.sessionId) {
+          sessionThreadManager.updateSessionId(threadSessionKey, result.sessionId);
+          claudeSessionOps.setSessionId(result.sessionId, threadChannelId);
+          claudeSessionOps.setSessionId(result.sessionId, channelId);
+          sender.setSessionId(result.sessionId);
+        }
+
+        // Best-effort: reuse Claude Code's auto-generated session summary as the thread name
+        if (thread && result.sessionId) {
+          renameThreadByTopic(thread, effectiveWorkDir, result.sessionId).catch((err) => {
+            console.warn("[WorkspaceMessage] Thread rename failed:", err);
+          });
+        }
+      } catch (error) {
+        console.error("[WorkspaceMessage] Claude run failed:", error);
+        if (threadSessionKey.startsWith("pending_")) {
+          sessionThreadManager.updateSessionId(threadSessionKey, `failed_${threadSessionKey}`);
+        }
+        const errMsg = error instanceof Error ? error.message : String(error);
+        try {
+          await thread?.send(`⚠️ Claude failed: ${errMsg}`);
+        } catch { /* ignore */ }
+      } finally {
+        claudeSessionOps.setController(null, threadChannelId);
+        if (thinkingMsg) {
+          try {
+            await thinkingMsg.delete();
+          } catch { /* ignore */ }
+        }
       }
     },
   };
@@ -444,10 +601,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
     // Cleanup orphan workspaces — remove entries whose channel no longer exists
     const guild = mainChannel.guild;
-    const orphans = workspaceManager.list().filter(w => !guild.channels.cache.has(w.channelId));
+    const orphans = workspaceManager.list().filter((w) => !guild.channels.cache.has(w.channelId));
     if (orphans.length > 0) {
       for (const o of orphans) {
-        console.log(`[Workspace] Removing orphan workspace "${o.name}" (channel ${o.channelId} no longer exists)`);
+        console.log(
+          `[Workspace] Removing orphan workspace "${o.name}" (channel ${o.channelId} no longer exists)`,
+        );
         workspaceManager.remove(o.name);
       }
       await workspaceManager.saveToDisk();
@@ -478,7 +637,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     // Also check for any pending (placeholder-keyed) threads
     const allThreads = sessionThreadManager.getAllSessionThreads();
     for (const meta of allThreads) {
-      if (meta.sessionId.startsWith('pending_')) {
+      if (meta.sessionId.startsWith("pending_")) {
         const thread = sessionThreadManager.getThread(meta.sessionId);
         if (thread) return thread;
       }
@@ -503,11 +662,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
           .setTitle(embed.title)
           .setDescription(embed.description)
           .setTimestamp();
-        embed.fields.forEach(f => discordEmbed.addFields(f));
+        embed.fields.forEach((f) => discordEmbed.addFields(f));
         await channel.send({ embeds: [discordEmbed] });
       }
     }
-  }).catch(() => { /* version check is best-effort */ });
+  }).catch(() => {/* version check is best-effort */});
 
   // Start periodic update checks (every 12 hours)
   startPeriodicUpdateCheck(async (result) => {
@@ -518,7 +677,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const embed = new EmbedBuilder()
           .setColor(0xFFA500)
           .setTitle("🔄 Update Available")
-          .setDescription(`A newer version is available. You are running **v${BOT_VERSION}** (\`${result.localCommit}\`).`)
+          .setDescription(
+            `A newer version is available. You are running **v${BOT_VERSION}** (\`${result.localCommit}\`).`,
+          )
           .addFields(
             { name: "Latest Commit", value: `\`${result.remoteCommit}\``, inline: true },
             {
@@ -526,8 +687,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
               value: Deno.env.get("DOCKER_CONTAINER")
                 ? "```\ndocker compose pull && docker compose up -d\n```"
                 : "```\ngit pull origin main && deno task start\n```",
-              inline: false
-            }
+              inline: false,
+            },
           )
           .setTimestamp();
         await channel.send({ embeds: [embed] });
@@ -559,12 +720,123 @@ export async function createClaudeCodeBot(config: BotConfig) {
 // Helper Functions
 // ================================
 
+/** Prefix marking a thread name as auto-generated from the raw prompt, pending topic-based rename. */
+const PENDING_RENAME_PREFIX = "new-";
+/** Discord's hard limit on thread/channel names. */
+const DISCORD_THREAD_NAME_MAX = 100;
+
+/**
+ * Derive a thread name from the raw prompt only — no tool calls, no network fetches.
+ * The returned name is prefixed with `new-` so that `renameThreadByTopic` can later
+ * recognise it as a candidate for topic-based rename. If prefix + body would exceed
+ * Discord's 100-char name limit, the body is truncated from the end.
+ */
+async function generateThreadNameFromPrompt(prompt: string): Promise<string> {
+  const { threadNameFromPrompt } = await import("./discord/session-threads.ts");
+  const body = threadNameFromPrompt(prompt.trim());
+  const budget = DISCORD_THREAD_NAME_MAX - PENDING_RENAME_PREFIX.length;
+  const trimmed = body.length <= budget ? body : body.slice(0, budget - 1) + "…";
+  return PENDING_RENAME_PREFIX + trimmed;
+}
+
+/**
+ * Rename the thread by generating a topic title from the session's actual messages.
+ * Uses a lightweight 1-turn Claude call (no tools) to produce a concise title.
+ */
+// deno-lint-ignore no-explicit-any
+async function renameThreadByTopic(thread: any, workDir: string, sessionId: string): Promise<void> {
+  try {
+    // Only rename threads still carrying the auto-generated `new-` prefix;
+    // leave user-customised names (or already-renamed ones) untouched.
+    const currentName: string = thread?.name ?? "";
+    if (!currentName.startsWith(PENDING_RENAME_PREFIX)) {
+      return;
+    }
+
+    const { getSessionMessages, query: claudeQuery } = await import(
+      "@anthropic-ai/claude-agent-sdk"
+    );
+
+    const msgs = await getSessionMessages(sessionId, { dir: workDir });
+
+    // Collect conversation snippets for title generation (cap at ~1500 chars)
+    let context = "";
+    for (const msg of msgs) {
+      if (!msg.message?.content) continue;
+      if (msg.type !== "user" && msg.type !== "assistant") continue;
+      // deno-lint-ignore no-explicit-any
+      const texts = (msg.message.content as any[])
+        .filter((c: { type: string }) => c.type === "text")
+        .map((c: { text: string }) => c.text);
+      const combined = texts.join(" ").trim();
+      if (!combined || combined.length < 20) continue;
+      const role = msg.type === "user" ? "User" : "Assistant";
+      context += `${role}: ${combined.slice(0, 300)}\n`;
+      if (context.length > 1500) break;
+    }
+
+    if (context.length < 50) {
+      console.warn(`[renameThreadByTopic] Not enough content for session ${sessionId.slice(0, 8)}`);
+      return;
+    }
+
+    let title = "";
+    const result = claudeQuery({
+      prompt:
+        `Summarize the topic of the following conversation as a short phrase (5-10 words). Output only the title itself.\n\n${context}`,
+      options: {
+        maxTurns: 1,
+        cwd: "/tmp",
+        model: "haiku",
+        systemPrompt: {
+          type: "custom" as const,
+          content:
+            "You are a title generator. Output a single short topic title (5-10 words). No explanations, no quotes, no trailing punctuation.",
+        },
+      },
+    });
+    for await (const m of result) {
+      if (m.type === "assistant" && m.message?.content) {
+        // deno-lint-ignore no-explicit-any
+        for (const block of m.message.content as any[]) {
+          if (block.type === "text") title += block.text;
+        }
+      }
+    }
+
+    title = title
+      .split(/\r?\n/)[0]
+      .replace(/^["'`]+|["'`]+$/g, "")
+      .replace(/[#*`_~]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (title.length > DISCORD_THREAD_NAME_MAX) {
+      title = title.slice(0, DISCORD_THREAD_NAME_MAX - 1) + "…";
+    }
+
+    if (!title || title.length < 5) {
+      console.warn(
+        `[renameThreadByTopic] Generated title too short for session ${sessionId.slice(0, 8)}`,
+      );
+      return;
+    }
+
+    await thread.setName(title);
+    console.log(
+      `[renameThreadByTopic] Renamed thread to "${title}" for session ${sessionId.slice(0, 8)}`,
+    );
+  } catch (err) {
+    console.warn("[renameThreadByTopic]", err instanceof Error ? err.message : String(err));
+  }
+}
+
 /**
  * Build a Discord.js payload from a MessageContent object and send it to a channel.
  */
 // deno-lint-ignore no-explicit-any
 async function sendMessageContent(channel: any, content: MessageContent): Promise<void> {
-  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = await import("npm:discord.js@14.14.1");
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } =
+    await import("npm:discord.js@14.14.1");
 
   // deno-lint-ignore no-explicit-any
   const payload: any = {};
@@ -572,12 +844,12 @@ async function sendMessageContent(channel: any, content: MessageContent): Promis
   if (content.content) payload.content = content.content;
 
   if (content.embeds) {
-    payload.embeds = content.embeds.map(e => {
+    payload.embeds = content.embeds.map((e) => {
       const embed = new EmbedBuilder();
       if (e.color !== undefined) embed.setColor(e.color);
       if (e.title) embed.setTitle(e.title);
       if (e.description) embed.setDescription(e.description);
-      if (e.fields) e.fields.forEach(f => embed.addFields(f));
+      if (e.fields) e.fields.forEach((f) => embed.addFields(f));
       if (e.footer) embed.setFooter(e.footer);
       if (e.timestamp) embed.setTimestamp();
       return embed;
@@ -585,21 +857,31 @@ async function sendMessageContent(channel: any, content: MessageContent): Promis
   }
 
   if (content.components) {
-    payload.components = content.components.map(row => {
+    payload.components = content.components.map((row) => {
       // deno-lint-ignore no-explicit-any
       const actionRow = new ActionRowBuilder<any>();
-      row.components.forEach(comp => {
+      row.components.forEach((comp) => {
         const button = new ButtonBuilder().setLabel(comp.label);
 
         switch (comp.style) {
-          case 'primary': button.setStyle(ButtonStyle.Primary); break;
-          case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
-          case 'success': button.setStyle(ButtonStyle.Success); break;
-          case 'danger': button.setStyle(ButtonStyle.Danger); break;
-          case 'link': button.setStyle(ButtonStyle.Link); break;
+          case "primary":
+            button.setStyle(ButtonStyle.Primary);
+            break;
+          case "secondary":
+            button.setStyle(ButtonStyle.Secondary);
+            break;
+          case "success":
+            button.setStyle(ButtonStyle.Success);
+            break;
+          case "danger":
+            button.setStyle(ButtonStyle.Danger);
+            break;
+          case "link":
+            button.setStyle(ButtonStyle.Link);
+            break;
         }
 
-        if (comp.style === 'link' && comp.url) {
+        if (comp.style === "link" && comp.url) {
           button.setURL(comp.url);
         } else if (comp.customId) {
           button.setCustomId(comp.customId);
@@ -613,7 +895,9 @@ async function sendMessageContent(channel: any, content: MessageContent): Promis
 
   // Handle file attachments
   if (content.files && content.files.length > 0) {
-    payload.files = content.files.map(f => new AttachmentBuilder(f.path, { name: f.name || 'attachment', description: f.description }));
+    payload.files = content.files.map((f) =>
+      new AttachmentBuilder(f.path, { name: f.name || "attachment", description: f.description })
+    );
   }
 
   await channel.send(payload);
@@ -627,7 +911,9 @@ async function sendMessageContentTracked(channel: any, content: MessageContent):
   const payload: any = {};
   if (content.content) payload.content = content.content;
   if (content.files && content.files.length > 0) {
-    payload.files = content.files.map(f => new AttachmentBuilder(f.path, { name: f.name || 'attachment', description: f.description }));
+    payload.files = content.files.map((f) =>
+      new AttachmentBuilder(f.path, { name: f.name || "attachment", description: f.description })
+    );
   }
   return await channel.send(payload);
 }
@@ -663,7 +949,7 @@ function createDiscordSenderAdapter(bot: any): DiscordSender {
       if (channel) {
         await sendMessageContent(channel, content);
       }
-    }
+    },
   };
 }
 
@@ -703,14 +989,18 @@ function createChannelSenderAdapter(channel: any): DiscordSender {
  * 4. Returns answers to the SDK so Claude can continue
  */
 // deno-lint-ignore no-explicit-any
-function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (input: AskUserQuestionInput) => Promise<Record<string, string>> {
+function createAskUserDiscordHandler(
+  bot: any,
+  getTargetChannel?: () => any,
+): (input: AskUserQuestionInput) => Promise<Record<string, string>> {
   return async (input: AskUserQuestionInput): Promise<Record<string, string>> => {
     const channel = getTargetChannel?.() ?? bot.getChannel();
     if (!channel) {
-      throw new Error('Discord channel not available');
+      throw new Error("Discord channel not available");
     }
 
-    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = await import("npm:discord.js@14.14.1");
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } =
+      await import("npm:discord.js@14.14.1");
     const answers: Record<string, string> = {};
 
     for (let qi = 0; qi < input.questions.length; qi++) {
@@ -721,11 +1011,19 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
         .setColor(0xff9900)
         .setTitle(`❓ Claude needs your input — ${q.header}`)
         .setDescription(q.question)
-        .setFooter({ text: q.multiSelect ? 'Select option(s), then click ✅ Confirm — Claude is waiting' : 'Click an option to answer — Claude is waiting' })
+        .setFooter({
+          text: q.multiSelect
+            ? "Select option(s), then click ✅ Confirm — Claude is waiting"
+            : "Click an option to answer — Claude is waiting",
+        })
         .setTimestamp();
 
       for (let oi = 0; oi < q.options.length; oi++) {
-        embed.addFields({ name: `${oi + 1}. ${q.options[oi].label}`, value: q.options[oi].description, inline: true });
+        embed.addFields({
+          name: `${oi + 1}. ${q.options[oi].label}`,
+          value: q.options[oi].description,
+          inline: true,
+        });
       }
 
       // Build buttons
@@ -735,7 +1033,7 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
           new ButtonBuilder()
             .setCustomId(`ask-user:${qi}:${oi}`)
             .setLabel(q.options[oi].label)
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonStyle.Primary),
         );
       }
 
@@ -743,8 +1041,8 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`ask-user-confirm:${qi}`)
-            .setLabel('✅ Confirm')
-            .setStyle(ButtonStyle.Success)
+            .setLabel("✅ Confirm")
+            .setStyle(ButtonStyle.Success),
         );
       }
 
@@ -761,7 +1059,7 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
 
         await new Promise<void>((resolve, reject) => {
           // deno-lint-ignore no-explicit-any
-          collector.on('collect', async (i: any) => {
+          collector.on("collect", async (i: any) => {
             const parsed = parseAskUserButtonId(i.customId);
             if (parsed && parsed.questionIndex === qi) {
               const label = q.options[parsed.optionIndex].label;
@@ -769,22 +1067,30 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
                 selected.push(label);
               }
               await i.update({
-                embeds: [embed.setFooter({ text: `Selected: ${selected.join(', ')} — click ✅ Confirm when done` })],
+                embeds: [
+                  embed.setFooter({
+                    text: `Selected: ${selected.join(", ")} — click ✅ Confirm when done`,
+                  }),
+                ],
                 components: [row],
               });
             } else if (parseAskUserConfirmId(i.customId)?.questionIndex === qi) {
-              answers[q.question] = selected.join(', ');
-              collector.stop('confirmed');
+              answers[q.question] = selected.join(", ");
+              collector.stop("confirmed");
               await i.update({
-                embeds: [embed.setColor(0x00ff00).setFooter({ text: `✅ Answered: ${selected.join(', ')}` })],
+                embeds: [
+                  embed.setColor(0x00ff00).setFooter({
+                    text: `✅ Answered: ${selected.join(", ")}`,
+                  }),
+                ],
                 components: [],
               });
               resolve();
             }
           });
 
-          collector.on('end', (_: unknown, reason: string) => {
-            if (reason !== 'confirmed') {
+          collector.on("end", (_: unknown, reason: string) => {
+            if (reason !== "confirmed") {
               reject(new Error(`Question "${q.header}" was cancelled`));
             }
           });
@@ -811,7 +1117,7 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
       }
     }
 
-    console.log('[AskUserQuestion] Collected answers:', JSON.stringify(answers));
+    console.log("[AskUserQuestion] Collected answers:", JSON.stringify(answers));
     return answers;
   };
 }
@@ -827,21 +1133,25 @@ function createAskUserDiscordHandler(bot: any, getTargetChannel?: () => any): (i
  * 5. Returns true (allow) or false (deny)
  */
 // deno-lint-ignore no-explicit-any
-function createPermissionRequestHandler(bot: any, getTargetChannel?: () => any): PermissionRequestCallback {
+function createPermissionRequestHandler(
+  bot: any,
+  getTargetChannel?: () => any,
+): PermissionRequestCallback {
   // Simple incrementing nonce to disambiguate concurrent requests
   let nonce = 0;
 
   return async (toolName: string, toolInput: Record<string, unknown>): Promise<boolean> => {
     const channel = getTargetChannel?.() ?? bot.getChannel();
     if (!channel) {
-      console.warn('[PermissionRequest] No channel — auto-denying');
+      console.warn("[PermissionRequest] No channel — auto-denying");
       return false;
     }
 
     const reqNonce = String(++nonce);
     const embedData = buildPermissionEmbed(toolName, toolInput);
 
-    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = await import("npm:discord.js@14.14.1");
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } =
+      await import("npm:discord.js@14.14.1");
 
     const embed = new EmbedBuilder()
       .setColor(embedData.color)
@@ -857,11 +1167,11 @@ function createPermissionRequestHandler(bot: any, getTargetChannel?: () => any):
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`perm-req:${reqNonce}:allow`)
-        .setLabel('✅ Allow')
+        .setLabel("✅ Allow")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`perm-req:${reqNonce}:deny`)
-        .setLabel('❌ Deny')
+        .setLabel("❌ Deny")
         .setStyle(ButtonStyle.Danger),
     );
 
@@ -885,7 +1195,9 @@ function createPermissionRequestHandler(bot: any, getTargetChannel?: () => any):
       components: [], // Remove buttons after decision
     });
 
-    console.log(`[PermissionRequest] Tool "${toolName}" — ${allowed ? 'ALLOWED' : 'DENIED'} by user`);
+    console.log(
+      `[PermissionRequest] Tool "${toolName}" — ${allowed ? "ALLOWED" : "DENIED"} by user`,
+    );
     return allowed;
   };
 }
@@ -898,7 +1210,10 @@ function setupSignalHandlers(ctx: {
   allHandlers: AllHandlers;
   getClaudeController: () => AbortController | null;
   abortAllSessions?: () => void;
-  claudeSender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void } | null;
+  claudeSender: {
+    send: (messages: ClaudeMessage[]) => Promise<void>;
+    setSessionId: (id: string) => void;
+  } | null;
   actualCategoryName: string;
   repoName: string;
   branchName: string;
@@ -906,7 +1221,18 @@ function setupSignalHandlers(ctx: {
   // deno-lint-ignore no-explicit-any
   bot: any;
 }) {
-  const { managers, allHandlers, getClaudeController, abortAllSessions, claudeSender, actualCategoryName, repoName, branchName, cleanupInterval, bot } = ctx;
+  const {
+    managers,
+    allHandlers,
+    getClaudeController,
+    abortAllSessions,
+    claudeSender,
+    actualCategoryName,
+    repoName,
+    branchName,
+    cleanupInterval,
+    bot,
+  } = ctx;
   const { crashHandler, healthMonitor } = managers;
   const { shell: shellHandlers, git: gitHandlers } = allHandlers;
 
@@ -931,15 +1257,15 @@ function setupSignalHandlers(ctx: {
       // Send shutdown message
       if (claudeSender) {
         await claudeSender.send([{
-          type: 'system',
-          content: '',
+          type: "system",
+          content: "",
           metadata: {
-            subtype: 'shutdown',
+            subtype: "shutdown",
             signal,
             categoryName: actualCategoryName,
             repoName,
-            branchName
-          }
+            branchName,
+          },
         }]);
       }
 
@@ -954,14 +1280,12 @@ function setupSignalHandlers(ctx: {
         Deno.exit(0);
       }, 1000);
     } catch (error) {
-      console.error('Error during shutdown:', error);
+      console.error("Error during shutdown:", error);
       Deno.exit(1);
     }
   };
 
   // Cross-platform signal handling
-  const platform = Deno.build.os;
-
   try {
     Deno.addSignalListener("SIGINT", () => handleSignal("SIGINT"));
 
@@ -969,11 +1293,11 @@ function setupSignalHandlers(ctx: {
       Deno.addSignalListener("SIGTERM", () => handleSignal("SIGTERM"));
     } catch (unixError) {
       const message = unixError instanceof Error ? unixError.message : String(unixError);
-      console.warn('Could not register SIGTERM handler:', message);
+      console.warn("Could not register SIGTERM handler:", message);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn('Signal handler registration error:', message);
+    console.warn("Signal handler registration error:", message);
   }
 }
 
@@ -993,24 +1317,26 @@ async function loadEnvFile(): Promise<void> {
     if (!stat?.isFile) return;
 
     const content = await Deno.readTextFile(envPath);
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
     for (const line of lines) {
       const trimmed = line.trim();
 
       // Skip comments and empty lines
-      if (!trimmed || trimmed.startsWith('#')) continue;
+      if (!trimmed || trimmed.startsWith("#")) continue;
 
       // Parse KEY=VALUE format
-      const eqIndex = trimmed.indexOf('=');
+      const eqIndex = trimmed.indexOf("=");
       if (eqIndex === -1) continue;
 
       const key = trimmed.substring(0, eqIndex).trim();
       let value = trimmed.substring(eqIndex + 1).trim();
 
       // Remove surrounding quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
 
@@ -1020,7 +1346,7 @@ async function loadEnvFile(): Promise<void> {
       }
     }
 
-    console.log('✓ Loaded configuration from .env file');
+    console.log("✓ Loaded configuration from .env file");
   } catch (error) {
     // Silently ignore .env loading errors
     const message = error instanceof Error ? error.message : String(error);

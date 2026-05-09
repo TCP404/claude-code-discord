@@ -74,7 +74,9 @@ export async function createWorkspace(deps: AdminDeps, req: Request): Promise<Re
   // Place under the same category as the default channel
   const defaultChannelId = [...deps.workspaceManager.getManagedChannelIds()][0];
   const defaultChannel = defaultChannelId ? guild.channels.cache.get(defaultChannelId) : null;
-  const categoryId = defaultChannel && 'parentId' in defaultChannel ? defaultChannel.parentId : null;
+  const categoryId = defaultChannel && "parentId" in defaultChannel
+    ? defaultChannel.parentId
+    : null;
 
   let channelId: string;
   try {
@@ -95,7 +97,11 @@ export async function createWorkspace(deps: AdminDeps, req: Request): Promise<Re
   return json({ ok: true, workspace: { name, path, channelId } }, 201);
 }
 
-export async function updateWorkspace(deps: AdminDeps, name: string, req: Request): Promise<Response> {
+export async function updateWorkspace(
+  deps: AdminDeps,
+  name: string,
+  req: Request,
+): Promise<Response> {
   const existing = deps.workspaceManager.findByName(name);
   if (!existing) {
     return json({ error: `Workspace "${name}" not found` }, 404);
@@ -106,6 +112,7 @@ export async function updateWorkspace(deps: AdminDeps, name: string, req: Reques
     name: existing.name,
     path: body.path ?? existing.path,
     channelId: body.channelId ?? existing.channelId,
+    autoThread: typeof body.autoThread === "boolean" ? body.autoThread : existing.autoThread,
   };
 
   if (body.path) {
@@ -210,7 +217,9 @@ export function listChannels(deps: AdminDeps): Response {
       name: ch.name,
       category: ch.parent?.name ?? null,
     }))
-    .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name)
+    );
 
   return json(channels);
 }

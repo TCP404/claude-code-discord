@@ -12,11 +12,11 @@ export interface EmbedData {
 }
 
 export interface ComponentData {
-  type: 'button';
+  type: "button";
   customId?: string;
   url?: string;
   label: string;
-  style: 'primary' | 'secondary' | 'success' | 'danger' | 'link';
+  style: "primary" | "secondary" | "success" | "danger" | "link";
   disabled?: boolean;
 }
 
@@ -32,7 +32,7 @@ export interface FileAttachment {
 export interface MessageContent {
   content?: string;
   embeds?: EmbedData[];
-  components?: Array<{ type: 'actionRow'; components: ComponentData[] }>;
+  components?: Array<{ type: "actionRow"; components: ComponentData[] }>;
   /** File attachments to include */
   files?: FileAttachment[];
 }
@@ -136,4 +136,8 @@ export interface BotDependencies {
   setResponseChannel?: (channel: any) => void;
   /** Returns set of channel IDs managed by workspace system (checked by isOurChannel) */
   getManagedChannelIds?: () => Set<string>;
+  /** Returns true when the given channel has the auto-thread workspace option enabled */
+  isAutoThreadChannel?: (channelId: string) => boolean;
+  /** Callback for plain text messages in auto-thread-enabled workspace channels */
+  onWorkspaceMessage?: (channelId: string, content: string) => Promise<void>;
 }

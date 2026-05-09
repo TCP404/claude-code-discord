@@ -1,21 +1,21 @@
 import {
-  Client,
-  GatewayIntentBits,
-  Events,
-  ChannelType,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  REST,
-  Routes,
-  CommandInteraction,
-  ButtonInteraction,
+  AttachmentBuilder,
   AutocompleteInteraction,
-  TextChannel,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  ChannelType,
+  Client,
+  CommandInteraction,
   EmbedBuilder,
+  Events,
+  GatewayIntentBits,
   Message,
   MessageFlags,
-  AttachmentBuilder,
+  REST,
+  Routes,
+  TextChannel,
 } from "npm:discord.js@14.14.1";
 
 import { sanitizeChannelName } from "./utils.ts";
@@ -27,13 +27,12 @@ import { SETTINGS_ACTIONS, SETTINGS_VALUES } from "../settings/unified-settings.
 import { BOT_VERSION } from "../util/version-check.ts";
 import type {
   BotConfig,
-  CommandHandlers,
+  BotDependencies,
   ButtonHandlers,
-  MessageContent,
+  CommandHandlers,
   InteractionContext,
-  BotDependencies
+  MessageContent,
 } from "./types.ts";
-
 
 // ================================
 // Helper Functions
@@ -47,12 +46,12 @@ function convertMessageContent(content: MessageContent): any {
   if (content.content) payload.content = content.content;
 
   if (content.embeds) {
-    payload.embeds = content.embeds.map(e => {
+    payload.embeds = content.embeds.map((e) => {
       const embed = new EmbedBuilder();
       if (e.color !== undefined) embed.setColor(e.color);
       if (e.title) embed.setTitle(e.title);
       if (e.description) embed.setDescription(e.description);
-      if (e.fields) e.fields.forEach(f => embed.addFields(f));
+      if (e.fields) e.fields.forEach((f) => embed.addFields(f));
       if (e.footer) embed.setFooter(e.footer);
       if (e.timestamp) embed.setTimestamp();
       return embed;
@@ -60,20 +59,30 @@ function convertMessageContent(content: MessageContent): any {
   }
 
   if (content.components) {
-    payload.components = content.components.map(row => {
+    payload.components = content.components.map((row) => {
       const actionRow = new ActionRowBuilder<ButtonBuilder>();
-      row.components.forEach(comp => {
+      row.components.forEach((comp) => {
         const button = new ButtonBuilder().setLabel(comp.label);
 
         switch (comp.style) {
-          case 'primary': button.setStyle(ButtonStyle.Primary); break;
-          case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
-          case 'success': button.setStyle(ButtonStyle.Success); break;
-          case 'danger': button.setStyle(ButtonStyle.Danger); break;
-          case 'link': button.setStyle(ButtonStyle.Link); break;
+          case "primary":
+            button.setStyle(ButtonStyle.Primary);
+            break;
+          case "secondary":
+            button.setStyle(ButtonStyle.Secondary);
+            break;
+          case "success":
+            button.setStyle(ButtonStyle.Success);
+            break;
+          case "danger":
+            button.setStyle(ButtonStyle.Danger);
+            break;
+          case "link":
+            button.setStyle(ButtonStyle.Link);
+            break;
         }
 
-        if (comp.style === 'link' && comp.url) {
+        if (comp.style === "link" && comp.url) {
           button.setURL(comp.url);
         } else if (comp.customId) {
           button.setCustomId(comp.customId);
@@ -87,9 +96,9 @@ function convertMessageContent(content: MessageContent): any {
 
   // Handle file attachments
   if (content.files && content.files.length > 0) {
-    payload.files = content.files.map(f => ({
+    payload.files = content.files.map((f) => ({
       attachment: f.path,
-      name: f.name || 'attachment',
+      name: f.name || "attachment",
       description: f.description,
     }));
   }
@@ -106,7 +115,7 @@ export async function createDiscordBot(
   handlers: CommandHandlers,
   buttonHandlers: ButtonHandlers,
   dependencies: BotDependencies,
-  crashHandler?: any
+  crashHandler?: any,
 ) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName } = config;
   const actualCategoryName = categoryName || repoName;
@@ -140,7 +149,7 @@ export async function createDiscordBot(
 
     let category = guild.channels.cache.find(
       // deno-lint-ignore no-explicit-any
-      (c: any) => c.type === ChannelType.GuildCategory && c.name === actualCategoryName
+      (c: any) => c.type === ChannelType.GuildCategory && c.name === actualCategoryName,
     );
 
     if (!category) {
@@ -153,7 +162,9 @@ export async function createDiscordBot(
         console.log(`Created category "${actualCategoryName}"`);
       } catch (error) {
         console.error(`Category creation error: ${error}`);
-        throw new Error(`Cannot create category. Please ensure the bot has "Manage Channels" permission.`);
+        throw new Error(
+          `Cannot create category. Please ensure the bot has "Manage Channels" permission.`,
+        );
       }
     }
 
@@ -161,7 +172,8 @@ export async function createDiscordBot(
 
     let channel = guild.channels.cache.find(
       // deno-lint-ignore no-explicit-any
-      (c: any) => c.type === ChannelType.GuildText && c.name === channelName && c.parentId === category.id
+      (c: any) =>
+        c.type === ChannelType.GuildText && c.name === channelName && c.parentId === category.id,
     );
 
     if (!channel) {
@@ -171,12 +183,15 @@ export async function createDiscordBot(
           name: channelName,
           type: ChannelType.GuildText,
           parent: category.id,
-          topic: `Repository: ${repoName} | Branch: ${branchName} | Machine: ${Deno.hostname()} | Path: ${workDir}`,
+          topic:
+            `Repository: ${repoName} | Branch: ${branchName} | Machine: ${Deno.hostname()} | Path: ${workDir}`,
         });
         console.log(`Created channel "${channelName}"`);
       } catch (error) {
         console.error(`Channel creation error: ${error}`);
-        throw new Error(`Cannot create channel. Please ensure the bot has "Manage Channels" permission.`);
+        throw new Error(
+          `Cannot create channel. Please ensure the bot has "Manage Channels" permission.`,
+        );
       }
     }
 
@@ -184,7 +199,9 @@ export async function createDiscordBot(
   }
 
   // Create interaction context wrapper
-  function createInteractionContext(interaction: CommandInteraction | ButtonInteraction): InteractionContext {
+  function createInteractionContext(
+    interaction: CommandInteraction | ButtonInteraction,
+  ): InteractionContext {
     return {
       async deferReply(): Promise<void> {
         await interaction.deferReply();
@@ -207,7 +224,7 @@ export async function createDiscordBot(
       },
 
       async update(content: MessageContent): Promise<void> {
-        if ('update' in interaction) {
+        if ("update" in interaction) {
           await (interaction as ButtonInteraction).update(convertMessageContent(content));
         }
       },
@@ -238,10 +255,10 @@ export async function createDiscordBot(
 
       getMemberRoleIds(): Set<string> {
         const member = interaction.member;
-        if (member && 'roles' in member && member.roles && 'cache' in member.roles) {
+        if (member && "roles" in member && member.roles && "cache" in member.roles) {
           // deno-lint-ignore no-explicit-any
           const cache = (member.roles as any).cache;
-          if (cache && typeof cache.keys === 'function') {
+          if (cache && typeof cache.keys === "function") {
             return new Set([...cache.keys()]);
           }
         }
@@ -249,11 +266,11 @@ export async function createDiscordBot(
       },
 
       getUserId(): string {
-        return interaction.user?.id ?? '';
+        return interaction.user?.id ?? "";
       },
 
       getChannelId(): string {
-        return interaction.channelId ?? '';
+        return interaction.channelId ?? "";
       },
 
       getSubcommand(): string | null {
@@ -261,10 +278,12 @@ export async function createDiscordBot(
           try {
             // deno-lint-ignore no-explicit-any
             return (interaction as any).options.getSubcommand(false) ?? null;
-          } catch { return null; }
+          } catch {
+            return null;
+          }
         }
         return null;
-      }
+      },
     };
   }
 
@@ -317,7 +336,7 @@ export async function createDiscordBot(
     if (!handler) {
       await ctx.reply({
         content: `Unknown command: ${interaction.commandName}`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -330,12 +349,16 @@ export async function createDiscordBot(
       try {
         if (interaction.deferred) {
           await ctx.editReply({
-            content: `Error executing command: ${error instanceof Error ? error.message : 'Unknown error'}`
+            content: `Error executing command: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
           });
         } else {
           await ctx.reply({
-            content: `Error executing command: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            ephemeral: true
+            content: `Error executing command: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+            ephemeral: true,
           });
         }
       } catch {
@@ -346,24 +369,24 @@ export async function createDiscordBot(
 
   // Autocomplete handler for /settings action & value fields
   async function handleAutocomplete(interaction: AutocompleteInteraction) {
-    if (interaction.commandName !== 'settings') return;
+    if (interaction.commandName !== "settings") return;
 
     const focused = interaction.options.getFocused(true);
-    const category = interaction.options.getString('category') ?? '';
-    const action = interaction.options.getString('action') ?? '';
+    const category = interaction.options.getString("category") ?? "";
+    const action = interaction.options.getString("action") ?? "";
     const typed = focused.value.toLowerCase();
 
     let choices: { name: string; value: string }[] = [];
 
-    if (focused.name === 'action') {
+    if (focused.name === "action") {
       choices = SETTINGS_ACTIONS[category] ?? [];
-    } else if (focused.name === 'value') {
+    } else if (focused.name === "value") {
       choices = SETTINGS_VALUES[action] ?? [];
     }
 
     // Filter by what the user has typed so far
     const filtered = choices
-      .filter(c => c.name.toLowerCase().includes(typed) || c.value.toLowerCase().includes(typed))
+      .filter((c) => c.name.toLowerCase().includes(typed) || c.value.toLowerCase().includes(typed))
       .slice(0, 25); // Discord max 25 choices
 
     await interaction.respond(filtered);
@@ -378,20 +401,27 @@ export async function createDiscordBot(
     const ctx = createInteractionContext(interaction);
 
     // Handle pagination buttons first
-    if (interaction.customId.startsWith('pagination:')) {
+    if (interaction.customId.startsWith("pagination:")) {
       try {
         const paginationResult = handlePaginationInteraction(interaction.customId);
         if (paginationResult) {
           await ctx.update({
             embeds: [paginationResult.embed],
-            components: paginationResult.components ? [{ type: 'actionRow', components: paginationResult.components }] : []
+            components: paginationResult.components
+              ? [{ type: "actionRow", components: paginationResult.components }]
+              : [],
           });
           return;
         }
       } catch (error) {
-        console.error('Error handling pagination:', error);
+        console.error("Error handling pagination:", error);
         if (crashHandler) {
-          await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'pagination', 'Button interaction');
+          await crashHandler.reportCrash(
+            "main",
+            error instanceof Error ? error : new Error(String(error)),
+            "pagination",
+            "Button interaction",
+          );
         }
       }
     }
@@ -404,12 +434,19 @@ export async function createDiscordBot(
       } catch (error) {
         console.error(`Error handling button ${interaction.customId}:`, error);
         if (crashHandler) {
-          await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'button', `ID: ${interaction.customId}`);
+          await crashHandler.reportCrash(
+            "main",
+            error instanceof Error ? error : new Error(String(error)),
+            "button",
+            `ID: ${interaction.customId}`,
+          );
         }
         try {
           await ctx.followUp({
-            content: `Error handling button: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            ephemeral: true
+            content: `Error handling button: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+            ephemeral: true,
           });
         } catch {
           // Ignore errors when sending error message
@@ -422,33 +459,36 @@ export async function createDiscordBot(
     const buttonId = interaction.customId;
 
     // Handle continue with session ID pattern: "continue:sessionId"
-    if (buttonId.startsWith('continue:')) {
+    if (buttonId.startsWith("continue:")) {
       if (dependencies.onContinueSession) {
         try {
           await dependencies.onContinueSession(ctx);
         } catch (error) {
-          console.error('Error handling continue button:', error);
+          console.error("Error handling continue button:", error);
           try {
             await ctx.followUp({
-              content: `Error continuing session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              ephemeral: true
+              content: `Error continuing session: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+              ephemeral: true,
             });
           } catch { /* ignore follow-up errors */ }
         }
       } else {
         // Fallback: show session ID text if callback not wired
-        const sessionId = buttonId.split(':')[1];
+        const sessionId = buttonId.split(":")[1];
         try {
           await ctx.update({
             embeds: [{
               color: 0xffff00,
-              title: '\u27a1\ufe0f Continue Session',
-              description: `Use \`/continue\` or \`/claude session_id:${sessionId}\` to continue this conversation.`,
+              title: "\u27a1\ufe0f Continue Session",
+              description:
+                `Use \`/continue\` or \`/claude session_id:${sessionId}\` to continue this conversation.`,
               fields: [
-                { name: 'Session ID', value: `\`${sessionId}\``, inline: false }
+                { name: "Session ID", value: `\`${sessionId}\``, inline: false },
               ],
-              timestamp: true
-            }]
+              timestamp: true,
+            }],
           });
         } catch (error) {
           console.error(`Error handling continue button fallback:`, error);
@@ -458,19 +498,23 @@ export async function createDiscordBot(
     }
 
     // Handle copy session ID pattern: "copy-session:sessionId" (legacy — kept for old messages)
-    if (buttonId.startsWith('copy-session:')) {
-      const sessionId = buttonId.split(':')[1];
+    if (buttonId.startsWith("copy-session:")) {
+      const sessionId = buttonId.split(":")[1];
       try {
         await ctx.update({
           embeds: [{
             color: 0x00ff00,
-            title: '\ud83d\udccb Session ID',
+            title: "\ud83d\udccb Session ID",
             description: `\`${sessionId}\``,
             fields: [
-              { name: 'Usage', value: 'Copy this ID to use with `/claude session_id:...`', inline: false }
+              {
+                name: "Usage",
+                value: "Copy this ID to use with `/claude session_id:...`",
+                inline: false,
+              },
             ],
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
       } catch (error) {
         console.error(`Error handling copy-session button:`, error);
@@ -479,14 +523,14 @@ export async function createDiscordBot(
     }
 
     // Handle file upload button: "file:fileId"
-    if (buttonId.startsWith('file:')) {
+    if (buttonId.startsWith("file:")) {
       const fileId = buttonId.substring(5);
       const fileInfo = pendingFileUploads.get(fileId);
       if (!fileInfo) {
         try {
           await interaction.reply({
-            content: '⚠️ 文件已过期，请重新生成。',
-            ephemeral: true
+            content: "⚠️ 文件已过期，请重新生成。",
+            ephemeral: true,
           });
         } catch { /* ignore */ }
         return;
@@ -495,14 +539,14 @@ export async function createDiscordBot(
         const attachment = new AttachmentBuilder(fileInfo.path, { name: fileInfo.name });
         await interaction.reply({
           files: [attachment],
-          ephemeral: false
+          ephemeral: false,
         });
       } catch (error) {
         console.error(`[File Upload] Error:`, error);
         try {
           await interaction.reply({
             content: `❌ 文件上传失败: ${error instanceof Error ? error.message : String(error)}`,
-            ephemeral: true
+            ephemeral: true,
           });
         } catch { /* ignore */ }
       }
@@ -510,9 +554,7 @@ export async function createDiscordBot(
     }
 
     // Handle expand content pattern: "expand:contentId"
-    if (buttonId.startsWith('expand:')) {
-      const expandId = buttonId.substring(7);
-
+    if (buttonId.startsWith("expand:")) {
       // Try to find a handler that can process expand buttons
       for (const [handlerName, handler] of handlers.entries()) {
         if (handler.handleButton) {
@@ -530,11 +572,11 @@ export async function createDiscordBot(
         await ctx.update({
           embeds: [{
             color: 0xffaa00,
-            title: '📖 Content Not Available',
-            description: 'The full content is no longer available for expansion.',
-            timestamp: true
+            title: "📖 Content Not Available",
+            description: "The full content is no longer available for expansion.",
+            timestamp: true,
           }],
-          components: []
+          components: [],
         });
       } catch (error) {
         console.error(`Error handling expand button fallback:`, error);
@@ -543,7 +585,7 @@ export async function createDiscordBot(
     }
 
     // If no specific handler found, try to delegate to command handlers with handleButton method
-    const commandHandler = Array.from(handlers.values()).find(h => h.handleButton);
+    const commandHandler = Array.from(handlers.values()).find((h) => h.handleButton);
     if (commandHandler?.handleButton) {
       try {
         await commandHandler.handleButton(ctx, interaction.customId);
@@ -551,8 +593,10 @@ export async function createDiscordBot(
         console.error(`Error handling button ${interaction.customId} via command handler:`, error);
         try {
           await ctx.followUp({
-            content: `Error handling button: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            ephemeral: true
+            content: `Error handling button: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+            ephemeral: true,
           });
         } catch {
           // Ignore errors when sending error message
@@ -564,23 +608,23 @@ export async function createDiscordBot(
   }
 
   // Register commands
-  const rest = new REST({ version: '10' }).setToken(discordToken);
+  const rest = new REST({ version: "10" }).setToken(discordToken);
 
   try {
-    console.log('Registering slash commands...');
+    console.log("Registering slash commands...");
     await rest.put(
-      Routes.applicationGuildCommands(applicationId, Deno.env.get('GUILD_ID') || ''),
-      { body: commands.map(cmd => cmd.toJSON()) },
+      Routes.applicationGuildCommands(applicationId, Deno.env.get("GUILD_ID") || ""),
+      { body: commands.map((cmd) => cmd.toJSON()) },
     );
-    console.log('Slash commands registered');
+    console.log("Slash commands registered");
   } catch (error) {
-    console.error('Failed to register slash commands:', error);
+    console.error("Failed to register slash commands:", error);
     throw error;
   }
 
   // Wait for ClientReady to fully complete (including async channel setup)
   // before returning, so callers can safely call getChannel() immediately.
-  const readyPromise = new Promise<void>((resolve, reject) => {
+  const readyPromise = new Promise<void>((resolve, _reject) => {
     client.once(Events.ClientReady, async () => {
       console.log(`Bot logged in: ${client.user?.tag}`);
       console.log(`Category: ${actualCategoryName}`);
@@ -589,14 +633,14 @@ export async function createDiscordBot(
 
       const guilds = client.guilds.cache;
       if (guilds.size === 0) {
-        console.error('Error: Bot is not in any servers');
+        console.error("Error: Bot is not in any servers");
         resolve();
         return;
       }
 
       const guild = guilds.first();
       if (!guild) {
-        console.error('Error: Guild not found');
+        console.error("Error: Guild not found");
         resolve();
         return;
       }
@@ -611,26 +655,46 @@ export async function createDiscordBot(
             title: `🚀 v${BOT_VERSION} — Startup Complete`,
             description: `Claude Code bot for branch ${branchName} has started`,
             fields: [
-              { name: 'Category', value: actualCategoryName, inline: true },
-              { name: 'Repository', value: repoName, inline: true },
-              { name: 'Branch', value: branchName, inline: true },
-              { name: 'Working Directory', value: `\`${workDir}\``, inline: false }
+              { name: "Category", value: actualCategoryName, inline: true },
+              { name: "Repository", value: repoName, inline: true },
+              { name: "Branch", value: branchName, inline: true },
+              { name: "Working Directory", value: `\`${workDir}\``, inline: false },
             ],
-            timestamp: true
+            timestamp: true,
           }],
           components: [{
-            type: 'actionRow',
+            type: "actionRow",
             components: [
-              { type: 'button', customId: 'startup:sessions', label: '📂 Sessions', style: 'secondary' },
-              { type: 'button', customId: 'workflow:git-status', label: '📋 Git Status', style: 'secondary' },
-              { type: 'button', customId: 'startup:system-info', label: '💻 System Info', style: 'secondary' },
-              { type: 'button', url: `http://localhost:${Number(Deno.env.get("ADMIN_PORT")) || 7860}`, label: '🌐 Admin Web', style: 'link' },
-            ]
-          }]
+              {
+                type: "button",
+                customId: "startup:sessions",
+                label: "📂 Sessions",
+                style: "secondary",
+              },
+              {
+                type: "button",
+                customId: "workflow:git-status",
+                label: "📋 Git Status",
+                style: "secondary",
+              },
+              {
+                type: "button",
+                customId: "startup:system-info",
+                label: "💻 System Info",
+                style: "secondary",
+              },
+              {
+                type: "button",
+                url: `http://localhost:${Number(Deno.env.get("ADMIN_PORT")) || 7860}`,
+                label: "🌐 Admin Web",
+                style: "link",
+              },
+            ],
+          }],
         }));
         resolve();
       } catch (error) {
-        console.error('Channel creation/retrieval error:', error);
+        console.error("Channel creation/retrieval error:", error);
         resolve(); // resolve even on error so the bot doesn't hang
       }
     });
@@ -646,16 +710,26 @@ export async function createDiscordBot(
     }
   });
 
-  // Auto-resume: plain text or voice messages in session threads trigger Claude
-  if (dependencies.onThreadMessage) {
+  // Auto-resume: plain text or voice messages in session threads trigger Claude.
+  // Auto-thread: plain text in workspace channels (with autoThread on) spawns a new thread.
+  if (dependencies.onThreadMessage || dependencies.onWorkspaceMessage) {
     const onThreadMessage = dependencies.onThreadMessage;
-    client.on(Events.MessageCreate, async (message: Message) => {
-      // Ignore bot messages and slash commands
-      if (message.author.bot) return;
-      if (message.content.startsWith('/')) return;
+    const onWorkspaceMessage = dependencies.onWorkspaceMessage;
+    const isAutoThreadChannel = dependencies.isAutoThreadChannel;
 
-      // Only handle messages inside threads
-      if (!message.channel.isThread()) return;
+    client.on(Events.MessageCreate, async (message: Message) => {
+      if (message.author.bot) return;
+      if (message.content.startsWith("/")) return;
+
+      const inThread = message.channel.isThread();
+      const autoThreadEnabled = !inThread &&
+        !!onWorkspaceMessage &&
+        !!isAutoThreadChannel &&
+        isAutoThreadChannel(message.channelId);
+
+      // Ignore messages that neither trigger thread-resume nor auto-thread
+      if (!inThread && !autoThreadEnabled) return;
+      if (inThread && !onThreadMessage) return;
 
       // Multi-bot coexistence: if the message mentions another bot but not us, skip
       const mentionedUsers = message.mentions.users;
@@ -673,13 +747,15 @@ export async function createDiscordBot(
       let textContent = message.content.trim();
 
       if (isVoiceMessage) {
-        const audioAttachment = message.attachments.find(a =>
+        const audioAttachment = message.attachments.find((a) =>
           a.contentType?.startsWith("audio/")
         );
         if (!audioAttachment) return;
 
         if (!isVoiceTranscriptionEnabled()) {
-          await message.reply("⚠️ Voice transcription is not configured. Set `OPENAI_API_KEY` to enable.");
+          await message.reply(
+            "⚠️ Voice transcription is not configured. Set `OPENAI_API_KEY` to enable.",
+          );
           return;
         }
 
@@ -688,8 +764,10 @@ export async function createDiscordBot(
           textContent = await transcribeAudio(audioAttachment.url);
           await message.reply(`🎙️ *Transcribed:* ${textContent}`);
         } catch (error) {
-          console.error('[Voice] Transcription failed:', error);
-          await message.reply("❌ Voice transcription failed. Please try again or type your message.");
+          console.error("[Voice] Transcription failed:", error);
+          await message.reply(
+            "❌ Voice transcription failed. Please try again or type your message.",
+          );
           return;
         }
       }
@@ -697,9 +775,13 @@ export async function createDiscordBot(
       if (!textContent) return;
 
       try {
-        await onThreadMessage(message.channelId, textContent);
+        if (inThread) {
+          await onThreadMessage!(message.channelId, textContent);
+        } else {
+          await onWorkspaceMessage!(message.channelId, textContent);
+        }
       } catch (error) {
-        console.error('[ThreadMessage] Error handling thread message:', error);
+        console.error("[MessageCreate] Error handling message:", error);
       }
     });
   }
@@ -719,7 +801,9 @@ export async function createDiscordBot(
       const content = message.content;
       if (!content) return;
 
-      console.log(`[Monitor] Alert detected from ${message.author.id}: ${content.substring(0, 100)}...`);
+      console.log(
+        `[Monitor] Alert detected from ${message.author.id}: ${content.substring(0, 100)}...`,
+      );
 
       pendingAlerts.push(content);
       lastAlertMessage = message;
@@ -735,7 +819,7 @@ export async function createDiscordBot(
         lastAlertMessage = null;
         debounceTimer = null;
 
-        const combined = alertBatch.join('\n---\n');
+        const combined = alertBatch.join("\n---\n");
         const channel = threadAnchor.channel as TextChannel;
 
         try {
@@ -746,13 +830,17 @@ export async function createDiscordBot(
 
           await onAlertMessage(combined, thread as unknown as TextChannel);
         } catch (error) {
-          console.error('[Monitor] Error handling alert:', error);
-          await channel.send(`Failed to investigate alert: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.error("[Monitor] Error handling alert:", error);
+          await channel.send(
+            `Failed to investigate alert: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+          );
         }
       }, 30_000);
     });
 
-    console.log(`[Monitor] Watching channel ${channelId} for messages from ${botIds.join(', ')}`);
+    console.log(`[Monitor] Watching channel ${channelId} for messages from ${botIds.join(", ")}`);
   }
 
   // Login and wait for ClientReady handler to complete
@@ -777,6 +865,6 @@ export async function createDiscordBot(
     },
     getBotSettings() {
       return { ...botSettings };
-    }
+    },
   };
 }
