@@ -1,22 +1,42 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { splitText } from "../discord/utils.ts";
-import type { ClaudeMessage } from "./types.ts";
-import type { ComponentData, EmbedData, MessageContent } from "../discord/types.ts";
-import { generatePreview } from "./file-preview.ts";
-import { getUsage, recordUsage } from "./session-usage.ts";
+/**
+ * Claude → Discord message sender.
+ * Orchestrates status line management and dispatches to per-type renderers.
+ *
+ * @module claude/discord-sender
+ */
 
-// Marker pattern: model outputs [FILE:/path/to/file] to explicitly deliver a file to the user
-const FILE_MARKER_REGEX = /\[FILE:((?:\/|\.\/)[^\]]+)\]/g;
+import type { ClaudeMessage } from "./types.ts";
+import type { MessageContent } from "../discord/types.ts";
+import { getUsage, recordUsage } from "./session-usage.ts";
+import {
+  hiddenMessageTypes,
+  toStatusLine,
+} from "./sender-utils.ts";
+import {
+  deliverFileMarkers,
+  renderText,
+  renderToolUse,
+  renderToolResult,
+  renderThinking,
+  renderSystem,
+  renderOther,
+  renderPermissionDenied,
+  renderTaskStarted,
+  renderTaskNotification,
+  renderToolProgress,
+  renderToolSummary,
+  type RendererContext,
+} from "./sender-renderers.ts";
+
+// Re-export public API that other modules depend on
+export { hiddenMessageTypes, FILE_MARKER_REGEX } from "./sender-utils.ts";
 
 // Discord sender interface for dependency injection
 export interface DiscordSender {
   sendMessage(content: MessageContent): Promise<void>;
-  /** Send a message and return an opaque handle for later editing/deleting */
   sendTracked?(content: MessageContent): Promise<TrackedMessage>;
 }
 
-/** Opaque handle to a sent Discord message */
 export interface TrackedMessage {
   edit(content: MessageContent): Promise<void>;
   delete(): Promise<void>;
@@ -28,190 +48,16 @@ export const expandableContent = new Map<string, string>();
 // Store file paths for button-triggered uploads
 export const pendingFileUploads = new Map<string, { path: string; name: string }>();
 
-// Message types that are hidden by default — toggled via /show_system, /show_tool_details
-// Key = message type (or "system:init" for non-completion system messages)
-export const hiddenMessageTypes = new Set<string>([
-  "system", // ⚙️ System: init, etc. (non-completion)
-  "system:completion", // ✅ Claude Code Complete
-  "tool_use", // 🔧 Tool Use
-  "tool_result", // ✅ Tool Result
-  "tool_progress", // ⏳ running...
-  "tool_summary", // 📋 Tool Summary
-  "other", // Unrecognized content blocks (e.g., agent prompts)
-]);
-
-// Helper function to create action buttons for completed sessions
-function createActionButtons(sessionId?: string): ComponentData[] {
-  const buttons: ComponentData[] = [];
-
-  if (sessionId) {
-    buttons.push({
-      type: "button",
-      customId: `continue:${sessionId}`,
-      label: "▶️ Continue",
-      style: "primary",
-    });
-  }
-
-  buttons.push(
-    {
-      type: "button",
-      customId: "workflow:git-status",
-      label: "📊 Git Status",
-      style: "secondary",
-    },
-    {
-      type: "button",
-      customId: "prompt-history",
-      label: "📜 Prompt History",
-      style: "secondary",
-    },
-  );
-
-  return buttons;
-}
-
-// Helper function to truncate content with smart preview
-function truncateContent(
-  content: string,
-  maxLines = 15,
-  maxChars = 1000,
-): { preview: string; isTruncated: boolean; totalLines: number } {
-  const lines = content.split("\n");
-  const totalLines = lines.length;
-  const truncatedLines = lines.slice(0, maxLines);
-  const preview = truncatedLines.join("\n");
-
-  if (preview.length > maxChars) {
-    return {
-      preview: preview.substring(0, maxChars - 3) + "...",
-      isTruncated: true,
-      totalLines,
-    };
-  }
-
-  return {
-    preview,
-    isTruncated: lines.length > maxLines,
-    totalLines,
-  };
-}
-
-// Format stop_reason for human-readable display in completion embeds
-// See SDK v0.2.31+ for stop_reason field on result messages
-function formatStopReason(stopReason?: string, sdkSubtype?: string): string | null {
-  // Map SDK error subtypes to user-friendly messages
-  if (sdkSubtype && sdkSubtype !== "success") {
-    const subtypeMap: Record<string, string> = {
-      "error_max_turns": "🔄 Hit turn limit",
-      "error_budget": "💰 Budget exceeded",
-      "error_tool": "🔧 Tool error",
-      "error_streaming": "📡 Streaming error",
-    };
-    if (subtypeMap[sdkSubtype]) return subtypeMap[sdkSubtype];
-  }
-
-  if (!stopReason) return null;
-
-  const reasonMap: Record<string, string> = {
-    "end_turn": "✅ Completed",
-    "max_tokens": "⚠️ Hit token limit",
-    "refusal": "🚫 Request declined",
-    "stop_sequence": "⏹️ Stop sequence",
-    "tool_use": "🔧 Tool use",
-  };
-
-  return reasonMap[stopReason] ?? null;
-}
-
-// Helper function to detect file type from path
-function getFileTypeInfo(filePath: string): { icon: string; language: string } {
-  const ext = filePath.split(".").pop()?.toLowerCase() || "";
-
-  const fileTypes: Record<string, { icon: string; language: string }> = {
-    "ts": { icon: "📘", language: "TypeScript" },
-    "tsx": { icon: "⚛️", language: "React/TypeScript" },
-    "js": { icon: "📙", language: "JavaScript" },
-    "jsx": { icon: "⚛️", language: "React/JavaScript" },
-    "py": { icon: "🐍", language: "Python" },
-    "rs": { icon: "🦀", language: "Rust" },
-    "go": { icon: "🐹", language: "Go" },
-    "java": { icon: "☕", language: "Java" },
-    "md": { icon: "📝", language: "Markdown" },
-    "json": { icon: "📋", language: "JSON" },
-    "yml": { icon: "⚙️", language: "YAML" },
-    "yaml": { icon: "⚙️", language: "YAML" },
-    "html": { icon: "🌐", language: "HTML" },
-    "css": { icon: "🎨", language: "CSS" },
-    "scss": { icon: "🎨", language: "SCSS" },
-  };
-
-  return fileTypes[ext] || { icon: "📄", language: "Text" };
-}
-
-// Tool-specific formatters
-function formatGenericTool(
-  toolName: string,
-  metadata: any,
-): { title: string; color: number; description: string } {
-  const inputStr = JSON.stringify(metadata.input || {}, null, 2);
-  const { preview, isTruncated } = truncateContent(inputStr, 10, 800);
-
-  return {
-    title: `🔧 Tool Use: ${toolName}`,
-    color: 0x0099ff,
-    description: `\`\`\`json\n${preview}\n\`\`\``,
-  };
-}
-
-// Format a tool/system message into a short status line
-function toStatusLine(msg: ClaudeMessage): string | null {
-  switch (msg.type) {
-    case "tool_use": {
-      const name = msg.metadata?.name || "Unknown";
-      const input = msg.metadata?.input || {};
-      // Show concise context per tool
-      if (name === "Bash") {
-        return `⚡ Running: \`${(input.command as string || "").substring(0, 80)}\``;
-      }
-      if (name === "Read") return `📖 Reading: \`${input.file_path || ""}\``;
-      if (name === "Edit" || name === "Write") return `✏️ Editing: \`${input.file_path || ""}\``;
-      if (name === "Glob") return `🔍 Searching: \`${input.pattern || ""}\``;
-      if (name === "Grep") return `🔍 Grep: \`${input.pattern || ""}\``;
-      if (name === "Agent") return `🤖 Spawning agent...`;
-      return `🔧 ${name}`;
-    }
-    case "tool_result":
-      return null; // don't update status for results
-    case "tool_progress":
-      return `⏳ ${msg.metadata?.toolName || "Tool"} running... (${
-        msg.metadata?.elapsedSeconds?.toFixed(0) || "?"
-      }s)`;
-    case "tool_summary":
-      return null;
-    case "system": {
-      if (msg.metadata?.subtype === "completion") return null; // handled separately
-      return `⚙️ ${msg.metadata?.subtype || "init"}`;
-    }
-    default:
-      return null;
-  }
-}
-
-// Create sendClaudeMessages function with dependency injection
 export function createClaudeSender(
   sender: DiscordSender,
   options?: { isThread?: boolean; sessionId?: string },
 ) {
   const isThread = options?.isThread ?? false;
   let currentSessionId = options?.sessionId;
-  // Live status message — single message that gets edited in place
+
+  // Status line state
   let statusMsg: TrackedMessage | null = null;
   let statusStartTime = 0;
-
-  // Track whether a visible message was sent since the last status update.
-  // When true, the next status update should create a new message at the bottom
-  // instead of editing the old one (which would be above the new visible content).
   let visibleSentSinceStatus = false;
 
   async function updateStatus(line: string) {
@@ -222,11 +68,8 @@ export function createClaudeSender(
       if (statusMsg && !visibleSentSinceStatus) {
         await statusMsg.edit({ content });
       } else {
-        // Delete old status if it's stuck above new content
         if (statusMsg) {
-          try {
-            await statusMsg.delete();
-          } catch { /* ignore */ }
+          try { await statusMsg.delete(); } catch { /* ignore */ }
         }
         statusStartTime = Date.now();
         statusMsg = await sender.sendTracked({ content: line });
@@ -242,9 +85,7 @@ export function createClaudeSender(
         await statusMsg.edit({ content });
       } else {
         if (statusMsg) {
-          try {
-            await statusMsg.delete();
-          } catch { /* ignore */ }
+          try { await statusMsg.delete(); } catch { /* ignore */ }
         }
         statusMsg = await sender.sendTracked({ content });
         visibleSentSinceStatus = false;
@@ -254,81 +95,51 @@ export function createClaudeSender(
 
   async function clearStatus() {
     if (statusMsg) {
-      try {
-        await statusMsg.delete();
-      } catch { /* ignore */ }
+      try { await statusMsg.delete(); } catch { /* ignore */ }
       statusMsg = null;
     }
   }
 
-  // Deduplicate file previews within a single query
+  // Renderer context shared across all renderers
   const sentFilePaths = new Set<string>();
+  const ctx: RendererContext = {
+    expandableContent,
+    pendingFileUploads,
+    sentFilePaths,
+    isThread,
+    get currentSessionId() { return currentSessionId; },
+    setCurrentSessionId: (id: string) => { currentSessionId = id; },
+  };
+
+  async function sendVisible(content: MessageContent) {
+    visibleSentSinceStatus = true;
+    await sender.sendMessage(content);
+  }
 
   const sendClaudeMessages = async function (messages: ClaudeMessage[]) {
     for (const msg of messages) {
-      // Auto-upload: detect [FILE:/path] markers in tool_result (even when hidden)
+      // File marker extraction from tool_result (even when hidden)
       if (msg.type === "tool_result" && msg.content) {
-        for (const match of msg.content.matchAll(FILE_MARKER_REGEX)) {
-          let cleanPath = match[1].replace(/[`()"']/g, "");
-          if (!cleanPath.startsWith("/")) {
-            cleanPath = resolve(Deno.cwd(), cleanPath);
-          }
-          if (sentFilePaths.has(cleanPath)) continue;
-          if (existsSync(cleanPath)) {
-            sentFilePaths.add(cleanPath);
-            const preview = await generatePreview(cleanPath);
-            if (preview) {
-              visibleSentSinceStatus = true;
-              await sender.sendMessage(preview.content);
-            } else {
-              const fileName = cleanPath.split("/").pop() || "attachment";
-              const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
-              visibleSentSinceStatus = true;
-              const ext = fileName.split(".").pop()?.toLowerCase() || "";
-              const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
-              await sender.sendMessage({
-                embeds: [{
-                  color: 0x2b82d4,
-                  title: `${isImage ? "🖼️" : "📎"} ${fileName}`,
-                  timestamp: true,
-                }],
-                components: [{
-                  type: "actionRow",
-                  components: [{
-                    type: "button",
-                    customId: `file:${fileId}`,
-                    label: isImage ? "📷 查看图片" : "📥 下载文件",
-                    style: "primary",
-                  }],
-                }],
-              });
-            }
-          }
+        const filePayloads = await deliverFileMarkers(msg.content, ctx);
+        for (const payload of filePayloads) {
+          await sendVisible(payload);
         }
       }
 
-      // Check display filter — hidden types get routed to live status
+      // Hidden messages → status line
       if (msg.type === "system") {
         const subkey = msg.metadata?.subtype === "completion" ? "system:completion" : "system";
         if (hiddenMessageTypes.has(subkey)) {
-          // Special handling for completion: record usage and show cost in status line
           if (msg.metadata?.subtype === "completion") {
             const activeSessionId = currentSessionId || msg.metadata?.session_id;
             if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
-              recordUsage(
-                activeSessionId,
-                msg.metadata.total_cost_usd,
-                msg.metadata?.duration_ms ?? 0,
-              );
+              recordUsage(activeSessionId, msg.metadata.total_cost_usd, msg.metadata?.duration_ms ?? 0);
             }
             const showCost = Deno.env.get("SHOW_COST") !== "false";
             if (showCost && msg.metadata?.total_cost_usd !== undefined) {
               const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
               const costPart = sessionUsage && sessionUsage.queryCount > 1
-                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
-                  sessionUsage.totalCost.toFixed(4)
-                } / ${sessionUsage.queryCount} queries)`
+                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${sessionUsage.totalCost.toFixed(4)} / ${sessionUsage.queryCount} queries)`
                 : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
               const durPart = msg.metadata?.duration_ms !== undefined
                 ? ` | ${(msg.metadata.duration_ms / 1000).toFixed(1)}s`
@@ -349,452 +160,72 @@ export function createClaudeSender(
         continue;
       }
 
-      // Visible message arriving — mark status as stale so next update goes to bottom
-      visibleSentSinceStatus = true;
-
+      // Dispatch visible messages to renderers
       switch (msg.type) {
         case "text": {
-          // Detect [FILE:/path] markers, strip them from display text, and deliver files
-          const fileMarkers: string[] = [];
-          const displayText = msg.content.replace(FILE_MARKER_REGEX, (_, path) => {
-            fileMarkers.push(path);
-            return ""; // Remove marker from visible text
-          }).trim();
-
-          if (displayText) {
-            const chunks = splitText(displayText, 2000);
-            for (const chunk of chunks) {
-              await sender.sendMessage({ content: chunk });
-            }
-          }
-
-          // Deliver marked files
-          for (const p of fileMarkers) {
-            let cleanPath = p.replace(/[`()"']/g, "");
-            if (!cleanPath.startsWith("/")) {
-              cleanPath = resolve(Deno.cwd(), cleanPath);
-            }
-            if (sentFilePaths.has(cleanPath)) continue;
-            if (existsSync(cleanPath)) {
-              sentFilePaths.add(cleanPath);
-              const preview = await generatePreview(cleanPath);
-              if (preview) {
-                await sender.sendMessage(preview.content);
-              } else {
-                const fileName = cleanPath.split("/").pop() || "attachment";
-                const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                pendingFileUploads.set(fileId, { path: cleanPath, name: fileName });
-                const ext = fileName.split(".").pop()?.toLowerCase() || "";
-                const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
-                await sender.sendMessage({
-                  embeds: [{
-                    color: 0x2b82d4,
-                    title: `${isImage ? "🖼️" : "📎"} ${fileName}`,
-                    timestamp: true,
-                  }],
-                  components: [{
-                    type: "actionRow",
-                    components: [{
-                      type: "button",
-                      customId: `file:${fileId}`,
-                      label: isImage ? "📷 查看图片" : "📥 下载文件",
-                      style: "primary",
-                    }],
-                  }],
-                });
-              }
-            }
-          }
+          const textPayloads = renderText(msg);
+          for (const p of textPayloads) await sendVisible(p);
+          // Deliver file markers from text content
+          const filePayloads = await deliverFileMarkers(msg.content, ctx);
+          for (const p of filePayloads) await sendVisible(p);
           break;
         }
 
         case "tool_use": {
-          if (msg.metadata?.name === "TodoWrite") {
-            const todos = msg.metadata?.input?.todos || [];
-            const statusEmojis: Record<string, string> = {
-              pending: "⏳",
-              in_progress: "🔄",
-              completed: "✅",
-            };
-            const priorityEmojis: Record<string, string> = {
-              high: "🔴",
-              medium: "🟡",
-              low: "🟢",
-            };
-
-            let todoList = "";
-            if (todos.length === 0) {
-              todoList = "Task list is empty";
-            } else {
-              for (const todo of todos) {
-                const statusEmoji = statusEmojis[todo.status] || "❓";
-                const priorityEmoji = priorityEmojis[todo.priority] || "";
-                const priorityText = priorityEmoji ? `${priorityEmoji} ` : "";
-                todoList += `${statusEmoji} ${priorityText}**${todo.content}**\n`;
-              }
-            }
-
-            await sender.sendMessage({
-              embeds: [{
-                color: 0x9932cc,
-                title: "📝 Todo List Updated",
-                description: todoList,
-                footer: {
-                  text: "⏳ Pending | 🔄 In Progress | ✅ Completed | 🔴 High | 🟡 Medium | 🟢 Low",
-                },
-                timestamp: true,
-              }],
-            });
-          } else {
-            // Use simplified consistent formatting for all tools
-            const toolName = msg.metadata?.name || "Unknown";
-
-            // Special handling for Edit tool to keep "Replacing/With" functionality
-            if (toolName === "Edit") {
-              const filePath = msg.metadata.input?.file_path || "Unknown file";
-              const oldString = msg.metadata.input?.old_string || "";
-              const newString = msg.metadata.input?.new_string || "";
-
-              const fields = [
-                { name: "📁 File Path", value: `\`${filePath}\``, inline: false },
-              ];
-
-              if (oldString) {
-                const { preview: oldPreview } = truncateContent(oldString, 3, 150);
-                fields.push({
-                  name: "🔴 Replacing",
-                  value: `\`\`\`\n${oldPreview}\n\`\`\``,
-                  inline: false,
-                });
-              }
-
-              if (newString) {
-                const { preview: newPreview } = truncateContent(newString, 3, 150);
-                fields.push({
-                  name: "🟢 With",
-                  value: `\`\`\`\n${newPreview}\n\`\`\``,
-                  inline: false,
-                });
-              }
-
-              await sender.sendMessage({
-                embeds: [{
-                  color: 0xffaa00,
-                  title: "✏️ Tool Use: Edit",
-                  fields,
-                  timestamp: true,
-                }],
-              });
-            } else {
-              // All other tools use generic consistent formatting
-              const inputStr = JSON.stringify(msg.metadata.input || {}, null, 2);
-              const { preview, isTruncated } = truncateContent(inputStr, 10, 800);
-
-              const messageContent: MessageContent = {
-                embeds: [{
-                  color: 0x0099ff,
-                  title: `🔧 Tool Use: ${toolName}`,
-                  description: `\`\`\`json\n${preview}\n\`\`\``,
-                  timestamp: true,
-                }],
-              };
-
-              // Add expand button if content was truncated
-              if (isTruncated) {
-                const expandId = `tool-${msg.metadata?.id || Date.now()}`;
-                expandableContent.set(expandId, inputStr);
-
-                messageContent.components = [{
-                  type: "actionRow",
-                  components: [{
-                    type: "button",
-                    customId: `expand:${expandId}`,
-                    label: "📖 Show Full Content",
-                    style: "secondary",
-                  }],
-                }];
-              }
-
-              await sender.sendMessage(messageContent);
-            }
-          }
+          const payloads = renderToolUse(msg, ctx);
+          for (const p of payloads) await sendVisible(p);
           break;
         }
 
         case "tool_result": {
-          // Filter out system reminder content
-          let cleanContent = msg.content;
-
-          // Remove system reminder blocks
-          cleanContent = cleanContent.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "");
-
-          // Remove any remaining empty lines or extra whitespace
-          cleanContent = cleanContent.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
-
-          if (!cleanContent) {
-            // If no content left after filtering, don't show the tool result
-            break;
-          }
-
-          const { preview, isTruncated, totalLines } = truncateContent(cleanContent);
-
-          const messageContent: MessageContent = {
-            embeds: [{
-              color: 0x00ffff,
-              title: `✅ Tool Result${isTruncated ? ` (+${totalLines - 15} more lines)` : ""}`,
-              description: `\`\`\`\n${preview}\n\`\`\``,
-              timestamp: true,
-            }],
-          };
-
-          // Add expand button if content was truncated
-          if (isTruncated) {
-            const expandId = `result-${Date.now()}`;
-            expandableContent.set(expandId, cleanContent);
-
-            messageContent.components = [{
-              type: "actionRow",
-              components: [{
-                type: "button",
-                customId: `expand:${expandId}`,
-                label: "📖 Show Full Result",
-                style: "secondary",
-              }],
-            }];
-          }
-
-          await sender.sendMessage(messageContent);
+          const payload = renderToolResult(msg, ctx);
+          if (payload) await sendVisible(payload);
           break;
         }
 
         case "thinking": {
-          const chunks = splitText(msg.content, 4000);
-          for (let i = 0; i < chunks.length; i++) {
-            await sender.sendMessage({
-              embeds: [{
-                color: 0x9b59b6,
-                title: chunks.length > 1
-                  ? `💭 Thinking (${i + 1}/${chunks.length})`
-                  : "💭 Thinking",
-                description: chunks[i],
-                timestamp: true,
-              }],
-            });
-          }
+          const payloads = renderThinking(msg);
+          for (const p of payloads) await sendVisible(p);
           break;
         }
 
         case "system": {
-          // Session ending — clean up status line
           if (msg.metadata?.subtype === "completion") await clearStatus();
-
-          const embedData: EmbedData = {
-            color: msg.metadata?.subtype === "completion" ? 0x00ff00 : 0xaaaaaa,
-            title: msg.metadata?.subtype === "completion"
-              ? "✅ Claude Code Complete"
-              : `⚙️ System: ${msg.metadata?.subtype || "info"}`,
-            timestamp: true,
-            fields: [],
-          };
-
-          if (msg.metadata?.cwd) {
-            embedData.fields!.push({
-              name: "Working Directory",
-              value: `\`${msg.metadata.cwd}\``,
-              inline: false,
-            });
-          }
-          if (msg.metadata?.session_id) {
-            if (!currentSessionId) currentSessionId = msg.metadata.session_id;
-            embedData.fields!.push({
-              name: "Session ID",
-              value: `\`${msg.metadata.session_id}\``,
-              inline: false,
-            });
-          }
-          if (msg.metadata?.model) {
-            embedData.fields!.push({ name: "Model", value: msg.metadata.model, inline: true });
-          }
-          // Record usage NOW so cumulative data is available for the embed below
-          const activeSessionId = currentSessionId || msg.metadata?.session_id;
-          if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
-            recordUsage(
-              activeSessionId,
-              msg.metadata.total_cost_usd,
-              msg.metadata?.duration_ms ?? 0,
-            );
-          }
-          const showCost = Deno.env.get("SHOW_COST") !== "false";
-          if (showCost && msg.metadata?.total_cost_usd !== undefined) {
-            const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
-            const costStr = sessionUsage && sessionUsage.queryCount > 1
-              ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
-                sessionUsage.totalCost.toFixed(4)
-              } / ${sessionUsage.queryCount} queries)`
-              : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
-            embedData.fields!.push({ name: "Cost", value: costStr, inline: true });
-          }
-          if (showCost && msg.metadata?.duration_ms !== undefined) {
-            const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
-            const durStr = sessionUsage && sessionUsage.queryCount > 1
-              ? `${(msg.metadata.duration_ms / 1000).toFixed(2)}s (session: ${
-                (sessionUsage.totalDuration / 1000).toFixed(1)
-              }s)`
-              : `${(msg.metadata.duration_ms / 1000).toFixed(2)}s`;
-            embedData.fields!.push({ name: "Duration", value: durStr, inline: true });
-          }
-
-          // Display stop reason — why Claude finished (v0.2.31+ SDK feature)
-          const stopReasonDisplay = formatStopReason(
-            msg.metadata?.stop_reason,
-            msg.metadata?.sdkSubtype,
-          );
-          if (stopReasonDisplay) {
-            embedData.fields!.push({ name: "Stop Reason", value: stopReasonDisplay, inline: true });
-          }
-
-          // Special handling for shutdown
-          if (msg.metadata?.subtype === "shutdown") {
-            embedData.color = 0xff0000;
-            embedData.title = "🛑 Shutdown";
-            embedData.description = `Bot stopped by signal ${msg.metadata.signal}`;
-            embedData.fields = [
-              { name: "Category", value: msg.metadata.categoryName, inline: true },
-              { name: "Repository", value: msg.metadata.repoName, inline: true },
-              { name: "Branch", value: msg.metadata.branchName, inline: true },
-            ];
-          }
-
-          // Add interactive buttons for completed sessions (but not in threads — users reply directly there)
-          const messageContent: MessageContent = { embeds: [embedData] };
-
-          if (!isThread && msg.metadata?.subtype === "completion" && msg.metadata?.session_id) {
-            const actionButtons = createActionButtons(msg.metadata.session_id);
-
-            messageContent.components = [
-              { type: "actionRow", components: actionButtons },
-            ];
-          }
-
-          await sender.sendMessage(messageContent);
+          const payload = renderSystem(msg, ctx);
+          await sendVisible(payload);
           break;
         }
 
         case "other": {
-          const jsonStr = JSON.stringify(msg.metadata || msg.content, null, 2);
-          // Account for code block markers when splitting
-          const maxChunkLength = 4096 - "```json\n\n```".length - 50; // 50 chars safety margin
-          const chunks = splitText(jsonStr, maxChunkLength);
-          for (let i = 0; i < chunks.length; i++) {
-            await sender.sendMessage({
-              embeds: [{
-                color: 0xffaa00,
-                title: chunks.length > 1
-                  ? `Other Content (${i + 1}/${chunks.length})`
-                  : "Other Content",
-                description: `\`\`\`json\n${chunks[i]}\n\`\`\``,
-                timestamp: true,
-              }],
-            });
-          }
+          const payloads = renderOther(msg);
+          for (const p of payloads) await sendVisible(p);
           break;
         }
 
         case "permission_denied": {
-          const toolName = msg.metadata?.toolName || "Unknown";
-          const toolInput = msg.metadata?.toolInput || {};
-          const inputPreview = JSON.stringify(toolInput, null, 2);
-          const { preview } = truncateContent(inputPreview, 6, 500);
-
-          await sender.sendMessage({
-            embeds: [{
-              color: 0xff4444,
-              title: `🚫 Permission Denied: ${toolName}`,
-              description:
-                "This tool was blocked — it isn't in the pre-approved whitelist and no interactive permission handler matched.",
-              fields: [
-                { name: "Tool", value: `\`${toolName}\``, inline: true },
-                { name: "Input Preview", value: `\`\`\`json\n${preview}\n\`\`\``, inline: false },
-              ],
-              footer: {
-                text: "Change operation mode with /settings → Mode Settings to allow more tools",
-              },
-              timestamp: true,
-            }],
-          });
+          await sendVisible(renderPermissionDenied(msg));
           break;
         }
 
         case "task_started": {
-          const description = msg.metadata?.description || msg.content ||
-            "Starting subagent task...";
-          const taskType = msg.metadata?.taskType;
-
-          await sender.sendMessage({
-            embeds: [{
-              color: 0x5865f2,
-              title: "🚀 Subagent Task Started",
-              description,
-              fields: taskType ? [{ name: "Type", value: taskType, inline: true }] : [],
-              timestamp: true,
-            }],
-          });
+          await sendVisible(renderTaskStarted(msg));
           break;
         }
 
         case "task_notification": {
-          const status = msg.metadata?.status || "unknown";
-          const summary = msg.metadata?.summary || msg.content || "No summary";
-          const statusEmoji = status === "completed" ? "✅" : status === "failed" ? "❌" : "⏹️";
-          const statusColor = status === "completed"
-            ? 0x00ff00
-            : status === "failed"
-            ? 0xff0000
-            : 0xffaa00;
-
-          await sender.sendMessage({
-            embeds: [{
-              color: statusColor,
-              title: `${statusEmoji} Subagent Task ${
-                status.charAt(0).toUpperCase() + status.slice(1)
-              }`,
-              description: summary.length > 4000 ? summary.substring(0, 3997) + "..." : summary,
-              timestamp: true,
-            }],
-          });
+          await sendVisible(renderTaskNotification(msg));
           break;
         }
 
         case "tool_progress": {
-          // Only show progress for long-running tools (>5s)
-          const elapsed = msg.metadata?.elapsedSeconds || 0;
-          if (elapsed >= 5) {
-            const toolName = msg.metadata?.toolName || "Unknown";
-            await sender.sendMessage({
-              embeds: [{
-                color: 0x888888,
-                title: `⏳ ${toolName} running...`,
-                description: `Elapsed: ${elapsed.toFixed(1)}s`,
-                timestamp: true,
-              }],
-            });
-          }
+          const payload = renderToolProgress(msg);
+          if (payload) await sendVisible(payload);
           break;
         }
 
         case "tool_summary": {
-          if (msg.content) {
-            await sender.sendMessage({
-              embeds: [{
-                color: 0x00ccff,
-                title: "📋 Tool Summary",
-                description: msg.content.length > 4000
-                  ? msg.content.substring(0, 3997) + "..."
-                  : msg.content,
-                timestamp: true,
-              }],
-            });
-          }
+          const payload = renderToolSummary(msg);
+          if (payload) await sendVisible(payload);
           break;
         }
       }

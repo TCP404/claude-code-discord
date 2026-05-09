@@ -119,3 +119,6 @@ export {
   type WorkspaceEntry,
   WorkspaceManager,
 } from "./workspace-manager.ts";
+
+// Environment loading
+export { loadEnvFile } from "./env-loader.ts";

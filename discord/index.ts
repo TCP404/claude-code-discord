@@ -32,6 +32,22 @@ export type {
   ComponentData
 } from "./types.ts";
 export { SessionThreadManager, threadNameFromPrompt } from "./session-threads.ts";
+
+// Message sending utilities
+export {
+  sendMessageContent,
+  sendMessageContentTracked,
+  createDiscordSenderAdapter,
+  createChannelSenderAdapter,
+} from "./message-sender.ts";
+
+// Interactive handlers
+export { createAskUserDiscordHandler } from "./ask-user-handler.ts";
+export { createPermissionRequestHandler } from "./permission-handler.ts";
+
+// Session thread callbacks
+export { createSessionThreadCallbacks, type SessionThreadCallbackDeps } from "./session-thread-callbacks.ts";
+
 // Re-export shared types for convenience
 export type { BotSettings, BotSettingsUpdater } from "../types/shared.ts";
 export type {
