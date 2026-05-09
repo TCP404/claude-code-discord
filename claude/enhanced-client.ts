@@ -1,8 +1,7 @@
 /** @module claude/enhanced-client — High-level session manager, model registry, and template support. */
 import { sendToClaudeCode, type ClaudeModelOptions, type SDKPermissionMode, type ThinkingConfig, type EffortLevel, type SDKAgentDefinition, type SDKModelInfo } from "./client.ts";
-import type { ClaudeMessage } from "./types.ts";
 import { recordAPIUsage } from "../util/usage-tracker.ts";
-import { startModelRefresh, stopModelRefresh, fetchModels } from "./model-fetcher.ts";
+import { startModelRefresh, fetchModels } from "./model-fetcher.ts";
 
 // Enhanced Claude Code client with additional features
 // Maps user-facing settings to actual Claude Agent SDK parameters
@@ -241,7 +240,7 @@ Remotes: ${remotes || 'No remotes'}
 Recent Commits:
 ${recentCommits || 'No commits'}
 </git-context>`;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -271,7 +270,7 @@ Error reading file: ${error instanceof Error ? error.message : 'Unknown error'}
     return `<file-context>
 ${fileContents.join('\n')}
 </file-context>`;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }

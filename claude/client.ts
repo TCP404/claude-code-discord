@@ -213,8 +213,6 @@ export async function sendToClaudeCode(
   // Load MCP servers from .claude/mcp.json
   const mcpServers = await loadMcpServers(workDir);
 
-  // Build set of MCP server name prefixes for auto-allowing MCP tools
-  const mcpToolPrefixes = mcpServers ? Object.keys(mcpServers).map((name) => `mcp__${name}__`) : [];
 
   // Wrap with comprehensive error handling
   const executeWithErrorHandling = async (overrideModel?: string) => {

@@ -227,7 +227,7 @@ async function saveAgentSessions(): Promise<void> {
 }
 
 export function createAgentHandlers(deps: AgentHandlerDeps) {
-  const { workDir, crashHandler, sendClaudeMessages, sessionManager } = deps;
+  const { crashHandler } = deps;
 
   return {
     async onAgent(

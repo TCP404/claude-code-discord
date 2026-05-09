@@ -5,7 +5,7 @@
  * @module core/git-shell-handlers
  */
 
-import type { CommandHandlers, InteractionContext } from "../discord/index.ts";
+import type { InteractionContext } from "../discord/index.ts";
 import { formatShellOutput, formatGitOutput, formatError, createFormattedEmbed, cleanupPaginationStates } from "../discord/index.ts";
 import type { AllHandlers } from "./handler-registry.ts";
 import type { ProcessCrashHandler, ProcessHealthMonitor } from "../process/index.ts";

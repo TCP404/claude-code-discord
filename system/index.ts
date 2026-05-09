@@ -17,12 +17,12 @@ export interface SystemHandlerDeps {
 }
 
 export function createSystemHandlers(deps: SystemHandlerDeps) {
-  const { workDir, crashHandler } = deps;
+  const { workDir } = deps;
   const platform = detectPlatform();
   const platformCommands = getPlatformCommands();
 
   return {
-    async onSystemInfo(ctx: any) {
+    async onSystemInfo(_ctx: any) {
       try {
         const platformName = getPlatformDisplayName();
         const systemInfoOutput = await executeSystemCommand(platformCommands.systemInfoCmd);
@@ -45,7 +45,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onProcesses(ctx: any, filter?: string, limit: number = 20) {
+    async onProcesses(_ctx: any, filter?: string, limit: number = 20) {
       try {
         let command = platformCommands.processListCmd;
 
@@ -80,7 +80,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onSystemResources(ctx: any) {
+    async onSystemResources(_ctx: any) {
       try {
         let resourceInfo = `System Resources - ${getPlatformDisplayName()}\n\n`;
         
@@ -105,7 +105,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onNetworkInfo(ctx: any) {
+    async onNetworkInfo(_ctx: any) {
       try {
         const networkOutput = await executeSystemCommand(platformCommands.networkInfoCmd);
         
@@ -127,7 +127,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onDiskUsage(ctx: any) {
+    async onDiskUsage(_ctx: any) {
       try {
         const diskOutput = await executeSystemCommand(platformCommands.diskUsageCmd);
         
@@ -139,7 +139,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onEnvVars(ctx: any, filter?: string) {
+    async onEnvVars(_ctx: any, filter?: string) {
       try {
         const envVars = Deno.env.toObject();
         let envInfo = `Environment Variables - ${getPlatformDisplayName()}\n\n`;
@@ -173,7 +173,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onSystemLogs(ctx: any, lines: number = 50, service?: string) {
+    async onSystemLogs(_ctx: any, lines: number = 50, service?: string) {
       try {
         let command = platformCommands.systemLogsCmd;
         
@@ -206,7 +206,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onPortScan(ctx: any, host: string = 'localhost', ports?: string) {
+    async onPortScan(_ctx: any, host: string = 'localhost', _ports?: string) {
       try {
         let portInfo = `Port Scan - ${host} (${getPlatformDisplayName()})\n\n`;
         
@@ -224,7 +224,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onServiceStatus(ctx: any, service?: string) {
+    async onServiceStatus(_ctx: any, service?: string) {
       try {
         let command = platformCommands.serviceStatusCmd;
         
@@ -249,7 +249,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onUptime(ctx: any) {
+    async onUptime(_ctx: any) {
       try {
         const uptimeOutput = await executeSystemCommand(platformCommands.uptimeCmd);
 
@@ -261,7 +261,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onRefreshBedrock(ctx: any) {
+    async onRefreshBedrock(_ctx: any) {
       try {
         const cmd = new Deno.Command('aws', {
           args: ['sso', 'login', '--profile', 'enterprise-ai'],

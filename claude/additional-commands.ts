@@ -1,6 +1,5 @@
 /** @module claude/additional-commands — Extra slash commands (quick-query, template, etc). */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
 
 export const additionalClaudeCommands = [
   new SlashCommandBuilder()
@@ -194,7 +193,7 @@ export interface AdditionalClaudeHandlerDeps {
 }
 
 export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps) {
-  const { workDir, sessionManager, crashHandler, sendClaudeMessages, settings } = deps;
+  const { workDir, crashHandler, sendClaudeMessages, settings } = deps;
 
   // Helper: merge runtime options (thinking, operation, proxy) into enhanced query options
   function getRuntimeOpts() {

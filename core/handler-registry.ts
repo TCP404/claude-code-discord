@@ -22,12 +22,11 @@ import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "../cla
 import { infoCommands, createInfoCommandHandlers } from "../claude/info-commands.ts";
 import { cleanSessionId } from "../claude/client.ts";
 import { ClaudeSessionManager } from "../claude/enhanced-client.ts";
-import { hiddenMessageTypes } from "../claude/discord-sender.ts";
 import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
 import { buildHooks, type HookEvent_Discord } from "../claude/hooks.ts";
 import { advancedSettingsCommands, createAdvancedSettingsHandlers, type AdvancedBotSettings } from "../settings/index.ts";
 import { unifiedSettingsCommands, createUnifiedSettingsHandlers, type UnifiedBotSettings } from "../settings/index.ts";
-import { THINKING_MODES, OPERATION_MODES, EFFORT_LEVELS } from "../settings/index.ts";
+import { THINKING_MODES, OPERATION_MODES } from "../settings/index.ts";
 import { gitCommands, createGitHandlers } from "../git/index.ts";
 import { shellCommands, createShellHandlers } from "../shell/index.ts";
 import { utilsCommands, createUtilsHandlers } from "../util/index.ts";

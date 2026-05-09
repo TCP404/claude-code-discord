@@ -1,5 +1,5 @@
 /** @module settings/unified-handlers — Interaction handlers for the unified /settings command. */
-import type { UnifiedBotSettings, RateLimitTier } from "./unified-settings.ts";
+import type { UnifiedBotSettings } from "./unified-settings.ts";
 import { 
   UNIFIED_DEFAULT_SETTINGS, 
   THINKING_MODES, 
@@ -7,7 +7,7 @@ import {
   EFFORT_LEVELS,
   ANTHROPIC_RATE_LIMITS 
 } from "./unified-settings.ts";
-import { CLAUDE_MODELS, isValidModel, resolveModelId, type ModelInfo } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
 import { 
   getTodosManager, 
   type TodoItem as PersistenceTodoItem
@@ -1463,7 +1463,7 @@ async function handleProxySettings(ctx: any, settings: UnifiedBotSettings, updat
 }
 
 // Developer settings management
-async function handleDeveloperSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleDeveloperSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, _value?: string) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
@@ -1561,7 +1561,7 @@ async function handleDeveloperSettings(ctx: any, settings: UnifiedBotSettings, u
 }
 
 // Reset settings to defaults
-async function handleResetSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string) {
+async function handleResetSettings(ctx: any, _settings: UnifiedBotSettings, updateSettings: any, action?: string) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
@@ -1704,7 +1704,7 @@ async function handleResetSettings(ctx: any, settings: UnifiedBotSettings, updat
 }
 
 // Generate todos from code comments (TODO, FIXME, etc.)
-async function generateTodosFromCode(ctx: any, filePath: string, rateTier?: string) {
+async function generateTodosFromCode(ctx: any, filePath: string, _rateTier?: string) {
   await ensurePersistence();
   
   try {
@@ -1809,7 +1809,7 @@ async function generateTodosFromCode(ctx: any, filePath: string, rateTier?: stri
 }
 
 // Prioritize todos by urgency
-async function prioritizeTodos(ctx: any, rateTier?: string) {
+async function prioritizeTodos(ctx: any, _rateTier?: string) {
   if (todos.length === 0) {
     await ctx.editReply({
       embeds: [{

@@ -237,7 +237,7 @@ export async function getGitStatus(workDir: string): Promise<GitStatus> {
       branch: cleanBranch, 
       remote: formattedRemote 
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       status: "Error getting git status",
       branch: "unknown", 

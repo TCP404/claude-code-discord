@@ -113,7 +113,7 @@ export async function createDiscordBot(
   const actualCategoryName = categoryName || repoName;
 
   let myChannel: TextChannel | null = null;
-  // deno-lint-ignore no-explicit-any no-unused-vars
+  // deno-lint-ignore no-explicit-any
   let myCategory: any = null;
 
   const botSettings = dependencies.botSettings || {
@@ -512,8 +512,6 @@ export async function createDiscordBot(
 
     // Handle expand content pattern: "expand:contentId"
     if (buttonId.startsWith('expand:')) {
-      const expandId = buttonId.substring(7);
-
       // Try to find a handler that can process expand buttons
       for (const [handlerName, handler] of handlers.entries()) {
         if (handler.handleButton) {
@@ -581,7 +579,7 @@ export async function createDiscordBot(
 
   // Wait for ClientReady to fully complete (including async channel setup)
   // before returning, so callers can safely call getChannel() immediately.
-  const readyPromise = new Promise<void>((resolve, reject) => {
+  const readyPromise = new Promise<void>((resolve, _reject) => {
     client.once(Events.ClientReady, async () => {
       console.log(`Bot logged in: ${client.user?.tag}`);
       console.log(`Category: ${actualCategoryName}`);

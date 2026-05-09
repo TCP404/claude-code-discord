@@ -285,7 +285,7 @@ export function cleanupPaginationStates(maxAge: number = 3600000): void { // 1 h
   const now = Date.now();
   const toDelete: string[] = [];
   
-  for (const [id, state] of paginationStates.entries()) {
+  for (const [id, _state] of paginationStates.entries()) {
     // Extract timestamp from pagination ID
     const timestamp = parseInt(id.split('_')[1]);
     if (now - timestamp > maxAge) {

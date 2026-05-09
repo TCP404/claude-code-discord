@@ -6,7 +6,7 @@
  */
 
 import type { CommandHandlers, InteractionContext } from "../discord/index.ts";
-import { formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "../discord/index.ts";
+import { formatError, createFormattedEmbed } from "../discord/index.ts";
 import type { AllHandlers, MessageHistoryOps } from "./handler-registry.ts";
 import type { ProcessCrashHandler, ProcessHealthMonitor } from "../process/index.ts";
 import { expandableContent, hiddenMessageTypes } from "../claude/discord-sender.ts";
@@ -124,7 +124,7 @@ export function createSystemCommandHandlers(
  */
 export function createParameterizedSystemHandlers(
   handlers: AllHandlers,
-  crashHandler: ProcessCrashHandler
+  _crashHandler: ProcessCrashHandler
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
   const { system: systemHandlers } = handlers;
 
@@ -220,7 +220,7 @@ export function createParameterizedSystemHandlers(
 export function createClaudeCommandHandlers(
   handlers: AllHandlers,
   messageHistory: MessageHistoryOps,
-  getClaudeController: () => AbortController | null
+  _getClaudeController: () => AbortController | null
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void>; handleButton?: (ctx: InteractionContext, customId: string) => Promise<void> }> {
   const { claude: claudeHandlers, enhancedClaude: enhancedClaudeHandlers, additionalClaude: additionalClaudeHandlers } = handlers;
   const { addToHistory } = messageHistory;

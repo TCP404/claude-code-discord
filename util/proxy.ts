@@ -148,7 +148,7 @@ export function clearProxyEnvironment(): void {
 /**
  * Test proxy connectivity
  */
-export async function testProxyConnection(proxyUrl: string): Promise<{
+export async function testProxyConnection(_proxyUrl: string): Promise<{
   success: boolean;
   error?: string;
   responseTime?: number;

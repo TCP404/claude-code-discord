@@ -127,7 +127,7 @@ export type ExpandableContentMap = Map<string, string>;
  */
 export function createButtonHandlers(
   deps: ButtonHandlerDeps,
-  expandableContent: ExpandableContentMap
+  _expandableContent: ExpandableContentMap
 ): ButtonHandlers {
   const { messageHistory, handlers } = deps;
   const { addToHistory, getPreviousMessage, getNextMessage, getState } = messageHistory;

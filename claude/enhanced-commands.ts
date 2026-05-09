@@ -1,6 +1,6 @@
 /** @module claude/enhanced-commands — /claude slash command with model/template/thinking options. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS, CLAUDE_TEMPLATES, type ModelInfo } from "./enhanced-client.ts";
+import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
 
 export const enhancedClaudeCommands = [
   new SlashCommandBuilder()
@@ -25,7 +25,7 @@ export const enhancedClaudeCommands = [
         .setDescription('Use a predefined template')
         .setRequired(false)
         .addChoices(
-          ...Object.entries(CLAUDE_TEMPLATES).map(([key, value]) => ({
+          ...Object.entries(CLAUDE_TEMPLATES).map(([key, _value]) => ({
             name: key.charAt(0).toUpperCase() + key.slice(1),
             value: key
           }))
@@ -403,7 +403,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
               const content = await Deno.readTextFile(filePath);
               const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
               fileContents.push(`**${filePath}:**\n\`\`\`\n${preview}\n\`\`\``);
-            } catch (error) {
+            } catch (_error) {
               fileContents.push(`**${filePath}:** Error reading file`);
             }
           }
