@@ -376,22 +376,6 @@ export function createButtonHandlers(
     // ================================
 
     // Continue last session (uses SDK's continue: true — picks up most recent conversation)
-    ['startup:continue', async (ctx: InteractionContext) => {
-      await ctx.deferReply();
-      try {
-        await claudeHandlers.onContinue(ctx, undefined);
-      } catch (error) {
-        await ctx.editReply({
-          embeds: [{
-            color: 0xff0000,
-            title: '❌ Resume Failed',
-            description: `${error instanceof Error ? error.message : String(error)}`,
-            timestamp: true
-          }]
-        });
-      }
-    }],
-
     // Recent sessions — reads from ~/.claude/projects/ to show recent conversations
     ['startup:sessions', async (ctx: InteractionContext) => {
       await ctx.deferReply();
