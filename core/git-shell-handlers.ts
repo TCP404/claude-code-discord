@@ -541,6 +541,19 @@ export function createUtilityCommandHandlers(
   const { handlers, crashHandler, healthMonitor, getClaudeController, cleanupInterval, botSettings } = deps;
   const { git: gitHandlers, shell: shellHandlers, utils: utilsHandlers, help: helpHandlers } = handlers;
 
+  function doGracefulShutdown() {
+    shellHandlers.killAllProcesses();
+    gitHandlers.killAllWorktreeBots();
+    const claudeController = getClaudeController();
+    if (claudeController) {
+      claudeController.abort();
+    }
+    healthMonitor.stopAll();
+    crashHandler.cleanup();
+    cleanupPaginationStates();
+    clearInterval(cleanupInterval);
+  }
+
   return new Map([
     ['status', {
       execute: async (ctx: InteractionContext) => {
@@ -604,18 +617,7 @@ export function createUtilityCommandHandlers(
           }]
         });
 
-        shellHandlers.killAllProcesses();
-        gitHandlers.killAllWorktreeBots();
-
-        const claudeController = getClaudeController();
-        if (claudeController) {
-          claudeController.abort();
-        }
-
-        healthMonitor.stopAll();
-        crashHandler.cleanup();
-        cleanupPaginationStates();
-        clearInterval(cleanupInterval);
+        doGracefulShutdown();
 
         setTimeout(() => {
           Deno.exit(0);
@@ -634,23 +636,12 @@ export function createUtilityCommandHandlers(
           }]
         });
 
-        shellHandlers.killAllProcesses();
-        gitHandlers.killAllWorktreeBots();
-
-        const claudeController = getClaudeController();
-        if (claudeController) {
-          claudeController.abort();
-        }
-
-        healthMonitor.stopAll();
-        crashHandler.cleanup();
-        cleanupPaginationStates();
-        clearInterval(cleanupInterval);
+        doGracefulShutdown();
 
         const scriptPath = new URL("../start.sh", import.meta.url).pathname;
         const pid = Deno.pid;
         const child = new Deno.Command("bash", {
-          args: ["-c", `while kill -0 ${pid} 2>/dev/null; do sleep 0.5; done; exec "${scriptPath}" start`],
+          args: ["-c", `timeout 30 bash -c 'while kill -0 ${pid} 2>/dev/null; do sleep 0.5; done'; exec "${scriptPath}" start`],
           stdin: "null",
           stdout: "null",
           stderr: "null",

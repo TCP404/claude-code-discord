@@ -54,6 +54,7 @@ do_stop() {
     if kill -0 "$PID" 2>/dev/null; then
       pkill -9 -P "$PID" 2>/dev/null
       kill -9 "$PID" 2>/dev/null
+      sleep 0.5
       echo "Force killed PID $PID"
     else
       echo "Stopped PID $PID"
