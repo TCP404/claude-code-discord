@@ -14,21 +14,6 @@ import {
 } from "./sender-renderers.ts";
 import type { ClaudeMessage, RendererContext } from "./types.ts";
 
-function makeCtx(overrides: Partial<RendererContext> = {}): RendererContext {
-  return {
-    expandableContent: new Map(),
-    pendingFileUploads: new Map(),
-    sentFilePaths: new Set(),
-    isThread: false,
-    currentSessionId: undefined,
-    setCurrentSessionId: (id: string) => { ctx.currentSessionId = id; },
-    ...overrides,
-  };
-  // Trick: define ctx variable to capture setCurrentSessionId writes
-  var ctx = arguments[0] as unknown as RendererContext;
-}
-
-// Use a self-referencing factory to properly capture setCurrentSessionId
 function createCtx(overrides: Partial<RendererContext> = {}): RendererContext {
   const ctx: RendererContext = {
     expandableContent: new Map(),

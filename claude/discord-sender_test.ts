@@ -2,7 +2,6 @@ import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import { createClaudeSender } from "./discord-sender.ts";
 import type { DiscordSender, TrackedMessage } from "./types.ts";
 import type { MessageContent } from "../discord/types.ts";
-import type { ClaudeMessage } from "./types.ts";
 
 interface MockTracked {
   content: MessageContent;

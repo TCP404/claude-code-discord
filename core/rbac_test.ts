@@ -1,10 +1,8 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
   isRestrictedCommand,
-  hasPermission,
   checkCommandPermission,
   getRestrictedCommands,
-  loadRBACConfig,
 } from "./rbac.ts";
 import type { InteractionContext } from "../discord/types.ts";
 
@@ -29,12 +27,6 @@ function mockContext(opts: {
   } as unknown as InteractionContext & { _replied: boolean };
 }
 
-function resetRBACCache() {
-  // Force config reload by clearing the module-level cache
-  // We do this by manipulating env vars and relying on loadRBACConfig's cache
-  // Since the cache is module-scoped, we need to reset it between tests
-  // The module caches on first call, so we test in a specific order
-}
 
 // --- isRestrictedCommand ---
 
