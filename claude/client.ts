@@ -222,8 +222,10 @@ export async function sendToClaudeCode(
       // Determine which model to use
       const modelToUse = overrideModel || modelOptions?.model;
 
-      // Determine permission mode (defaults to acceptEdits for Discord)
-      const permMode = modelOptions?.permissionMode || "acceptEdits";
+      // Determine permission mode (env DEFAULT_PERMISSION_MODE, fallback acceptEdits)
+      const permMode = modelOptions?.permissionMode
+        || (Deno.env.get("DEFAULT_PERMISSION_MODE") as SDKPermissionMode | undefined)
+        || "acceptEdits";
 
       // Build environment variables for the subprocess
       const envVars: Record<string, string> = {
