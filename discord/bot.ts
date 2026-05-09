@@ -658,6 +658,14 @@ export async function createDiscordBot(
       // Only handle messages inside threads
       if (!message.channel.isThread()) return;
 
+      // Multi-bot coexistence: if the message mentions another bot but not us, skip
+      const mentionedUsers = message.mentions.users;
+      if (mentionedUsers.size > 0) {
+        const mentionsMe = mentionedUsers.has(client.user!.id);
+        const mentionsOtherBot = mentionedUsers.some(u => u.bot && u.id !== client.user!.id);
+        if (mentionsOtherBot && !mentionsMe) return;
+      }
+
       // Check if this is a voice message
       const isVoiceMessage = message.flags.has(MessageFlags.IsVoiceMessage);
       let textContent = message.content.trim();
