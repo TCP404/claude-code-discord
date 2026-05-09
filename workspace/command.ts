@@ -1,3 +1,4 @@
+/** @module workspace/command — /workspace add|remove|list command definition and handlers. */
 import { SlashCommandBuilder, ChannelType } from "npm:discord.js@14.14.1";
 import type { WorkspaceManager } from "../core/workspace-manager.ts";
 import type { SessionThreadManager } from "../discord/session-threads.ts";

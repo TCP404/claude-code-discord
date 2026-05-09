@@ -1,3 +1,4 @@
+/** @module settings/unified-settings — Unified settings types, defaults, and slash command definition. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
 

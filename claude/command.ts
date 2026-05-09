@@ -1,3 +1,4 @@
+/** @module claude/command — /ask slash command: simple single-turn Claude query. */
 import type { ClaudeResponse, ClaudeMessage } from "./types.ts";
 import { sendToClaudeCode, type ClaudeModelOptions } from "./client.ts";
 import { convertToClaudeMessages } from "./message-converter.ts";

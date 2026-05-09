@@ -1,3 +1,4 @@
+/** @module screenshot/command — Screenshot slash command definition and handlers. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
 // Screenshot command - captures host machine's screen (not available in Docker)

@@ -1,3 +1,4 @@
+/** @module util — Barrel export for utility modules. */
 export * from "./types.ts";
 export { utilsCommands, createUtilsHandlers, type UtilsHandlerDeps } from "./command.ts";
 export * from "./proxy.ts";

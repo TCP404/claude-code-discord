@@ -8,20 +8,45 @@ Discord bot that exposes Claude Code capabilities through Discord slash commands
 
 ```
 Discord slash command
-  → core/handler-registry.ts    (route + build query options)
-  → claude/client.ts            (SDK query with MCP/settings/permissions)
-  → @anthropic-ai/claude-agent-sdk  (streaming async generator)
-  → claude/discord-sender.ts    (SDK messages → Discord embeds/status line)
+  → core/handler-registry.ts       (route + build query options)
+  → claude/client.ts               (SDK query with MCP/settings/permissions)
+  → @anthropic-ai/claude-agent-sdk (streaming async generator)
+  → claude/discord-sender.ts       (orchestrate status line + dispatch to renderers)
+    → claude/sender-renderers.ts   (per-message-type → MessageContent)
+    → claude/sender-utils.ts       (pure helpers: truncate, format, constants)
+  → discord/message-sender.ts      (MessageContent → Discord.js API calls)
 ```
 
 Key directories:
-- `claude/` — SDK integration: query execution, streaming, model fetching, permissions, MCP loading
-- `core/` — Bot infrastructure: command routing, signal handling, RBAC, button handlers, workspace manager
-- `discord/` — Discord layer: message formatting, session-thread persistence, pagination
+- `claude/` — SDK integration: query execution, streaming, model registry, permissions, MCP loading
+  - `client.ts` — low-level SDK wrapper (builds options, streams)
+  - `enhanced-client.ts` — session manager, model registry, templates
+  - `discord-sender.ts` — orchestrator: status line + renderer dispatch
+  - `sender-renderers.ts` — per-message-type render functions
+  - `sender-utils.ts` — pure utility functions and constants
+  - `query-manager.ts` — active query state, rewind, info retrieval
+  - `hooks.ts` — passive SDK callbacks for observability
+  - `user-question.ts` — AskUserQuestion embed/button building
+  - `permission-request.ts` — tool permission Allow/Deny embeds
+- `core/` — Bot infrastructure: config, signal handling, RBAC, handler wiring
+  - `config-loader.ts` — env + CLI arg parsing
+  - `handler-registry.ts` — session state, command routing
+  - `bot-factory.ts` — manager creation, context assembly
+  - `signal-handler.ts` — SIGINT/SIGTERM graceful shutdown
+  - `workspace-manager.ts` — channelId → workDir registry
+  - `env-loader.ts` — .env file reader
+- `discord/` — Discord layer: message sending, threads, pagination, formatting
+  - `bot.ts` — Discord.js client creation and event routing
+  - `message-sender.ts` — MessageContent → Discord.js payloads
+  - `session-threads.ts` — session↔thread mapping persistence
+  - `session-thread-callbacks.ts` — connects Claude sessions to threads
+  - `ask-user-handler.ts` — interactive question flow via buttons
+  - `permission-handler.ts` — tool permission flow via buttons
+  - `pagination.ts` — paginated embeds with navigation
 - `settings/` — Unified settings state and `/settings` command handlers
 - `system/` — System monitoring commands (processes, disk, network, etc.)
 - `shell/` — Shell command execution via Discord
-- `agent/` — Built-in agent definitions (code-review, debug, architect, etc.)
+- `agent/` — Built-in agent personas (code-review, debug, architect, etc.)
 - `workspace/` — Multi-workspace slash command handlers (`/workspace add|remove|list`)
 - `admin/` — Local HTTP admin server (localhost:7860) for workspace management UI
 

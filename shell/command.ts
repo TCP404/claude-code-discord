@@ -1,3 +1,4 @@
+/** @module shell/command — /shell slash command definition and handlers. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import type { ShellManager } from "./handler.ts";
 

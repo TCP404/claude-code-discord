@@ -1,3 +1,4 @@
+/** @module shell/handler — ShellManager: spawns, tracks, and kills shell processes. */
 import type { ShellProcess, ShellExecutionResult, ShellInputResult, ShellKillResult } from "./types.ts";
 import { detectPlatform, getShellCommand } from "../util/platform.ts";
 import { killProcessCrossPlatform } from "../util/process.ts";

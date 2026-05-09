@@ -9,7 +9,7 @@ import type { CommandHandlers, InteractionContext } from "../discord/index.ts";
 import { formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "../discord/index.ts";
 import type { AllHandlers, MessageHistoryOps } from "./handler-registry.ts";
 import type { ProcessCrashHandler, ProcessHealthMonitor } from "../process/index.ts";
-import { expandableContent, hiddenMessageTypes } from "../claude/index.ts";
+import { expandableContent, hiddenMessageTypes } from "../claude/discord-sender.ts";
 
 // ================================
 // Types

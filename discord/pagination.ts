@@ -1,3 +1,4 @@
+/** @module discord/pagination — Paginated embed messages with navigation buttons. */
 import type { EmbedData, ComponentData } from "./types.ts";
 
 export interface PaginationOptions {

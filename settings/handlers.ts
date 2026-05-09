@@ -1,3 +1,4 @@
+/** @module settings/handlers — Interaction handlers for legacy /advanced-settings command. */
 import { CLAUDE_MODELS, isValidModel, resolveModelId, type ModelInfo } from "../claude/enhanced-client.ts";
 import type { AdvancedBotSettings } from "./advanced-settings.ts";
 

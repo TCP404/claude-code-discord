@@ -1,3 +1,4 @@
+/** @module git/handler — Git command execution (status, diff, log, worktree). */
 import { promisify } from "node:util";
 import { exec as execCallback } from "node:child_process";
 import { basename } from "node:path";

@@ -8,7 +8,7 @@
 import type { ButtonHandlers, InteractionContext } from "../discord/index.ts";
 import type { MessageHistoryOps } from "./handler-registry.ts";
 import type { AllHandlers } from "./handler-registry.ts";
-import type { ClaudeMessage } from "../claude/index.ts";
+import type { ClaudeMessage } from "../claude/types.ts";
 
 // ================================
 // Session Reader Utility

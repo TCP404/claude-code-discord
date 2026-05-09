@@ -27,10 +27,14 @@ import {
 import type { TextChannel } from "npm:discord.js@14.14.1";
 
 import { getGitInfo } from "./git/index.ts";
-import { createClaudeSender, expandableContent, sendToClaudeCode, convertToClaudeMessages, type ClaudeMessage, type SessionThreadCallbacks } from "./claude/index.ts";
+import { createClaudeSender, expandableContent } from "./claude/discord-sender.ts";
+import { sendToClaudeCode } from "./claude/client.ts";
+import { convertToClaudeMessages } from "./claude/message-converter.ts";
+import type { ClaudeMessage } from "./claude/types.ts";
+import type { SessionThreadCallbacks } from "./claude/command.ts";
 import { BOT_SYSTEM_PROMPT } from "./claude/bot-system-prompt.ts";
-import { type AskUserQuestionInput } from "./claude/index.ts";
-import { type PermissionRequestCallback } from "./claude/index.ts";
+import type { AskUserQuestionInput } from "./claude/user-question.ts";
+import type { PermissionRequestCallback } from "./claude/permission-request.ts";
 import { initModels } from "./claude/enhanced-client.ts";
 import { DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS } from "./settings/index.ts";
 import { runVersionCheck, startPeriodicUpdateCheck, BOT_VERSION } from "./util/version-check.ts";
@@ -58,7 +62,7 @@ import { createWorkspaceHandlers } from "./workspace/index.ts";
 
 // Re-export for backward compatibility
 export { getGitInfo, executeGitCommand } from "./git/index.ts";
-export { sendToClaudeCode } from "./claude/index.ts";
+export { sendToClaudeCode } from "./claude/client.ts";
 
 // ================================
 // Bot Creation

@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { splitText } from "../discord/utils.ts";
-import type { ClaudeMessage } from "./types.ts";
+import type { ClaudeMessage, RendererContext } from "./types.ts";
 import type { EmbedData, MessageContent } from "../discord/types.ts";
 import { generatePreview } from "./file-preview.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
@@ -19,14 +19,7 @@ import {
   createActionButtons,
 } from "./sender-utils.ts";
 
-export interface RendererContext {
-  expandableContent: Map<string, string>;
-  pendingFileUploads: Map<string, { path: string; name: string }>;
-  sentFilePaths: Set<string>;
-  isThread: boolean;
-  currentSessionId: string | undefined;
-  setCurrentSessionId: (id: string) => void;
-}
+export type { RendererContext } from "./types.ts";
 
 /** Detect [FILE:...] markers, resolve paths, and return file delivery payloads. */
 export async function deliverFileMarkers(

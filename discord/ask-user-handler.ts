@@ -5,7 +5,7 @@
  * @module discord/ask-user-handler
  */
 
-import { parseAskUserButtonId, parseAskUserConfirmId, type AskUserQuestionInput } from "../claude/index.ts";
+import { parseAskUserButtonId, parseAskUserConfirmId, type AskUserQuestionInput } from "../claude/user-question.ts";
 
 /**
  * Create the AskUserQuestion handler that uses the Discord channel.

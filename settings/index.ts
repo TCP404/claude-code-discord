@@ -1,3 +1,4 @@
+/** @module settings — Barrel export for settings commands and types. */
 // Advanced settings exports (legacy)
 export { 
   advancedSettingsCommands,

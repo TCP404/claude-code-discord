@@ -5,7 +5,7 @@
  * @module discord/permission-handler
  */
 
-import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCallback } from "../claude/index.ts";
+import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCallback } from "../claude/permission-request.ts";
 
 /**
  * Create the PermissionRequest handler that uses the Discord channel.

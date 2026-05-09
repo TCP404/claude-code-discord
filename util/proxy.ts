@@ -1,4 +1,4 @@
-// Proxy configuration utilities
+/** @module util/proxy — HTTP/SOCKS proxy configuration detection and types. */
 
 export interface ProxyConfig {
   enabled: boolean;

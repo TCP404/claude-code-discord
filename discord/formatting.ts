@@ -1,4 +1,4 @@
-// Enhanced formatting utilities for Discord messages
+/** @module discord/formatting — Rich text formatting for code blocks, git output, and embeds. */
 export interface FormatOptions {
   maxLength?: number;
   truncateAt?: number;

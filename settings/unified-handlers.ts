@@ -1,3 +1,4 @@
+/** @module settings/unified-handlers — Interaction handlers for the unified /settings command. */
 import type { UnifiedBotSettings, RateLimitTier } from "./unified-settings.ts";
 import { 
   UNIFIED_DEFAULT_SETTINGS, 

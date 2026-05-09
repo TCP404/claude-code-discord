@@ -1,3 +1,4 @@
+/** @module claude/enhanced-client — High-level session manager, model registry, and template support. */
 import { sendToClaudeCode, type ClaudeModelOptions, type SDKPermissionMode, type ThinkingConfig, type EffortLevel, type SDKAgentDefinition, type SDKModelInfo } from "./client.ts";
 import type { ClaudeMessage } from "./types.ts";
 import { recordAPIUsage } from "../util/usage-tracker.ts";

@@ -13,7 +13,7 @@ import {
   setupGlobalErrorHandlers,
   type RecoveryOptions 
 } from "../process/index.ts";
-import { ClaudeSessionManager } from "../claude/index.ts";
+import { ClaudeSessionManager } from "../claude/enhanced-client.ts";
 import type { AppConfig } from "./config-loader.ts";
 
 // ================================

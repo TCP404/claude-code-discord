@@ -1,3 +1,4 @@
+/** @module git/command — /git slash command definition and handlers. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { WorktreeBotManager } from "./process-manager.ts";
 

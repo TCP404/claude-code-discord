@@ -1,63 +1,22 @@
-// Claude Code integration exports
-export { claudeCommands, createClaudeHandlers } from "./command.ts";
-export type { SessionThreadCallbacks } from "./command.ts";
-export { cleanSessionId, sendToClaudeCode } from "./client.ts";
+/** @module claude — Barrel export for Claude Code SDK integration. */
+//
+// Prefer importing from source files directly (e.g. ./claude/client.ts).
+// This barrel exists for backward-compatibility and top-level re-exports only.
+//
+
+// Types
+export type { ClaudeMessage, ClaudeResponse, TodoItem } from "./types.ts";
 export type { ClaudeModelOptions, SDKPermissionMode, ThinkingConfig, EffortLevel, SDKAgentDefinition, SDKModelInfo } from "./client.ts";
+export type { DiscordSender, TrackedMessage } from "./discord-sender.ts";
+export type { SessionThreadCallbacks } from "./command.ts";
+export type { AskUserCallback, AskUserQuestionInput } from "./user-question.ts";
+export type { PermissionRequestCallback } from "./permission-request.ts";
+export type { EnhancedClaudeOptions, ClaudeSession, ModelInfo } from "./enhanced-client.ts";
+export type { HookConfig, HookEvent_Discord } from "./hooks.ts";
+export type { ClaudeInitInfo } from "./query-manager.ts";
+
+// Runtime values used by top-level assembly (index.ts)
+export { sendToClaudeCode, cleanSessionId } from "./client.ts";
 export { createClaudeSender, expandableContent, hiddenMessageTypes, pendingFileUploads } from "./discord-sender.ts";
 export { convertToClaudeMessages } from "./message-converter.ts";
-export {
-  enhancedClaudeCommands,
-  createEnhancedClaudeHandlers
-} from "./enhanced-commands.ts";
-export {
-  enhancedClaudeQuery,
-  ClaudeSessionManager,
-  CLAUDE_MODELS,
-  CLAUDE_TEMPLATES,
-  initModels,
-  refreshModels,
-  updateModelsFromSDK,
-  resolveModelId,
-  isValidModel
-} from "./enhanced-client.ts";
-export type { DiscordSender, TrackedMessage } from "./discord-sender.ts";
-export type { ClaudeMessage } from "./types.ts";
-export type {
-  EnhancedClaudeOptions,
-  ClaudeSession,
-  ModelInfo
-} from "./enhanced-client.ts";
-export type { EnhancedClaudeHandlerDeps } from "./enhanced-commands.ts";
-// Info & control commands — /claude-info, /rewind, /claude-control
-export { infoCommands, createInfoCommandHandlers } from "./info-commands.ts";
-export type { InfoCommandHandlerDeps } from "./info-commands.ts";
-// Query manager — active query controls, info retrieval, rewind
-export {
-  setActiveQuery,
-  getActiveQuery,
-  trackMessageId,
-  getTrackedMessages,
-  clearTrackedMessages,
-  interruptActiveQuery,
-  setActiveModel,
-  setActivePermissionMode,
-  rewindToMessage,
-  getInitInfo,
-  getAccountInfo,
-  getSupportedModels,
-  getMcpServerStatus,
-  fetchClaudeInfo,
-  toggleMcpServerActive,
-  reconnectMcpServerActive,
-  setMcpServersActive,
-} from "./query-manager.ts";
-export type { ClaudeInitInfo, RewindFilesResult } from "./query-manager.ts";
-// Hooks — passive SDK callbacks for tool/notification/task observability
-export { buildHooks } from "./hooks.ts";
-export type { HookConfig, HookEvent_Discord } from "./hooks.ts";
-// AskUserQuestion — interactive question flow (SDK v0.1.71+)
-export { buildQuestionMessages, parseAskUserButtonId, parseAskUserConfirmId } from "./user-question.ts";
-export type { AskUserCallback, AskUserQuestionInput, AskUserQuestionItem, AskUserOption } from "./user-question.ts";
-// PermissionRequest — interactive tool-permission flow (replaces TUI prompt)
-export { buildPermissionEmbed, describeToolAction, parsePermissionButtonId } from "./permission-request.ts";
-export type { PermissionRequestCallback } from "./permission-request.ts";
+export { ClaudeSessionManager, initModels } from "./enhanced-client.ts";

@@ -1,3 +1,4 @@
+/** @module discord — Barrel export for Discord layer components. */
 // Discord utilities and components
 export { createDiscordBot } from "./bot.ts";
 export { sanitizeChannelName, splitText } from "./utils.ts";

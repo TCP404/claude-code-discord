@@ -1,3 +1,4 @@
+/** @module system — System monitoring handlers (processes, disk, network, memory). */
 import {
   detectPlatform,
   getPlatformCommands,

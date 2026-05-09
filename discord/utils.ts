@@ -1,3 +1,4 @@
+/** @module discord/utils — Text splitting and channel name sanitization helpers. */
 export function sanitizeChannelName(name: string): string {
   return name
     .toLowerCase()

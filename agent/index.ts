@@ -1,10 +1,10 @@
-// Agent command implementation
+/** @module agent — /agent slash command: built-in agent personas (code-review, debug, etc). */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { 
   getAgentSessionsManager,
   type AgentSessionData 
 } from "../util/persistence.ts";
-import type { ClaudeModelOptions, SDKAgentDefinition } from "../claude/index.ts";
+import type { ClaudeModelOptions, SDKAgentDefinition } from "../claude/client.ts";
 
 // Agent types and interfaces
 // NOTE: Temperature and maxTokens are NOT supported by Claude Code CLI

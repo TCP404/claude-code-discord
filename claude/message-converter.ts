@@ -1,3 +1,4 @@
+/** @module claude/message-converter — Converts raw SDK JSON messages to ClaudeMessage[]. */
 import type { ClaudeMessage } from "./types.ts";
 
 // Convert JSON messages to ClaudeMessage

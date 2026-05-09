@@ -1,4 +1,4 @@
-// Additional Claude commands exports
+/** @module claude/additional-index — Barrel export for additional Claude commands. */
 export { 
   additionalClaudeCommands,
   createAdditionalClaudeHandlers

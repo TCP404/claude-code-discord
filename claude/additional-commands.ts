@@ -1,3 +1,4 @@
+/** @module claude/additional-commands — Extra slash commands (quick-query, template, etc). */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
 

@@ -1,4 +1,4 @@
-// Discord module types
+/** @module discord/types — Shared type definitions for the Discord layer. */
 import type { TextChannel } from "npm:discord.js@14.14.1";
 import type { BotSettings } from "../types/shared.ts";
 

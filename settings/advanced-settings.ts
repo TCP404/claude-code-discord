@@ -1,3 +1,4 @@
+/** @module settings/advanced-settings — Legacy settings types, defaults, and slash command. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { CLAUDE_MODELS, type ModelInfo } from "../claude/enhanced-client.ts";
 

@@ -1,4 +1,4 @@
-// claude/session-usage.ts
+/** @module claude/session-usage — Per-session cost and query count tracking. */
 
 export interface SessionUsage {
   totalCost: number;

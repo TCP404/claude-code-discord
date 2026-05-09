@@ -11,14 +11,23 @@ import type {
   BotDependencies
 } from "../discord/index.ts";
 
-import type { ClaudeMessage } from "../claude/index.ts";
-
-// Import command definitions
-import { claudeCommands, createClaudeHandlers } from "../claude/index.ts";
-import { enhancedClaudeCommands, createEnhancedClaudeHandlers } from "../claude/index.ts";
+import type { ClaudeMessage } from "../claude/types.ts";
+import type { ClaudeModelOptions } from "../claude/client.ts";
+import type { SessionThreadCallbacks } from "../claude/command.ts";
+import type { AskUserCallback } from "../claude/user-question.ts";
+import type { PermissionRequestCallback } from "../claude/permission-request.ts";
+import { claudeCommands, createClaudeHandlers } from "../claude/command.ts";
+import { enhancedClaudeCommands, createEnhancedClaudeHandlers } from "../claude/enhanced-commands.ts";
 import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "../claude/additional-index.ts";
+import { infoCommands, createInfoCommandHandlers } from "../claude/info-commands.ts";
+import { cleanSessionId } from "../claude/client.ts";
+import { ClaudeSessionManager } from "../claude/enhanced-client.ts";
+import { hiddenMessageTypes } from "../claude/discord-sender.ts";
+import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
+import { buildHooks, type HookEvent_Discord } from "../claude/hooks.ts";
 import { advancedSettingsCommands, createAdvancedSettingsHandlers, type AdvancedBotSettings } from "../settings/index.ts";
 import { unifiedSettingsCommands, createUnifiedSettingsHandlers, type UnifiedBotSettings } from "../settings/index.ts";
+import { THINKING_MODES, OPERATION_MODES, EFFORT_LEVELS } from "../settings/index.ts";
 import { gitCommands, createGitHandlers } from "../git/index.ts";
 import { shellCommands, createShellHandlers } from "../shell/index.ts";
 import { utilsCommands, createUtilsHandlers } from "../util/index.ts";
@@ -27,17 +36,6 @@ import { helpCommand, createHelpHandlers } from "../help/index.ts";
 import { agentCommand, createAgentHandlers } from "../agent/index.ts";
 import { screenshotCommands, createScreenshotHandlers } from "../screenshot/index.ts";
 import { workspaceCommands } from "../workspace/index.ts";
-import { infoCommands, createInfoCommandHandlers } from "../claude/index.ts";
-import { cleanSessionId, ClaudeSessionManager } from "../claude/index.ts";
-import type { SessionThreadCallbacks } from "../claude/index.ts";
-import type { ClaudeModelOptions } from "../claude/index.ts";
-import type { AskUserCallback } from "../claude/index.ts";
-import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
-import type { PermissionRequestCallback } from "../claude/index.ts";
-import { buildHooks } from "../claude/hooks.ts";
-import type { HookEvent_Discord } from "../claude/hooks.ts";
-import { THINKING_MODES, OPERATION_MODES, EFFORT_LEVELS } from "../settings/index.ts";
-import { hiddenMessageTypes } from "../claude/index.ts";
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
 import type { ShellManager } from "../shell/index.ts";

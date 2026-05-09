@@ -1,3 +1,4 @@
+/** @module help/commands — /help command: lists all available commands with descriptions. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
 // Fixed help command without choices to avoid Discord's 25-choice limit

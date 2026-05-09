@@ -1,3 +1,4 @@
+/** @module git/process-manager — Manages worktree bot child processes (spawn, kill, list). */
 // Worktree bot process management
 import { killProcessCrossPlatform } from "../util/process.ts";
 import type { BotSettings } from "../types/shared.ts";

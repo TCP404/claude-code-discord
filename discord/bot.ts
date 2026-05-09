@@ -1,3 +1,4 @@
+/** @module discord/bot — Discord.js client creation, slash command registration, and event routing. */
 import {
   Client,
   GatewayIntentBits,
@@ -20,7 +21,7 @@ import {
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
-import { pendingFileUploads } from "../claude/index.ts";
+import { pendingFileUploads } from "../claude/discord-sender.ts";
 import { isVoiceTranscriptionEnabled, transcribeAudio } from "../voice/transcribe.ts";
 import { checkCommandPermission } from "../core/rbac.ts";
 import { SETTINGS_ACTIONS, SETTINGS_VALUES } from "../settings/unified-settings.ts";

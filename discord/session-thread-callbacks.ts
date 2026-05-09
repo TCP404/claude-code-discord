@@ -6,7 +6,8 @@
  */
 
 import type { TextChannel } from "npm:discord.js@14.14.1";
-import { createClaudeSender, type SessionThreadCallbacks } from "../claude/index.ts";
+import { createClaudeSender } from "../claude/discord-sender.ts";
+import type { SessionThreadCallbacks } from "../claude/command.ts";
 import type { SessionThreadManager } from "./session-threads.ts";
 import { createChannelSenderAdapter, sendMessageContent } from "./message-sender.ts";
 

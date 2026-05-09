@@ -5,7 +5,7 @@
  * @module claude/discord-sender
  */
 
-import type { ClaudeMessage } from "./types.ts";
+import type { ClaudeMessage, DiscordSender, TrackedMessage, RendererContext } from "./types.ts";
 import type { MessageContent } from "../discord/types.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
 import {
@@ -25,22 +25,11 @@ import {
   renderTaskNotification,
   renderToolProgress,
   renderToolSummary,
-  type RendererContext,
 } from "./sender-renderers.ts";
 
 // Re-export public API that other modules depend on
 export { hiddenMessageTypes, FILE_MARKER_REGEX } from "./sender-utils.ts";
-
-// Discord sender interface for dependency injection
-export interface DiscordSender {
-  sendMessage(content: MessageContent): Promise<void>;
-  sendTracked?(content: MessageContent): Promise<TrackedMessage>;
-}
-
-export interface TrackedMessage {
-  edit(content: MessageContent): Promise<void>;
-  delete(): Promise<void>;
-}
+export type { DiscordSender, TrackedMessage } from "./types.ts";
 
 // Store full content for expand functionality
 export const expandableContent = new Map<string, string>();

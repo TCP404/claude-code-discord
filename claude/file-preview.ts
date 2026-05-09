@@ -1,3 +1,4 @@
+/** @module claude/file-preview — Generates previews (images, PDFs, code) for file delivery. */
 // File preview generation for different file types
 import { existsSync } from "node:fs";
 import { basename, extname } from "node:path";

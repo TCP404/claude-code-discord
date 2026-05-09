@@ -1,3 +1,4 @@
+/** @module claude/client — Low-level SDK wrapper: builds query options, streams responses. */
 import {
   type AgentDefinition as SDKAgentDefinition,
   type HookCallbackMatcher,

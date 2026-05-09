@@ -1,3 +1,3 @@
-// Help system exports
+/** @module help — Barrel export for help system. */
 export { helpCommand, createHelpHandlers, COMMAND_HELP } from "./commands.ts";
 export type { HelpHandlerDeps } from "./commands.ts";

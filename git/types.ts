@@ -1,3 +1,4 @@
+/** @module git/types — Type definitions for git operations. */
 export interface GitInfo {
   repo: string;
   branch: string;

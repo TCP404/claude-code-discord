@@ -1,4 +1,4 @@
-// Process management and crash handling exports
+/** @module process — Barrel export for process management and crash handling. */
 export { 
   ProcessCrashHandler, 
   setupGlobalErrorHandlers, 

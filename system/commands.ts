@@ -1,3 +1,4 @@
+/** @module system/commands — System monitoring slash command definitions. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
 // System commands - slash command definitions only

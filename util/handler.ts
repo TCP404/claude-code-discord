@@ -1,3 +1,4 @@
+/** @module util/handler — Bot settings handlers (pwd, update-settings). */
 import type { SettingsResult, PwdResult } from "./types.ts";
 import type { BotSettings, BotSettingsUpdater } from "../types/shared.ts";
 

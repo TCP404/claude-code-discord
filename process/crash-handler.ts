@@ -1,4 +1,4 @@
-// Enhanced process crash handling and recovery
+/** @module process/crash-handler — Crash recovery, SIGINT/SIGTERM handling, health monitoring. */
 import type { ShellManager } from "../shell/handler.ts";
 import type { WorktreeBotManager } from "../git/process-manager.ts";
 

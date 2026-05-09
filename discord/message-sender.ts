@@ -6,7 +6,7 @@
  */
 
 import type { MessageContent } from "./types.ts";
-import type { DiscordSender } from "../claude/index.ts";
+import type { DiscordSender } from "../claude/types.ts";
 
 /**
  * Build a Discord.js payload from a MessageContent object and send it to a channel.

@@ -1,3 +1,4 @@
+/** @module claude/enhanced-commands — /claude slash command with model/template/thinking options. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { CLAUDE_MODELS, CLAUDE_TEMPLATES, type ModelInfo } from "./enhanced-client.ts";
 

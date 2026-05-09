@@ -1,3 +1,4 @@
+/** @module claude/types — Shared type definitions for the Claude integration layer. */
 export interface ClaudeResponse {
   response: string;
   sessionId?: string;
@@ -28,4 +29,25 @@ export interface TodoItem {
   content: string;
   status: 'pending' | 'in_progress' | 'completed';
   priority: 'high' | 'medium' | 'low';
+}
+
+import type { MessageContent } from "../discord/types.ts";
+
+export interface DiscordSender {
+  sendMessage(content: MessageContent): Promise<void>;
+  sendTracked?(content: MessageContent): Promise<TrackedMessage>;
+}
+
+export interface TrackedMessage {
+  edit(content: MessageContent): Promise<void>;
+  delete(): Promise<void>;
+}
+
+export interface RendererContext {
+  expandableContent: Map<string, string>;
+  pendingFileUploads: Map<string, { path: string; name: string }>;
+  sentFilePaths: Set<string>;
+  isThread: boolean;
+  currentSessionId: string | undefined;
+  setCurrentSessionId: (id: string) => void;
 }
