@@ -1,6 +1,8 @@
 /** @module claude/hot-query — AsyncPushQueue + HotQuerySession for streaming-input mode. */
 
+import { buildQueryOptions } from "./client.ts";
 import type { ClaudeModelOptions, SDKPermissionMode } from "./client.ts";
+import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 /**
@@ -303,4 +305,23 @@ export class HotQuerySession {
     } catch { /* ignore */ }
     await this.consumerPromise.catch(() => {});
   }
+}
+
+/**
+ * Build a QueryFactory that invokes the real SDK `claudeQuery`.
+ * The returned factory is called once per HotQuerySession construction.
+ */
+export async function makeSdkQueryFactory(
+  workDir: string,
+  options: ClaudeModelOptions | undefined,
+  sessionIdToResume: string | undefined,
+  controller: AbortController,
+): Promise<QueryFactory> {
+  const built = await buildQueryOptions(workDir, options, sessionIdToResume, controller);
+  return (inputIter) => {
+    return claudeQuery({
+      prompt: inputIter as AsyncIterable<never>, // SDK accepts AsyncIterable<SDKUserMessage>
+      options: built.options,
+    }) as unknown as QueryLike;
+  };
 }
