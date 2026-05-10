@@ -199,7 +199,6 @@ export interface AgentHandlerDeps {
   workDir: string;
   crashHandler: any;
   sendClaudeMessages: (messages: any[]) => Promise<void>;
-  sessionManager: any;
   getQueryOptions?: () => ClaudeModelOptions;
 }
 
@@ -511,41 +510,32 @@ async function chatWithAgent(
 
   // Call Claude Code with agent-specific configuration
   try {
-    const { enhancedClaudeQuery } = await import("../claude/enhanced-client.ts");
+    const { sendToClaudeCode } = await import("../claude/client.ts");
     const { convertToClaudeMessages } = await import("../claude/message-converter.ts");
 
     const controller = new AbortController();
     const startTime = Date.now();
 
-    // Parse context files if provided
-    const contextFilesList = contextFiles
-      ? contextFiles.split(",").map((f) => f.trim()).filter((f) => f.length > 0)
-      : undefined;
-
     // Merge runtime settings (permissionMode, thinking, effort, proxy, etc.)
     const runtimeOpts = deps?.getQueryOptions?.() || {};
 
-    const result = await enhancedClaudeQuery(
+    const result = await sendToClaudeCode(
+      deps?.workDir || Deno.cwd(),
       enhancedPrompt,
-      {
-        workDir: deps?.workDir || Deno.cwd(),
-        // Use native SDK agent support — SDK applies agent's systemPrompt + model automatically
-        agent: activeAgentName,
-        agents: SDK_AGENTS,
-        includeSystemInfo: !!includeSystemInfo,
-        includeGitContext: false,
-        contextFiles: contextFilesList,
-        ...runtimeOpts,
-      },
       controller,
       undefined, // sessionId
-      undefined, // messages
+      undefined, // onChunk
       async (jsonData) => {
-        // Stream responses to Discord
         const claudeMessages = convertToClaudeMessages(jsonData);
         if (claudeMessages.length > 0 && deps?.sendClaudeMessages) {
           await deps.sendClaudeMessages(claudeMessages);
         }
+      },
+      {
+        ...runtimeOpts,
+        // Use native SDK agent support — SDK applies agent's systemPrompt + model automatically
+        agent: activeAgentName,
+        agents: SDK_AGENTS,
       },
     );
 

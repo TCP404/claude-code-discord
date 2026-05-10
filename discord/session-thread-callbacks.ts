@@ -60,6 +60,7 @@ export function createSessionThreadCallbacks(
         prompt,
         threadName,
       );
+      sessionThreadManager.recordActivity(placeholderKey);
 
       await sendMessageContent(channel, {
         embeds: [{

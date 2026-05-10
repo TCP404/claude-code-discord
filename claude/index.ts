@@ -18,7 +18,7 @@ export type { DiscordSender, TrackedMessage } from "./discord-sender.ts";
 export type { SessionThreadCallbacks } from "./command.ts";
 export type { AskUserCallback, AskUserQuestionInput } from "./user-question.ts";
 export type { PermissionRequestCallback } from "./permission-request.ts";
-export type { ClaudeSession, EnhancedClaudeOptions, ModelInfo } from "./enhanced-client.ts";
+export type { ModelInfo } from "./models.ts";
 export type { HookConfig, HookEvent_Discord } from "./hooks.ts";
 export type { ClaudeInitInfo } from "./query-manager.ts";
 
@@ -31,4 +31,4 @@ export {
   pendingFileUploads,
 } from "./discord-sender.ts";
 export { convertToClaudeMessages } from "./message-converter.ts";
-export { ClaudeSessionManager, initModels } from "./enhanced-client.ts";
+export { initModels } from "./models.ts";

@@ -7,7 +7,7 @@ import {
   THINKING_MODES,
   UNIFIED_DEFAULT_SETTINGS,
 } from "./unified-settings.ts";
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../claude/models.ts";
 import { getTodosManager, type TodoItem as PersistenceTodoItem } from "../util/persistence.ts";
 import {
   getMcpServerStatus,

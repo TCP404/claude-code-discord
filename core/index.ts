@@ -30,7 +30,6 @@ export {
   createBotContext,
   createBotContextOrThrow,
   createBotManagers,
-  createClaudeSessionManager,
   createCrashHandler,
   createShellManager,
   createWorktreeBotManager,

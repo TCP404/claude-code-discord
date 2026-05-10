@@ -48,6 +48,14 @@ tr:hover { background: #2d2d44; }
 .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; top: 3px; background-color: #e0e0e0; transition: .2s; border-radius: 50%; }
 input:checked + .slider { background-color: #7289da; }
 input:checked + .slider:before { transform: translateX(18px); }
+.ws-group { margin-top: 18px; }
+.ws-group:first-child { margin-top: 0; }
+.ws-group-header { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; background: #16213e; border-radius: 6px 6px 0 0; border-bottom: 1px solid #2d2d44; }
+.ws-group-header .ws-name { font-weight: 600; color: #7289da; font-size: 0.9rem; }
+.ws-group-header .ws-path { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem; color: #888; }
+.ws-group-header .ws-count { margin-left: auto; font-size: 0.75rem; color: #888; }
+.ws-group table { margin-top: 0; }
+.ws-group table th:first-child, .ws-group table td:first-child { padding-left: 12px; }
 </style>
 </head>
 <body>
@@ -82,10 +90,7 @@ input:checked + .slider:before { transform: translateX(18px); }
   <div style="margin-bottom: 12px;">
     <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>72h)</button>
   </div>
-  <table>
-    <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th></th></tr></thead>
-    <tbody id="sess-tbody"></tbody>
-  </table>
+  <div id="sess-groups"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -207,19 +212,63 @@ async function deleteWorkspace(name) {
 }
 
 // ─── Sessions ───
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 async function loadSessions() {
   const res = await fetch('/api/sessions');
   const list = await res.json();
-  const tbody = $('#sess-tbody');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No active sessions</td></tr>'; return; }
-  tbody.innerHTML = list.map(s => \`<tr>
-    <td>\${s.threadName}</td>
-    <td class="mono">\${s.sessionId.substring(0, 8)}...</td>
-    <td>\${timeAgo(s.createdAt)}</td>
-    <td>\${timeAgo(s.lastActivity)}</td>
-    <td>\${s.messageCount}</td>
-    <td><button class="btn btn-danger" onclick="deleteSession('\${s.sessionId}')">Delete</button></td>
-  </tr>\`).join('');
+  const container = $('#sess-groups');
+  if (!list.length) { container.innerHTML = '<div class="empty">No active sessions</div>'; return; }
+
+  // Group by workspace (null → "Unassigned")
+  const groups = new Map();
+  for (const s of list) {
+    const key = s.workspaceName || '__unassigned__';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        name: s.workspaceName,
+        path: s.workspacePath,
+        sessions: [],
+      });
+    }
+    groups.get(key).sessions.push(s);
+  }
+
+  // Sort groups: named workspaces alphabetically, unassigned last
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (a === '__unassigned__') return 1;
+    if (b === '__unassigned__') return -1;
+    return a.localeCompare(b);
+  });
+
+  container.innerHTML = sortedKeys.map(key => {
+    const g = groups.get(key);
+    // Sort sessions by last activity (most recent first)
+    g.sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+    const headerName = g.name ? escapeHtml(g.name) : 'Unassigned';
+    const headerPath = g.path ? '<span class="ws-path">' + escapeHtml(g.path) + '</span>' : '';
+    const rows = g.sessions.map(s => \`<tr>
+      <td>\${escapeHtml(s.threadName)}</td>
+      <td class="mono">\${s.sessionId.substring(0, 8)}...</td>
+      <td>\${timeAgo(s.createdAt)}</td>
+      <td>\${timeAgo(s.lastActivity)}</td>
+      <td>\${s.messageCount}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteSession('\${s.sessionId}')">Delete</button></td>
+    </tr>\`).join('');
+    return \`<div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-name">\${headerName}</span>
+        \${headerPath}
+        <span class="ws-count">\${g.sessions.length} session\${g.sessions.length === 1 ? '' : 's'}</span>
+      </div>
+      <table>
+        <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th></th></tr></thead>
+        <tbody>\${rows}</tbody>
+      </table>
+    </div>\`;
+  }).join('');
 }
 
 async function deleteSession(sessionId) {

@@ -9,7 +9,7 @@
  * hardcoded defaults when neither source is available.
  */
 
-import type { ModelInfo } from "./enhanced-client.ts";
+import type { ModelInfo } from "./models.ts";
 
 // Anthropic API response types
 interface AnthropicModelEntry {

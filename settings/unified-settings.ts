@@ -1,6 +1,6 @@
 /** @module settings/unified-settings — Unified settings types, defaults, and slash command definition. */
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../claude/models.ts";
 
 // Unified settings interface combining all bot settings
 // NOTE: Temperature and maxTokens are NOT supported by Claude Code CLI

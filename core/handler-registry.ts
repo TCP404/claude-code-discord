@@ -13,17 +13,8 @@ import type { SessionThreadCallbacks } from "../claude/command.ts";
 import type { AskUserCallback } from "../claude/user-question.ts";
 import type { PermissionRequestCallback } from "../claude/permission-request.ts";
 import { claudeCommands, createClaudeHandlers } from "../claude/command.ts";
-import {
-  createEnhancedClaudeHandlers,
-  enhancedClaudeCommands,
-} from "../claude/enhanced-commands.ts";
-import {
-  additionalClaudeCommands,
-  createAdditionalClaudeHandlers,
-} from "../claude/additional-index.ts";
 import { createInfoCommandHandlers, infoCommands } from "../claude/info-commands.ts";
 import { cleanSessionId } from "../claude/client.ts";
-import { ClaudeSessionManager } from "../claude/enhanced-client.ts";
 import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
 import { buildHooks, type HookEvent_Discord } from "../claude/hooks.ts";
 import {
@@ -140,8 +131,6 @@ export interface BotSettingsOps {
  */
 export interface AllHandlers {
   claude: ReturnType<typeof createClaudeHandlers>;
-  enhancedClaude: ReturnType<typeof createEnhancedClaudeHandlers>;
-  additionalClaude: ReturnType<typeof createAdditionalClaudeHandlers>;
   advancedSettings: ReturnType<typeof createAdvancedSettingsHandlers>;
   unifiedSettings: ReturnType<typeof createUnifiedSettingsHandlers>;
   git: ReturnType<typeof createGitHandlers>;
@@ -182,8 +171,6 @@ export interface HandlerRegistryDeps {
   crashHandler: ProcessCrashHandler;
   /** Health monitor instance */
   healthMonitor: ProcessHealthMonitor;
-  /** Claude session manager instance */
-  claudeSessionManager: ClaudeSessionManager;
   /** Function to send Claude messages */
   sendClaudeMessages: (messages: ClaudeMessage[]) => Promise<void>;
   /** Callback when bot settings update */
@@ -443,7 +430,6 @@ export function createAllHandlers(
     shellManager,
     worktreeBotManager,
     crashHandler,
-    claudeSessionManager,
     sendClaudeMessages,
     onBotSettingsUpdate,
   } = deps;
@@ -631,31 +617,9 @@ export function createAllHandlers(
     categoryName,
   });
 
-  const enhancedClaudeHandlers = createEnhancedClaudeHandlers({
-    workDir,
-    getClaudeController: claudeSession.getController,
-    setClaudeController: claudeSession.setController,
-    setClaudeSessionId: claudeSession.setSessionId,
-    sendClaudeMessages,
-    sessionManager: claudeSessionManager,
-    crashHandler,
-    getQueryOptions,
-  });
-
   const systemHandlers = createSystemHandlers({
     workDir,
     crashHandler,
-  });
-
-  const additionalClaudeHandlers = createAdditionalClaudeHandlers({
-    workDir,
-    getClaudeController: claudeSession.getController,
-    setClaudeController: claudeSession.setController,
-    sendClaudeMessages,
-    sessionManager: claudeSessionManager,
-    crashHandler,
-    settings: currentSettings.advanced,
-    getQueryOptions,
   });
 
   const advancedSettingsHandlers = createAdvancedSettingsHandlers({
@@ -675,7 +639,6 @@ export function createAllHandlers(
     workDir,
     crashHandler,
     sendClaudeMessages,
-    sessionManager: claudeSessionManager,
     getQueryOptions,
   });
 
@@ -692,8 +655,6 @@ export function createAllHandlers(
 
   return {
     claude: claudeHandlers,
-    enhancedClaude: enhancedClaudeHandlers,
-    additionalClaude: additionalClaudeHandlers,
     advancedSettings: advancedSettingsHandlers,
     unifiedSettings: unifiedSettingsHandlers,
     git: gitHandlers,
@@ -732,8 +693,6 @@ const hotQueriesCommand = new SlashCommandBuilder()
 export function getAllCommands() {
   return [
     ...claudeCommands,
-    ...enhancedClaudeCommands,
-    ...additionalClaudeCommands,
     ...advancedSettingsCommands,
     ...unifiedSettingsCommands,
     agentCommand,

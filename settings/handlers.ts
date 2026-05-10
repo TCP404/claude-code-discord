@@ -1,5 +1,5 @@
 /** @module settings/handlers — Interaction handlers for legacy /advanced-settings command. */
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../claude/models.ts";
 import type { AdvancedBotSettings } from "./advanced-settings.ts";
 
 export interface SettingsHandlerDeps {
