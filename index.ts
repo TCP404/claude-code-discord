@@ -29,6 +29,9 @@ import type { TextChannel } from "npm:discord.js@14.14.1";
 import { getGitInfo } from "./git/index.ts";
 import { createClaudeSender, expandableContent } from "./claude/discord-sender.ts";
 import { sendToClaudeCode } from "./claude/client.ts";
+import { readHotQueryConfig } from "./claude/hot-query-config.ts";
+import { HotQueryRegistry } from "./claude/hot-query-registry.ts";
+import { HotQuerySession, makeSdkQueryFactory } from "./claude/hot-query.ts";
 import { convertToClaudeMessages } from "./claude/message-converter.ts";
 import type { ClaudeMessage } from "./claude/types.ts";
 import type { SessionThreadCallbacks } from "./claude/command.ts";
@@ -141,6 +144,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   const workspaceManager = new WorkspaceManager(workDir);
   await workspaceManager.loadFromDisk();
+
+  const hotQueryConfig = readHotQueryConfig((k) => Deno.env.get(k));
+  const hotQueryRegistry = new HotQueryRegistry({
+    maxSessions: hotQueryConfig.maxSessions,
+    idleMs: hotQueryConfig.idleMs,
+    onEvict: (sessionId, reason) => {
+      console.log(`[HotQuery] session=${sessionId} closed (reason: ${reason})`);
+      if (reason === "lru") {
+        const thread = sessionThreadManager.getThread(sessionId);
+        thread?.send(
+          "🧊 会话已进入休眠以释放资源，下一条消息将正常处理（首条会多等 2-3s 冷启动）",
+        ).catch(() => {});
+      }
+    },
+  });
 
   // Per-channel routing maps
   // deno-lint-ignore no-explicit-any
@@ -314,14 +332,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         console.warn(`[ThreadMessage] No session found for thread ${threadChannelId}, ignoring`);
         return;
       }
-
       if (sessionId.startsWith("pending_") || sessionId.startsWith("failed_")) {
         console.warn(
           `[ThreadMessage] Session not ready (${sessionId.slice(0, 20)}…), ignoring message`,
         );
         return;
       }
-
       const thread = sessionThreadManager.getThread(sessionId);
       if (!thread) {
         console.warn(
@@ -331,6 +347,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
 
       const thinkingMsg = await thread.send("`Claude is thinking...`");
+      sessionThreadManager.recordActivity(sessionId);
 
       const { send: threadSender, setSessionId } = createClaudeSender(
         createChannelSenderAdapter(thread),
@@ -340,33 +357,71 @@ export async function createClaudeCodeBot(config: BotConfig) {
       const threadKey = threadChannelId;
       claudeSessionOps.setController(controller, threadKey);
 
+      // deno-lint-ignore no-explicit-any
       const parentChannelId = (thread as any).parentId ?? threadChannelId;
       const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
+      const turnOptions = { appendSystemPrompt: BOT_SYSTEM_PROMPT };
+
+      // deno-lint-ignore no-explicit-any
+      const onStreamJson = (jsonData: any) => {
+        const claudeMessages = convertToClaudeMessages(jsonData);
+        if (claudeMessages.length > 0) {
+          threadSender(claudeMessages).catch(() => {});
+        }
+      };
+      const onTyping = () => {
+        try {
+          thread.sendTyping();
+        } catch { /* ignore */ }
+      };
 
       try {
-        const result = await sendToClaudeCode(
-          effectiveWorkDir,
-          content,
-          controller,
-          sessionId,
-          undefined,
-          (jsonData) => {
-            const claudeMessages = convertToClaudeMessages(jsonData);
-            if (claudeMessages.length > 0) {
-              threadSender(claudeMessages).catch(() => {});
-            }
-          },
-          { appendSystemPrompt: BOT_SYSTEM_PROMPT },
-          () => {
-            try {
-              thread.sendTyping();
-            } catch { /* ignore */ }
-          },
-        );
-
-        if (result.sessionId) {
-          claudeSessionOps.setSessionId(result.sessionId, threadKey);
-          setSessionId(result.sessionId);
+        if (hotQueryConfig.enabled) {
+          let hot = hotQueryRegistry.get(sessionId);
+          if (!hot) {
+            console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
+            const t0 = Date.now();
+            const factory = await makeSdkQueryFactory(
+              effectiveWorkDir,
+              turnOptions,
+              sessionId,
+              controller,
+            );
+            hot = HotQuerySession.create({
+              sessionId,
+              workDir: effectiveWorkDir,
+              options: turnOptions,
+              queryFactory: factory,
+            });
+            hotQueryRegistry.register(hot);
+            console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
+          } else {
+            console.log(`[HotQuery] session=${sessionId} reused (skip cold-init)`);
+            hotQueryRegistry.touch(sessionId);
+          }
+          const result = await hot.runTurn(content, controller, {
+            onStreamJson,
+            onTyping,
+          });
+          if (result.sessionId) {
+            claudeSessionOps.setSessionId(result.sessionId, threadKey);
+            setSessionId(result.sessionId);
+          }
+        } else {
+          const result = await sendToClaudeCode(
+            effectiveWorkDir,
+            content,
+            controller,
+            sessionId,
+            undefined,
+            onStreamJson,
+            turnOptions,
+            onTyping,
+          );
+          if (result.sessionId) {
+            claudeSessionOps.setSessionId(result.sessionId, threadKey);
+            setSessionId(result.sessionId);
+          }
         }
       } catch (error) {
         console.error(`[ThreadMessage] Failed to resume session ${sessionId}:`, error);
