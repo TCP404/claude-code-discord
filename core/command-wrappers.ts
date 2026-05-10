@@ -400,13 +400,6 @@ export function createClaudeCommandHandlers(
         await claudeHandlers.onClaudeThread(ctx, prompt, channelId, threadName);
       },
     }],
-    ["resume", {
-      execute: async (ctx: InteractionContext) => {
-        const prompt = ctx.getString("prompt");
-        if (prompt) addToHistory(prompt);
-        await claudeHandlers.onContinue(ctx, prompt || undefined, ctx.getChannelId());
-      },
-    }],
     ["claude-cancel", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
@@ -827,18 +820,23 @@ export function createAllCommandHandlers(deps: CommandWrapperDeps): CommandHandl
   });
 
   // Combine all handlers into single map
-  const commandHandlers: CommandHandlers = new Map([
-    ...systemHandlers,
-    ...paramSystemHandlers,
-    ...claudeHandlers,
-    ...settingsHandlers,
-    ...screenshotHandlers,
-    ...infoCommandHandlers,
-    ...gitHandlers,
-    ...shellHandlers,
-    ...utilityHandlers,
-    ...displayToggleHandlers,
-  ]);
+  const commandHandlers: CommandHandlers = new Map();
+  for (
+    const [k, v] of [
+      ...systemHandlers,
+      ...paramSystemHandlers,
+      ...claudeHandlers,
+      ...settingsHandlers,
+      ...screenshotHandlers,
+      ...infoCommandHandlers,
+      ...gitHandlers,
+      ...shellHandlers,
+      ...utilityHandlers,
+      ...displayToggleHandlers,
+    ]
+  ) {
+    commandHandlers.set(k, v);
+  }
 
   return commandHandlers;
 }

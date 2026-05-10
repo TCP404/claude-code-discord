@@ -331,10 +331,9 @@ export function renderSystem(msg: ClaudeMessage, ctx: RendererContext): MessageC
 
   const messageContent: MessageContent = { embeds: [embedData] };
 
-  if (!ctx.isThread && msg.metadata?.subtype === "completion" && msg.metadata?.session_id) {
-    const actionButtons = createActionButtons(msg.metadata.session_id);
+  if (!ctx.isThread && msg.metadata?.subtype === "completion") {
     messageContent.components = [
-      { type: "actionRow", components: actionButtons },
+      { type: "actionRow", components: createActionButtons() },
     ];
   }
 

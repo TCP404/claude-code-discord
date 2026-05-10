@@ -207,7 +207,6 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeSessionId(result.sessionId);

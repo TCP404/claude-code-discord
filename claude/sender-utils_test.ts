@@ -37,17 +37,11 @@ Deno.test("FILE_MARKER_REGEX: does not match without leading / or ./", () => {
 
 // --- createActionButtons ---
 
-Deno.test("createActionButtons: includes continue button when sessionId provided", () => {
-  const buttons = createActionButtons("sess-123");
-  assertEquals(buttons.length, 3);
-  assertEquals(buttons[0].customId, "continue:sess-123");
-  assertEquals(buttons[0].style, "primary");
-});
-
-Deno.test("createActionButtons: omits continue button when no sessionId", () => {
-  const buttons = createActionButtons(undefined);
+Deno.test("createActionButtons: returns git-status and prompt-history buttons", () => {
+  const buttons = createActionButtons();
   assertEquals(buttons.length, 2);
   assertEquals(buttons[0].customId, "workflow:git-status");
+  assertEquals(buttons[1].customId, "prompt-history");
 });
 
 // --- truncateContent ---

@@ -279,7 +279,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -350,7 +349,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -418,7 +416,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -503,7 +500,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -570,7 +566,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -643,7 +638,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);
@@ -712,7 +706,6 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false,
         );
 
         deps.setClaudeController(null);

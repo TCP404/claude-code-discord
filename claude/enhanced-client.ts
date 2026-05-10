@@ -118,7 +118,6 @@ export async function enhancedClaudeQuery(
   sessionId?: string,
   onChunk?: (text: string) => void,
   onStreamJson?: (json: any) => void,
-  continueMode?: boolean,
 ) {
   let enhancedPrompt = prompt;
 
@@ -187,7 +186,6 @@ export async function enhancedClaudeQuery(
     sessionId,
     onChunk,
     onStreamJson,
-    continueMode,
     modelOptions,
     undefined, // no typing callback in enhanced client
   );

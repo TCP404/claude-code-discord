@@ -547,7 +547,6 @@ async function chatWithAgent(
           await deps.sendClaudeMessages(claudeMessages);
         }
       },
-      false, // allowToolUse
     );
 
     const duration = Date.now() - startTime;

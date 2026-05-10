@@ -263,9 +263,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
     cleanSessionId,
     botSettings,
     getManagedChannelIds: () => workspaceManager.getManagedChannelIds(),
-    onContinueSession: async (ctx) => {
-      await allHandlers.claude.onContinue(ctx);
-    },
     ...(monitorChannelId && monitorBotIds?.length && {
       monitorConfig: {
         channelId: monitorChannelId,
@@ -298,7 +295,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
                 threadSender(claudeMessages).catch(() => {});
               }
             },
-            false,
             undefined,
             () => {
               try {
@@ -360,7 +356,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
               threadSender(claudeMessages).catch(() => {});
             }
           },
-          false,
           { appendSystemPrompt: BOT_SYSTEM_PROMPT },
           () => {
             try {
@@ -453,7 +448,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
               sender.send(claudeMessages).catch(() => {});
             }
           },
-          false,
           { appendSystemPrompt: BOT_SYSTEM_PROMPT },
           () => {
             try {

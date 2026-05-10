@@ -126,8 +126,6 @@ export interface BotDependencies {
   cleanSessionId?: (sessionId: string) => string;
   /** Optional bot settings for mention functionality */
   botSettings?: BotSettings;
-  /** Callback to actually continue a Claude session from a button click */
-  onContinueSession?: (ctx: InteractionContext) => Promise<void>;
   /** Optional channel monitoring config for auto-responding to messages */
   monitorConfig?: MonitorConfig;
   /** Callback for plain text messages in session threads (auto-resume) */

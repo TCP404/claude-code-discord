@@ -44,24 +44,6 @@ export const COMMAND_HELP = {
       "Supports streaming responses for real-time feedback",
     ],
   },
-  continue: {
-    title: "⏭️ Continue Conversation",
-    description: "Continue the most recent Claude Code conversation in this directory",
-    usage: "/continue prompt: [optional additional message]",
-    examples: [
-      "/continue",
-      "/continue prompt: Can you also add error handling?",
-      "/continue prompt: What about edge cases?",
-    ],
-    parameters: [
-      { name: "prompt", description: "Additional message to add (optional)", required: false },
-    ],
-    notes: [
-      "Automatically loads the latest conversation",
-      "Uses continue mode to maintain context",
-      "Fallback prompt: 'Please continue.' if no prompt provided",
-    ],
-  },
   "claude-cancel": {
     title: "❌ Cancel Claude Session",
     description: "Cancel any currently running Claude Code operation",
@@ -1043,7 +1025,7 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
               {
                 name: "🤖 Claude Code Commands",
                 value:
-                  "`/claude` - Send prompts to Claude Code\n`/claude-enhanced` - Advanced Claude with options\n`/resume` - Resume conversation\n`/claude-cancel` - Cancel running operation\n`/fast` - Toggle fast mode (2.5x speed)",
+                  "`/claude` - Send prompts to Claude Code\n`/claude-enhanced` - Advanced Claude with options\n`/claude-cancel` - Cancel running operation\n`/fast` - Toggle fast mode (2.5x speed)",
                 inline: false,
               },
               {

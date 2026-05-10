@@ -22,19 +22,8 @@ export const hiddenMessageTypes = new Set<string>([
   "other",
 ]);
 
-export function createActionButtons(sessionId?: string): ComponentData[] {
-  const buttons: ComponentData[] = [];
-
-  if (sessionId) {
-    buttons.push({
-      type: "button",
-      customId: `continue:${sessionId}`,
-      label: "▶️ Continue",
-      style: "primary",
-    });
-  }
-
-  buttons.push(
+export function createActionButtons(): ComponentData[] {
+  return [
     {
       type: "button",
       customId: "workflow:git-status",
@@ -47,9 +36,7 @@ export function createActionButtons(sessionId?: string): ComponentData[] {
       label: "📜 Prompt History",
       style: "secondary",
     },
-  );
-
-  return buttons;
+  ];
 }
 
 export function truncateContent(

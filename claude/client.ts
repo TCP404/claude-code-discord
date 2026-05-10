@@ -188,7 +188,6 @@ export async function sendToClaudeCode(
   onChunk?: (text: string) => void,
   // deno-lint-ignore no-explicit-any
   onStreamJson?: (json: any) => void,
-  continueMode?: boolean,
   modelOptions?: ClaudeModelOptions,
   onTyping?: () => void,
 ): Promise<{
@@ -266,8 +265,8 @@ export async function sendToClaudeCode(
           ...(modelOptions?.maxBudgetUsd && { maxBudgetUsd: modelOptions.maxBudgetUsd }),
           // Guard for bypassPermissions
           ...(permMode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
-          ...(continueMode && { continue: true }),
-          ...(cleanedSessionId && !continueMode && { resume: cleanedSessionId }),
+          // resume: sessionId — SDK loads the exact session file by UUID
+          ...(cleanedSessionId && { resume: cleanedSessionId }),
           ...(modelToUse && { model: modelToUse }),
           ...(modelOptions?.maxTurns && { maxTurns: modelOptions.maxTurns }),
           ...(modelOptions?.fallbackModel && { fallbackModel: modelOptions.fallbackModel }),
@@ -382,9 +381,7 @@ export async function sendToClaudeCode(
           modelToUse || "default"
         } model, permission=${permMode}${thinkingLabel}${effortLabel}...`,
       );
-      if (continueMode) {
-        console.log(`Continue mode: Reading latest conversation in directory`);
-      } else if (cleanedSessionId) {
+      if (cleanedSessionId) {
         console.log(`Session resuming with ID: ${cleanedSessionId}`);
       }
 
