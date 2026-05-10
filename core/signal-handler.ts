@@ -15,6 +15,8 @@ export interface CleanupContext {
   killAllWorktreeBots: () => void;
   /** AbortController for the Claude session, if active */
   getClaudeController: () => AbortController | null;
+  /** Callback to close all hot queries (streaming-input sessions) */
+  closeHotQueries?: () => Promise<void>;
   /** Callback to send shutdown notification */
   sendShutdownNotification: (signal: string) => Promise<void>;
   /** Callback to destroy the Discord client */
@@ -75,6 +77,15 @@ export function createShutdownHandler(
       const claudeController = ctx.getClaudeController();
       if (claudeController) {
         claudeController.abort();
+      }
+
+      // Close all hot queries (streaming-input sessions)
+      if (ctx.closeHotQueries) {
+        try {
+          await ctx.closeHotQueries();
+        } catch (err) {
+          console.error("Error closing hot queries:", err);
+        }
       }
 
       // Send shutdown notification

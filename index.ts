@@ -656,6 +656,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     repoName,
     branchName,
     cleanupInterval,
+    closeHotQueries: () => hotQueryRegistry.closeAll("shutdown"),
     bot: bot as any,
   });
 
@@ -759,6 +760,7 @@ function setupSignalHandlers(ctx: {
   repoName: string;
   branchName: string;
   cleanupInterval: number;
+  closeHotQueries?: () => Promise<void>;
   // deno-lint-ignore no-explicit-any
   bot: any;
 }) {
@@ -772,6 +774,7 @@ function setupSignalHandlers(ctx: {
     repoName,
     branchName,
     cleanupInterval,
+    closeHotQueries,
     bot,
   } = ctx;
   const { crashHandler, healthMonitor } = managers;
@@ -790,6 +793,15 @@ function setupSignalHandlers(ctx: {
         const claudeController = getClaudeController();
         if (claudeController) {
           claudeController.abort();
+        }
+      }
+
+      // Close all hot queries (streaming-input sessions)
+      if (closeHotQueries) {
+        try {
+          await closeHotQueries();
+        } catch (err) {
+          console.error("Error closing hot queries:", err);
         }
       }
 
