@@ -1,5 +1,7 @@
 /** @module claude/hot-query — AsyncPushQueue + HotQuerySession for streaming-input mode. */
 
+import type { ClaudeModelOptions, SDKPermissionMode } from "./client.ts";
+
 /**
  * An async iterable driven by external `push()` calls. Pending `.next()` promises
  * resolve as soon as an item is pushed. After `close()`, all pending and future
@@ -42,4 +44,56 @@ export class AsyncPushQueue<T> implements AsyncIterable<T> {
       },
     };
   }
+}
+
+export type PrepareSetter =
+  | { kind: "setModel"; value: string | undefined }
+  | { kind: "setPermissionMode"; value: SDKPermissionMode };
+
+export type PrepareResult =
+  | { verdict: "reuse"; setters: PrepareSetter[] }
+  | { verdict: "recreate"; reason: string };
+
+const RECREATE_FIELDS: Array<keyof ClaudeModelOptions> = [
+  "appendSystemPrompt",
+  "agent",
+  "agents",
+  "betas",
+  "sandbox",
+  "thinking",
+  "effort",
+  "additionalDirectories",
+  "enableFileCheckpointing",
+];
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Decide whether an incoming turn's options can reuse an existing hot query
+ * or require a full recreate.
+ */
+export function prepareForTurn(
+  bound: ClaudeModelOptions | undefined,
+  next: ClaudeModelOptions | undefined,
+  boundCwd: string,
+  nextCwd: string,
+): PrepareResult {
+  if (boundCwd !== nextCwd) {
+    return { verdict: "recreate", reason: "cwd" };
+  }
+  for (const field of RECREATE_FIELDS) {
+    if (!deepEqual(bound?.[field], next?.[field])) {
+      return { verdict: "recreate", reason: String(field) };
+    }
+  }
+  const setters: PrepareSetter[] = [];
+  if (bound?.model !== next?.model) {
+    setters.push({ kind: "setModel", value: next?.model });
+  }
+  if (bound?.permissionMode !== next?.permissionMode && next?.permissionMode) {
+    setters.push({ kind: "setPermissionMode", value: next.permissionMode });
+  }
+  return { verdict: "reuse", setters };
 }
