@@ -54,7 +54,7 @@ async function loadMcpServers(
 export type { SDKAgentDefinition, SDKModelInfo };
 
 // Extract permission denials from SDK result messages (deduplicated by tool name)
-function extractPermissionDenials(
+export function extractPermissionDenials(
   messages: SDKMessage[],
 ): Array<{ toolName: string; toolUseId: string; toolInput: Record<string, unknown> }> {
   const denials: Array<

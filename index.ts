@@ -261,17 +261,25 @@ export async function createClaudeCodeBot(config: BotConfig) {
   handlers.set("hot-queries", {
     execute: async (ctx) => {
       const rows = hotQueryRegistry.list();
+      const { createdTotal, reusedTotal } = hotQueryRegistry.stats();
       if (rows.length === 0) {
-        await ctx.reply({ content: "📭 No active hot queries.", ephemeral: true });
+        await ctx.reply({
+          content:
+            `📭 No active hot queries. (lifetime: ${createdTotal} created, ${reusedTotal} reused)`,
+          ephemeral: true,
+        });
         return;
       }
-      const lines = rows.map((r) =>
-        `• session=\`${r.sessionId.slice(0, 8)}…\` idle=${
+      const lines = rows.map((r) => {
+        const threadName = sessionThreadManager.getSessionThread(r.sessionId)?.threadName ??
+          "(unknown thread)";
+        return `• \`${r.sessionId.slice(0, 8)}…\` "${threadName}" idle=${
           Math.floor(r.idleMs / 1000)
-        }s model=${r.model ?? "default"}`
-      );
+        }s reuse=${r.reuseCount} model=${r.model ?? "default"}`;
+      });
+      const header = `🔥 Active hot queries (lifetime: ${createdTotal} created, ${reusedTotal} reused):`;
       await ctx.reply({
-        content: ["🔥 Active hot queries:", ...lines].join("\n"),
+        content: [header, ...lines].join("\n"),
         ephemeral: true,
       });
     },
@@ -413,7 +421,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
               options: turnOptions,
               queryFactory: factory,
             });
-            hotQueryRegistry.register(hot);
+            await hotQueryRegistry.register(hot);
             console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
           } else {
             console.log(`[HotQuery] session=${sessionId} reused (skip cold-init)`);

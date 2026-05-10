@@ -51,66 +51,6 @@ Deno.test("AsyncPushQueue: buffered items drained before done", async () => {
   assertEquals((await iter.next()).done, true);
 });
 
-import { prepareForTurn } from "./hot-query.ts";
-import type { ClaudeModelOptions } from "./client.ts";
-
-const base: ClaudeModelOptions = {
-  model: "sonnet",
-  permissionMode: "acceptEdits",
-  appendSystemPrompt: "Discord bot prompt",
-};
-
-Deno.test("prepareForTurn: identical options → reuse, no setters", () => {
-  const result = prepareForTurn(base, base, "/work/dir", "/work/dir");
-  assertEquals(result.verdict, "reuse");
-  if (result.verdict === "reuse") assertEquals(result.setters, []);
-});
-
-Deno.test("prepareForTurn: model change → reuse with setModel", () => {
-  const next: ClaudeModelOptions = { ...base, model: "opus" };
-  const result = prepareForTurn(base, next, "/work/dir", "/work/dir");
-  assertEquals(result.verdict, "reuse");
-  if (result.verdict === "reuse") {
-    assertEquals(result.setters, [{ kind: "setModel", value: "opus" }]);
-  }
-});
-
-Deno.test("prepareForTurn: permissionMode change → reuse with setPermissionMode", () => {
-  const next: ClaudeModelOptions = { ...base, permissionMode: "plan" };
-  const result = prepareForTurn(base, next, "/work/dir", "/work/dir");
-  assertEquals(result.verdict, "reuse");
-  if (result.verdict === "reuse") {
-    assertEquals(result.setters, [{ kind: "setPermissionMode", value: "plan" }]);
-  }
-});
-
-Deno.test("prepareForTurn: cwd change → recreate", () => {
-  const result = prepareForTurn(base, base, "/old", "/new");
-  assertEquals(result.verdict, "recreate");
-  if (result.verdict === "recreate") assertEquals(result.reason, "cwd");
-});
-
-Deno.test("prepareForTurn: appendSystemPrompt change → recreate", () => {
-  const next: ClaudeModelOptions = { ...base, appendSystemPrompt: "different" };
-  const result = prepareForTurn(base, next, "/w", "/w");
-  assertEquals(result.verdict, "recreate");
-  if (result.verdict === "recreate") assertEquals(result.reason, "appendSystemPrompt");
-});
-
-Deno.test("prepareForTurn: thinking change → recreate", () => {
-  const next: ClaudeModelOptions = { ...base, thinking: { type: "disabled" } };
-  const result = prepareForTurn(base, next, "/w", "/w");
-  assertEquals(result.verdict, "recreate");
-  if (result.verdict === "recreate") assertEquals(result.reason, "thinking");
-});
-
-Deno.test("prepareForTurn: both model and permissionMode changed → reuse with two setters", () => {
-  const next: ClaudeModelOptions = { ...base, model: "haiku", permissionMode: "plan" };
-  const result = prepareForTurn(base, next, "/w", "/w");
-  assertEquals(result.verdict, "reuse");
-  if (result.verdict === "reuse") assertEquals(result.setters.length, 2);
-});
-
 import { HotQuerySession } from "./hot-query.ts";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
@@ -124,8 +64,6 @@ function makeFakeQuery(scripted: SDKMessage[][]) {
     pushedPrompts,
     [Symbol.asyncIterator]: () => outQueue[Symbol.asyncIterator](),
     interrupt: () => Promise.resolve(),
-    setModel: (_m?: string) => Promise.resolve(),
-    setPermissionMode: (_m: string) => Promise.resolve(),
     close: () => outQueue.close(),
   };
 
@@ -179,6 +117,81 @@ Deno.test("HotQuerySession: second concurrent turn rejects with Busy", async () 
   );
   await session.close("test");
   await first.catch(() => {});
+});
+
+Deno.test("HotQuerySession: result.permission_denials populates TurnResult.permissionDenials", async () => {
+  const result = {
+    type: "result",
+    session_id: "sess-d",
+    subtype: "success",
+    permission_denials: [
+      { tool_name: "Bash", tool_use_id: "t1", tool_input: { command: "rm -rf /" } },
+      { tool_name: "Bash", tool_use_id: "t2", tool_input: { command: "other" } }, // dedup by name
+      { tool_name: "WebFetch", tool_use_id: "t3", tool_input: { url: "http://x" } },
+    ],
+  } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[result]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-d",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const turn = await session.runTurn("q", new AbortController(), {});
+  assertEquals(turn.permissionDenials?.length, 2);
+  assertEquals(turn.permissionDenials?.[0].toolName, "Bash");
+  assertEquals(turn.permissionDenials?.[1].toolName, "WebFetch");
+  await session.close("test");
+});
+
+Deno.test("HotQuerySession: no denials → permissionDenials field omitted", async () => {
+  const result = { type: "result", session_id: "sess-nd" } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[result]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-nd",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const turn = await session.runTurn("q", new AbortController(), {});
+  assertEquals(turn.permissionDenials, undefined);
+  await session.close("test");
+});
+
+Deno.test("HotQuerySession: close during in-flight turn rejects the turn promise", async () => {
+  const { factory } = makeFakeQuery([[]]); // no result yielded → turn stays in-flight
+  const session = HotQuerySession.create({
+    sessionId: "sess-close",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const pending = session.runTurn("hello", new AbortController(), {});
+  await assertRejects(
+    async () => {
+      const p = pending;
+      await session.close("shutdown");
+      await p;
+    },
+    Error,
+    "HotQuerySession closed: shutdown",
+  );
+});
+
+Deno.test("HotQuerySession: runTurn after close rejects immediately", async () => {
+  const { factory } = makeFakeQuery([[]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-after-close",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  await session.close("shutdown");
+  await assertRejects(
+    () => session.runTurn("hi", new AbortController(), {}),
+    Error,
+    "HotQuerySession closed",
+  );
 });
 
 Deno.test("HotQuerySession: onChunk receives assistant text", async () => {

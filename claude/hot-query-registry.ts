@@ -21,14 +21,23 @@ export interface HotQuerySummary {
   sessionId: string;
   workDir: string;
   idleMs: number;
+  reuseCount: number;
   model?: string;
+}
+
+export interface HotQueryStats {
+  createdTotal: number;
+  reusedTotal: number;
 }
 
 export class HotQueryRegistry {
   private sessions = new Map<string, HotQuerySession>();
   private timers = new Map<string, number>();
   private lastTouched = new Map<string, number>();
+  private reuseCounts = new Map<string, number>();
   private config: HotQueryRegistryConfig;
+  private createdTotal = 0;
+  private reusedTotal = 0;
 
   constructor(config: HotQueryRegistryConfig) {
     this.config = config;
@@ -44,22 +53,31 @@ export class HotQueryRegistry {
       sessionId: s.sessionId,
       workDir: s.workDir,
       idleMs: now - (this.lastTouched.get(s.sessionId) ?? s.lastActivityAt),
+      reuseCount: this.reuseCounts.get(s.sessionId) ?? 0,
       model: s.boundOptions?.model,
     }));
   }
 
-  register(session: HotQuerySession): void {
+  stats(): HotQueryStats {
+    return { createdTotal: this.createdTotal, reusedTotal: this.reusedTotal };
+  }
+
+  async register(session: HotQuerySession): Promise<void> {
     if (this.sessions.size >= this.config.maxSessions) {
-      this.evictLRU();
+      await this.evictLRU();
     }
     this.sessions.set(session.sessionId, session);
     this.lastTouched.set(session.sessionId, Date.now());
+    this.reuseCounts.set(session.sessionId, 0);
+    this.createdTotal++;
     this.scheduleIdle(session.sessionId);
   }
 
   touch(sessionId: string): void {
     if (!this.sessions.has(sessionId)) return;
     this.lastTouched.set(sessionId, Date.now());
+    this.reuseCounts.set(sessionId, (this.reuseCounts.get(sessionId) ?? 0) + 1);
+    this.reusedTotal++;
     this.scheduleIdle(sessionId);
   }
 
@@ -68,6 +86,7 @@ export class HotQueryRegistry {
     if (!session) return;
     this.sessions.delete(sessionId);
     this.lastTouched.delete(sessionId);
+    this.reuseCounts.delete(sessionId);
     const timer = this.timers.get(sessionId);
     if (timer !== undefined) {
       clearTimeout(timer);
@@ -95,7 +114,7 @@ export class HotQueryRegistry {
     this.timers.set(sessionId, timer);
   }
 
-  private evictLRU(): void {
+  private async evictLRU(): Promise<void> {
     let oldestId: string | undefined;
     let oldestT = Infinity;
     for (const [id, t] of this.lastTouched.entries()) {
@@ -105,9 +124,11 @@ export class HotQueryRegistry {
       }
     }
     if (oldestId) {
-      this.close(oldestId, "lru").catch((err) => {
+      try {
+        await this.close(oldestId, "lru");
+      } catch (err) {
         console.error(`[HotQueryRegistry] LRU close failed for ${oldestId}:`, err);
-      });
+      }
     }
   }
 }

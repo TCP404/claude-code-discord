@@ -1,7 +1,7 @@
 /** @module claude/hot-query — AsyncPushQueue + HotQuerySession for streaming-input mode. */
 
-import { buildQueryOptions } from "./client.ts";
-import type { ClaudeModelOptions, SDKPermissionMode } from "./client.ts";
+import { buildQueryOptions, extractPermissionDenials } from "./client.ts";
+import type { ClaudeModelOptions } from "./client.ts";
 import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
@@ -49,60 +49,6 @@ export class AsyncPushQueue<T> implements AsyncIterable<T> {
   }
 }
 
-export type PrepareSetter =
-  | { kind: "setModel"; value: string | undefined }
-  | { kind: "setPermissionMode"; value: SDKPermissionMode };
-
-export type PrepareResult =
-  | { verdict: "reuse"; setters: PrepareSetter[] }
-  | { verdict: "recreate"; reason: string };
-
-const RECREATE_FIELDS: Array<keyof ClaudeModelOptions> = [
-  "appendSystemPrompt",
-  "agent",
-  "agents",
-  "betas",
-  "sandbox",
-  "thinking",
-  "effort",
-  "additionalDirectories",
-  "enableFileCheckpointing",
-];
-
-// Array order matters. Fine here because options come from the same builder
-// every turn, so arrays are produced in stable order.
-function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/**
- * Decide whether an incoming turn's options can reuse an existing hot query
- * or require a full recreate.
- */
-export function prepareForTurn(
-  bound: ClaudeModelOptions | undefined,
-  next: ClaudeModelOptions | undefined,
-  boundCwd: string,
-  nextCwd: string,
-): PrepareResult {
-  if (boundCwd !== nextCwd) {
-    return { verdict: "recreate", reason: "cwd" };
-  }
-  for (const field of RECREATE_FIELDS) {
-    if (!deepEqual(bound?.[field], next?.[field])) {
-      return { verdict: "recreate", reason: String(field) };
-    }
-  }
-  const setters: PrepareSetter[] = [];
-  if (bound?.model !== next?.model) {
-    setters.push({ kind: "setModel", value: next?.model });
-  }
-  if (bound?.permissionMode !== next?.permissionMode && next?.permissionMode) {
-    setters.push({ kind: "setPermissionMode", value: next.permissionMode });
-  }
-  return { verdict: "reuse", setters };
-}
-
 export interface TurnCallbacks {
   onChunk?: (text: string) => void;
   // deno-lint-ignore no-explicit-any
@@ -134,8 +80,6 @@ interface ActiveTurn {
 export interface QueryLike {
   [Symbol.asyncIterator](): AsyncIterator<SDKMessage>;
   interrupt(): Promise<void>;
-  setModel(model?: string): Promise<void>;
-  setPermissionMode(mode: string): Promise<void>;
   close(): void;
 }
 
@@ -223,12 +167,14 @@ export class HotQuerySession {
         if (msg.type === "result") {
           // deno-lint-ignore no-explicit-any
           const r = msg as any;
+          const denials = extractPermissionDenials([msg]);
           const resolved: TurnResult = {
             response: turn.response || "No response received",
             sessionId: r.session_id,
             cost: r.total_cost_usd,
             duration: r.duration_ms,
             modelUsed: this.boundOptions?.model || "Default",
+            ...(denials.length > 0 && { permissionDenials: denials }),
           };
           turn.controller.signal.removeEventListener("abort", turn.abortListener);
           this.currentTurn = null;
@@ -245,14 +191,15 @@ export class HotQuerySession {
     }
   }
 
-  // deno-lint-ignore require-await
-  async runTurn(
+  runTurn(
     prompt: string,
     controller: AbortController,
     callbacks: TurnCallbacks,
   ): Promise<TurnResult> {
-    if (this.closed) throw new Error("HotQuerySession closed");
-    if (this.currentTurn) throw new Error("Busy: previous turn still running");
+    if (this.closed) return Promise.reject(new Error("HotQuerySession closed"));
+    if (this.currentTurn) {
+      return Promise.reject(new Error("Busy: previous turn still running"));
+    }
     this.lastActivityAt = Date.now();
 
     return new Promise<TurnResult>((resolve, reject) => {
@@ -275,19 +222,6 @@ export class HotQuerySession {
         session_id: this.sessionId,
       });
     });
-  }
-
-  /** Apply in-place setters (model / permissionMode) without recreating. */
-  async applySetters(setters: PrepareSetter[]): Promise<void> {
-    for (const s of setters) {
-      if (s.kind === "setModel") await this.query.setModel(s.value);
-      else if (s.kind === "setPermissionMode") await this.query.setPermissionMode(s.value);
-    }
-    this.boundOptions = { ...(this.boundOptions ?? {}) };
-    for (const s of setters) {
-      if (s.kind === "setModel") this.boundOptions.model = s.value;
-      else if (s.kind === "setPermissionMode") this.boundOptions.permissionMode = s.value;
-    }
   }
 
   async close(reason: string): Promise<void> {
@@ -321,7 +255,9 @@ export async function makeSdkQueryFactory(
   return (inputIter) => {
     return claudeQuery({
       prompt: inputIter as AsyncIterable<never>, // SDK accepts AsyncIterable<SDKUserMessage>
+      abortController: built.abortController,
       options: built.options,
-    }) as unknown as QueryLike;
+      // deno-lint-ignore no-explicit-any
+    } as any) as unknown as QueryLike;
   };
 }
