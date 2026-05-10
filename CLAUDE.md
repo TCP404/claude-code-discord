@@ -29,6 +29,9 @@ Key directories:
   - `hooks.ts` — passive SDK callbacks for observability
   - `user-question.ts` — AskUserQuestion embed/button building
   - `permission-request.ts` — tool permission Allow/Deny embeds
+  - `hot-query.ts` — AsyncPushQueue + HotQuerySession for streaming-input mode
+  - `hot-query-registry.ts` — LRU + idle eviction for hot queries
+  - `hot-query-config.ts` — env-var driven hot-query config
 - `core/` — Bot infrastructure: config, signal handling, RBAC, handler wiring
   - `config-loader.ts` — env + CLI arg parsing
   - `handler-registry.ts` — session state, command routing
@@ -129,6 +132,7 @@ A single bot instance can manage multiple project channels, each with its own wo
 - **Workspace routing:** `workspaceManager.resolve(channelId)` resolves the correct working directory for any channel. Falls back to default `WORK_DIR`.
 - **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown (calls `abortAll()` to cancel all active sessions)
 - **File delivery via marker:** The model outputs `[FILE:/absolute/path]` markers when the user asks for a file. The Discord sender detects these markers, strips them from displayed text, and delivers the file as an attachment or preview. Implementation: `claude/discord-sender.ts` (regex + preview logic), `claude/bot-system-prompt.ts` (model instructions, injected as `appendSystemPrompt` on every query).
+- **Hot query reuse:** Session threads keep one long-lived SDK `Query` per sessionId (`claude/hot-query-registry.ts`). First message pays the 2–3 s cold start; subsequent messages push prompts into a streaming-input queue and skip init. Config via `HOT_QUERY_*` env vars. Disable entirely with `HOT_QUERY_ENABLED=false`. Observability: `/hot-queries` slash command.
 
 ## Environment Variables
 
