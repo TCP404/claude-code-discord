@@ -720,6 +720,10 @@ const displayToggleCommands = [
     .setDescription("Toggle thinking messages on/off"),
 ];
 
+const hotQueriesCommand = new SlashCommandBuilder()
+  .setName("hot-queries")
+  .setDescription("List current active hot query sessions");
+
 /**
  * Get all command definitions for bot registration.
  *
@@ -741,6 +745,7 @@ export function getAllCommands() {
     ...infoCommands,
     ...workspaceCommands,
     helpCommand,
+    hotQueriesCommand,
     ...displayToggleCommands,
   ];
 }

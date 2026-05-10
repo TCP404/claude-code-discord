@@ -257,6 +257,26 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
   });
 
+  // Hot queries handler
+  handlers.set("hot-queries", {
+    execute: async (ctx) => {
+      const rows = hotQueryRegistry.list();
+      if (rows.length === 0) {
+        await ctx.reply({ content: "📭 No active hot queries.", ephemeral: true });
+        return;
+      }
+      const lines = rows.map((r) =>
+        `• session=\`${r.sessionId.slice(0, 8)}…\` idle=${
+          Math.floor(r.idleMs / 1000)
+        }s model=${r.model ?? "default"}`
+      );
+      await ctx.reply({
+        content: ["🔥 Active hot queries:", ...lines].join("\n"),
+        ephemeral: true,
+      });
+    },
+  });
+
   // Button handlers
   const buttonHandlers: ButtonHandlers = createButtonHandlers(
     {
