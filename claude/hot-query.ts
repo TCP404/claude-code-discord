@@ -99,3 +99,209 @@ export function prepareForTurn(
   }
   return { verdict: "reuse", setters };
 }
+
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+
+export interface TurnCallbacks {
+  onChunk?: (text: string) => void;
+  // deno-lint-ignore no-explicit-any
+  onStreamJson?: (msg: any) => void;
+  onTyping?: () => void;
+}
+
+export interface TurnResult {
+  response: string;
+  sessionId?: string;
+  cost?: number;
+  duration?: number;
+  modelUsed?: string;
+  permissionDenials?: Array<
+    { toolName: string; toolUseId: string; toolInput: Record<string, unknown> }
+  >;
+}
+
+interface ActiveTurn {
+  controller: AbortController;
+  callbacks: TurnCallbacks;
+  response: string;
+  resolve: (r: TurnResult) => void;
+  reject: (e: Error) => void;
+  abortListener: () => void;
+}
+
+// Minimal structural type for the SDK Query shape we use (keeps tests decoupled).
+export interface QueryLike {
+  [Symbol.asyncIterator](): AsyncIterator<SDKMessage>;
+  interrupt(): Promise<void>;
+  setModel(model?: string): Promise<void>;
+  setPermissionMode(mode: string): Promise<void>;
+  close(): void;
+}
+
+export type QueryFactory = (
+  prompt: AsyncIterable<{
+    type: "user";
+    message: { role: "user"; content: string };
+    parent_tool_use_id: null;
+    session_id?: string;
+  }>,
+) => QueryLike;
+
+export interface HotQueryCreateParams {
+  sessionId: string;
+  workDir: string;
+  options: ClaudeModelOptions | undefined;
+  queryFactory: QueryFactory;
+}
+
+export class HotQuerySession {
+  readonly sessionId: string;
+  readonly workDir: string;
+  boundOptions: ClaudeModelOptions | undefined;
+  lastActivityAt: number;
+
+  private query: QueryLike;
+  private inputQueue: AsyncPushQueue<{
+    type: "user";
+    message: { role: "user"; content: string };
+    parent_tool_use_id: null;
+    session_id?: string;
+  }>;
+  private currentTurn: ActiveTurn | null = null;
+  private closed = false;
+  private consumerPromise: Promise<void>;
+
+  private constructor(params: HotQueryCreateParams) {
+    this.sessionId = params.sessionId;
+    this.workDir = params.workDir;
+    this.boundOptions = params.options;
+    this.lastActivityAt = Date.now();
+    this.inputQueue = new AsyncPushQueue();
+    this.query = params.queryFactory(this.inputQueue);
+    this.consumerPromise = this.runConsumer();
+  }
+
+  static create(params: HotQueryCreateParams): HotQuerySession {
+    return new HotQuerySession(params);
+  }
+
+  /** Whether a turn is currently in flight. */
+  get busy(): boolean {
+    return this.currentTurn !== null;
+  }
+
+  private async runConsumer(): Promise<void> {
+    try {
+      for await (const msg of this.query) {
+        const turn = this.currentTurn;
+        if (!turn) continue; // ignore messages outside a turn
+
+        try {
+          turn.callbacks.onStreamJson?.(msg);
+        } catch { /* non-critical */ }
+
+        if (
+          msg.type === "assistant" &&
+          "message" in msg &&
+          // deno-lint-ignore no-explicit-any
+          (msg as any).message?.content
+        ) {
+          // deno-lint-ignore no-explicit-any
+          const text = ((msg as any).message.content as Array<any>)
+            .filter((c) => c?.type === "text")
+            .map((c) => c.text)
+            .join("");
+          if (text) {
+            turn.response = text;
+            try {
+              turn.callbacks.onChunk?.(text);
+            } catch { /* non-critical */ }
+          }
+        }
+
+        if (msg.type === "result") {
+          // deno-lint-ignore no-explicit-any
+          const r = msg as any;
+          const resolved: TurnResult = {
+            response: turn.response || "No response received",
+            sessionId: r.session_id,
+            cost: r.total_cost_usd,
+            duration: r.duration_ms,
+            modelUsed: this.boundOptions?.model || "Default",
+          };
+          turn.controller.signal.removeEventListener("abort", turn.abortListener);
+          this.currentTurn = null;
+          turn.resolve(resolved);
+        }
+      }
+    } catch (err) {
+      const turn = this.currentTurn;
+      if (turn) {
+        turn.controller.signal.removeEventListener("abort", turn.abortListener);
+        this.currentTurn = null;
+        turn.reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  }
+
+  // deno-lint-ignore require-await
+  async runTurn(
+    prompt: string,
+    controller: AbortController,
+    callbacks: TurnCallbacks,
+  ): Promise<TurnResult> {
+    if (this.closed) throw new Error("HotQuerySession closed");
+    if (this.currentTurn) throw new Error("Busy: previous turn still running");
+    this.lastActivityAt = Date.now();
+
+    return new Promise<TurnResult>((resolve, reject) => {
+      const abortListener = () => {
+        this.query.interrupt().catch(() => {});
+      };
+      controller.signal.addEventListener("abort", abortListener, { once: true });
+      this.currentTurn = {
+        controller,
+        callbacks,
+        response: "",
+        resolve,
+        reject,
+        abortListener,
+      };
+      this.inputQueue.push({
+        type: "user",
+        message: { role: "user", content: prompt },
+        parent_tool_use_id: null,
+        session_id: this.sessionId,
+      });
+    });
+  }
+
+  /** Apply in-place setters (model / permissionMode) without recreating. */
+  async applySetters(setters: PrepareSetter[]): Promise<void> {
+    for (const s of setters) {
+      if (s.kind === "setModel") await this.query.setModel(s.value);
+      else if (s.kind === "setPermissionMode") await this.query.setPermissionMode(s.value);
+    }
+    this.boundOptions = { ...(this.boundOptions ?? {}) };
+    for (const s of setters) {
+      if (s.kind === "setModel") this.boundOptions.model = s.value;
+      else if (s.kind === "setPermissionMode") this.boundOptions.permissionMode = s.value;
+    }
+  }
+
+  async close(reason: string): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    const turn = this.currentTurn;
+    if (turn) {
+      turn.controller.signal.removeEventListener("abort", turn.abortListener);
+      this.currentTurn = null;
+      turn.reject(new Error(`HotQuerySession closed: ${reason}`));
+    }
+    this.inputQueue.close();
+    try {
+      this.query.close();
+    } catch { /* ignore */ }
+    await this.consumerPromise.catch(() => {});
+  }
+}

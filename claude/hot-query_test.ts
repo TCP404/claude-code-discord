@@ -110,3 +110,93 @@ Deno.test("prepareForTurn: both model and permissionMode changed → reuse with 
   assertEquals(result.verdict, "reuse");
   if (result.verdict === "reuse") assertEquals(result.setters.length, 2);
 });
+
+import { HotQuerySession } from "./hot-query.ts";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+
+// Fake Query factory — captures pushed prompts, yields scripted messages.
+function makeFakeQuery(scripted: SDKMessage[][]) {
+  let turnIdx = 0;
+  const pushedPrompts: string[] = [];
+  const outQueue: AsyncPushQueue<SDKMessage> = new AsyncPushQueue<SDKMessage>();
+
+  const query = {
+    pushedPrompts,
+    [Symbol.asyncIterator]: () => outQueue[Symbol.asyncIterator](),
+    interrupt: () => Promise.resolve(),
+    setModel: (_m?: string) => Promise.resolve(),
+    setPermissionMode: (_m: string) => Promise.resolve(),
+    close: () => outQueue.close(),
+  };
+
+  const factory = (inputIter: AsyncIterable<{ message: { content: string } }>) => {
+    (async () => {
+      for await (const msg of inputIter) {
+        pushedPrompts.push(msg.message.content);
+        const batch = scripted[turnIdx++] ?? [];
+        for (const m of batch) outQueue.push(m);
+      }
+    })();
+    return query;
+  };
+  return { factory, query };
+}
+
+Deno.test("HotQuerySession: first turn resolves on result message", async () => {
+  const resultMsg = {
+    type: "result",
+    session_id: "sess-1",
+    total_cost_usd: 0.01,
+    duration_ms: 1000,
+    subtype: "success",
+  } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[resultMsg]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-1",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const turn = await session.runTurn("hello", new AbortController(), {});
+  assertEquals(turn.sessionId, "sess-1");
+  assertEquals(turn.cost, 0.01);
+  await session.close("test");
+});
+
+Deno.test("HotQuerySession: second concurrent turn rejects with Busy", async () => {
+  const { factory } = makeFakeQuery([[]]); // no result → turn stays running
+  const session = HotQuerySession.create({
+    sessionId: "sess-2",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const first = session.runTurn("hello", new AbortController(), {});
+  await assertRejects(
+    () => session.runTurn("second", new AbortController(), {}),
+    Error,
+    "Busy",
+  );
+  await session.close("test");
+  await first.catch(() => {});
+});
+
+Deno.test("HotQuerySession: onChunk receives assistant text", async () => {
+  const asst = {
+    type: "assistant",
+    message: { content: [{ type: "text", text: "hi there" }] },
+    session_id: "sess-3",
+  } as unknown as SDKMessage;
+  const done = { type: "result", session_id: "sess-3" } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[asst, done]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-3",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const chunks: string[] = [];
+  await session.runTurn("q", new AbortController(), { onChunk: (t) => chunks.push(t) });
+  assertEquals(chunks, ["hi there"]);
+  await session.close("test");
+});
