@@ -158,6 +158,23 @@ Deno.test("HotQuerySession: no denials → permissionDenials field omitted", asy
   await session.close("test");
 });
 
+Deno.test("HotQuerySession: onTyping fires immediately on turn start", async () => {
+  const done = { type: "result", session_id: "sess-t" } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[done]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-t",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  let typingCalls = 0;
+  await session.runTurn("q", new AbortController(), {
+    onTyping: () => typingCalls++,
+  });
+  assertEquals(typingCalls >= 1, true);
+  await session.close("test");
+});
+
 Deno.test("HotQuerySession: close during in-flight turn rejects the turn promise", async () => {
   const { factory } = makeFakeQuery([[]]); // no result yielded → turn stays in-flight
   const session = HotQuerySession.create({

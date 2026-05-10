@@ -74,7 +74,12 @@ interface ActiveTurn {
   resolve: (r: TurnResult) => void;
   reject: (e: Error) => void;
   abortListener: () => void;
+  typingInterval?: ReturnType<typeof setInterval>;
 }
+
+// Discord's typing indicator auto-clears ~10s after the last trigger.
+// 8s keeps it continuously visible while a turn is in flight.
+const TYPING_REFRESH_MS = 8000;
 
 // Minimal structural type for the SDK Query shape we use (keeps tests decoupled).
 export interface QueryLike {
@@ -176,19 +181,23 @@ export class HotQuerySession {
             modelUsed: this.boundOptions?.model || "Default",
             ...(denials.length > 0 && { permissionDenials: denials }),
           };
-          turn.controller.signal.removeEventListener("abort", turn.abortListener);
-          this.currentTurn = null;
+          this.endTurn(turn);
           turn.resolve(resolved);
         }
       }
     } catch (err) {
       const turn = this.currentTurn;
       if (turn) {
-        turn.controller.signal.removeEventListener("abort", turn.abortListener);
-        this.currentTurn = null;
+        this.endTurn(turn);
         turn.reject(err instanceof Error ? err : new Error(String(err)));
       }
     }
+  }
+
+  private endTurn(turn: ActiveTurn): void {
+    turn.controller.signal.removeEventListener("abort", turn.abortListener);
+    if (turn.typingInterval !== undefined) clearInterval(turn.typingInterval);
+    this.currentTurn = null;
   }
 
   runTurn(
@@ -207,6 +216,19 @@ export class HotQuerySession {
         this.query.interrupt().catch(() => {});
       };
       controller.signal.addEventListener("abort", abortListener, { once: true });
+
+      let typingInterval: ReturnType<typeof setInterval> | undefined;
+      if (callbacks.onTyping) {
+        try {
+          callbacks.onTyping();
+        } catch { /* non-critical */ }
+        typingInterval = setInterval(() => {
+          try {
+            callbacks.onTyping!();
+          } catch { /* non-critical */ }
+        }, TYPING_REFRESH_MS);
+      }
+
       this.currentTurn = {
         controller,
         callbacks,
@@ -214,6 +236,7 @@ export class HotQuerySession {
         resolve,
         reject,
         abortListener,
+        typingInterval,
       };
       this.inputQueue.push({
         type: "user",
@@ -229,8 +252,7 @@ export class HotQuerySession {
     this.closed = true;
     const turn = this.currentTurn;
     if (turn) {
-      turn.controller.signal.removeEventListener("abort", turn.abortListener);
-      this.currentTurn = null;
+      this.endTurn(turn);
       turn.reject(new Error(`HotQuerySession closed: ${reason}`));
     }
     this.inputQueue.close();
