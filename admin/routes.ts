@@ -106,6 +106,7 @@ export async function updateWorkspace(deps: AdminDeps, name: string, req: Reques
     name: existing.name,
     path: body.path ?? existing.path,
     channelId: body.channelId ?? existing.channelId,
+    autoThread: typeof body.autoThread === "boolean" ? body.autoThread : existing.autoThread,
   };
 
   if (body.path) {

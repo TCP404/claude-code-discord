@@ -31,7 +31,18 @@ export const workspaceCommands = [
             .setRequired(true)))
     .addSubcommand(sub =>
       sub.setName('list-sessions')
-        .setDescription('List all session threads in the current channel')),
+        .setDescription('List all session threads in the current channel'))
+    .addSubcommand(sub =>
+      sub.setName('auto-thread')
+        .setDescription('Toggle auto-thread: plain text in the workspace channel spawns a Claude thread')
+        .addStringOption(opt =>
+          opt.setName('name')
+            .setDescription('Workspace name')
+            .setRequired(true))
+        .addBooleanOption(opt =>
+          opt.setName('enabled')
+            .setDescription('Turn auto-thread on or off')
+            .setRequired(true))),
 ];
 
 export interface WorkspaceHandlerDeps {
@@ -59,9 +70,42 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
         await handleRemove(ctx);
       } else if (subcommand === 'list-sessions') {
         await handleListSessions(ctx);
+      } else if (subcommand === 'auto-thread') {
+        await handleAutoThread(ctx);
       }
     },
   };
+
+  // deno-lint-ignore no-explicit-any
+  async function handleAutoThread(ctx: any) {
+    const name = ctx.getString('name', true);
+    const enabled = ctx.getBoolean('enabled', true);
+
+    const updated = workspaceManager.setAutoThread(name, enabled);
+    if (!updated) {
+      await ctx.reply({
+        content: `Workspace \`${name}\` not found.`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await workspaceManager.saveToDisk();
+
+    await ctx.reply({
+      embeds: [{
+        color: enabled ? 0x00ff00 : 0xff9900,
+        title: enabled ? 'Auto-Thread Enabled' : 'Auto-Thread Disabled',
+        description: enabled
+          ? `Plain text in <#${updated.channelId}> will now open a Claude thread automatically.`
+          : `Plain text in <#${updated.channelId}> will no longer create threads.`,
+        fields: [
+          { name: 'Workspace', value: name, inline: true },
+          { name: 'Channel', value: `<#${updated.channelId}>`, inline: true },
+        ],
+      }],
+    });
+  }
 
   // deno-lint-ignore no-explicit-any
   async function handleAdd(ctx: any) {
@@ -139,7 +183,7 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
     const fields = workspaces.map(w => ({
       name: w.name,
-      value: `Path: \`${w.path}\`\nChannel: <#${w.channelId}>`,
+      value: `Path: \`${w.path}\`\nChannel: <#${w.channelId}>\nAuto-Thread: ${w.autoThread ? 'on' : 'off'}`,
       inline: false,
     }));
 

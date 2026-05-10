@@ -355,6 +355,100 @@ export async function createClaudeCodeBot(config: BotConfig) {
         commandChannels.set(chId, ch);
       }
     },
+    isAutoThreadChannel: (channelId: string) => workspaceManager.isAutoThreadChannel(channelId),
+    onWorkspaceMessage: async (channelId: string, content: string) => {
+      const channel = commandChannels.get(channelId) ??
+        bot?.getGuild?.()?.channels.cache.get(channelId);
+      if (!channel) {
+        console.warn(`[WorkspaceMessage] Channel ${channelId} not found, ignoring`);
+        return;
+      }
+
+      // Register the channel for routing
+      commandChannels.set(channelId, channel);
+      responseChannels.set(channelId, channel);
+
+      // Create a thread with a `new-` prefixed name (so renameThreadByTopic can detect it later)
+      const { threadNameFromPrompt } = await import("./discord/session-threads.ts");
+      const body = threadNameFromPrompt(content.trim());
+      const budget = DISCORD_THREAD_NAME_MAX - PENDING_RENAME_PREFIX.length;
+      const trimmedName = body.length <= budget ? body : body.slice(0, budget - 1) + "…";
+      const autoThreadName = PENDING_RENAME_PREFIX + trimmedName;
+
+      let threadResult;
+      try {
+        threadResult = await sessionThreadCallbacks.createThreadSender(
+          content,
+          undefined,
+          autoThreadName,
+          channelId,
+        );
+      } catch (err) {
+        console.error("[WorkspaceMessage] Failed to create thread:", err);
+        return;
+      }
+
+      const { sender, threadSessionKey, threadChannelId } = threadResult;
+      const thread = sessionThreadManager.getThread(threadSessionKey);
+
+      const controller = new AbortController();
+      claudeSessionOps.setController(controller, threadChannelId);
+
+      // deno-lint-ignore no-explicit-any
+      let thinkingMsg: any = null;
+      if (thread) {
+        try { thinkingMsg = await thread.send('`Claude is thinking...`'); } catch { /* ignore */ }
+      }
+
+      const effectiveWorkDir = workspaceManager.resolve(channelId);
+
+      try {
+        const result = await sendToClaudeCode(
+          effectiveWorkDir,
+          content,
+          controller,
+          undefined,
+          undefined,
+          (jsonData) => {
+            const claudeMessages = convertToClaudeMessages(jsonData);
+            if (claudeMessages.length > 0) {
+              sender.send(claudeMessages).catch(() => {});
+            }
+          },
+          false,
+          { appendSystemPrompt: BOT_SYSTEM_PROMPT },
+          () => {
+            try { thread?.sendTyping(); } catch { /* ignore */ }
+          }
+        );
+
+        if (result.sessionId) {
+          sessionThreadManager.updateSessionId(threadSessionKey, result.sessionId);
+          claudeSessionOps.setSessionId(result.sessionId, threadChannelId);
+          claudeSessionOps.setSessionId(result.sessionId, channelId);
+          sender.setSessionId(result.sessionId);
+        }
+
+        // Best-effort: rename thread with a Haiku-generated topic
+        if (thread && result.sessionId) {
+          renameThreadByTopic(thread, effectiveWorkDir, result.sessionId).catch((err) => {
+            console.warn("[WorkspaceMessage] Thread rename failed:", err);
+          });
+        }
+      } catch (error) {
+        console.error("[WorkspaceMessage] Claude run failed:", error);
+        if (threadSessionKey.startsWith("pending_")) {
+          sessionThreadManager.updateSessionId(threadSessionKey, `failed_${threadSessionKey}`);
+        }
+        const errMsg = error instanceof Error ? error.message : String(error);
+        try { await thread?.send(`⚠️ Claude failed: ${errMsg}`); } catch { /* ignore */ }
+      } finally {
+        claudeSessionOps.setController(null, threadChannelId);
+        if (thinkingMsg) {
+          try { await thinkingMsg.delete(); } catch { /* ignore */ }
+        }
+      }
+    },
   };
 
   // Create Discord bot
@@ -469,6 +563,80 @@ export async function createClaudeCodeBot(config: BotConfig) {
   });
 
   return bot;
+}
+
+// ================================
+// Auto-Thread Helpers
+// ================================
+
+const PENDING_RENAME_PREFIX = "new-";
+const DISCORD_THREAD_NAME_MAX = 100;
+
+// deno-lint-ignore no-explicit-any
+async function renameThreadByTopic(thread: any, workDir: string, sessionId: string): Promise<void> {
+  try {
+    const currentName: string = thread?.name ?? "";
+    if (!currentName.startsWith(PENDING_RENAME_PREFIX)) return;
+
+    const { getSessionMessages, query: claudeQuery } = await import("@anthropic-ai/claude-agent-sdk");
+
+    const msgs = await getSessionMessages(sessionId, { dir: workDir });
+
+    let context = "";
+    for (const msg of msgs) {
+      // deno-lint-ignore no-explicit-any
+      const m = msg as any;
+      if (!m.message?.content) continue;
+      if (m.type !== "user" && m.type !== "assistant") continue;
+      const texts = (m.message.content as { type: string; text?: string }[])
+        .filter(c => c.type === "text")
+        .map(c => c.text ?? "");
+      const combined = texts.join(" ").trim();
+      if (!combined || combined.length < 20) continue;
+      const role = m.type === "user" ? "User" : "Assistant";
+      context += `${role}: ${combined.slice(0, 300)}\n`;
+      if (context.length > 1500) break;
+    }
+
+    if (context.length < 50) return;
+
+    let title = "";
+    const result = claudeQuery({
+      prompt: `Summarize the topic of the following conversation as a short phrase (5-10 words). Output only the title itself.\n\n${context}`,
+      options: {
+        maxTurns: 1,
+        cwd: "/tmp",
+        model: "haiku",
+        systemPrompt: "You are a title generator. Output a single short topic title (5-10 words). No explanations, no quotes, no trailing punctuation.",
+      },
+    });
+    for await (const ev of result) {
+      // deno-lint-ignore no-explicit-any
+      const e = ev as any;
+      if (e.type === "assistant" && e.message?.content) {
+        for (const block of e.message.content) {
+          if (block.type === "text") title += block.text;
+        }
+      }
+    }
+
+    title = title
+      .split(/\r?\n/)[0]
+      .replace(/^["'`]+|["'`]+$/g, "")
+      .replace(/[#*`_~]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (title.length > DISCORD_THREAD_NAME_MAX) {
+      title = title.slice(0, DISCORD_THREAD_NAME_MAX - 1) + "…";
+    }
+
+    if (!title || title.length < 5) return;
+
+    await thread.setName(title);
+    console.log(`[renameThreadByTopic] Renamed thread to "${title}" for session ${sessionId.slice(0, 8)}`);
+  } catch (err) {
+    console.warn("[renameThreadByTopic]", err instanceof Error ? err.message : String(err));
+  }
 }
 
 // ================================

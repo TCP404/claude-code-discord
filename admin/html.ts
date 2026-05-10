@@ -42,6 +42,12 @@ tr:hover { background: #2d2d44; }
 .empty { color: #666; font-style: italic; padding: 20px 0; }
 .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; background: #2d5a27; color: #7dff6e; font-size: 0.85rem; display: none; z-index: 100; }
 .toast.error { background: #5a2727; color: #ff6e6e; }
+.switch { position: relative; display: inline-block; width: 38px; height: 20px; vertical-align: middle; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background-color: #3d3d5c; transition: .2s; border-radius: 20px; }
+.slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; top: 3px; background-color: #e0e0e0; transition: .2s; border-radius: 50%; }
+input:checked + .slider { background-color: #7289da; }
+input:checked + .slider:before { transform: translateX(18px); }
 </style>
 </head>
 <body>
@@ -66,7 +72,7 @@ tr:hover { background: #2d2d44; }
     <button class="btn btn-primary" onclick="addWorkspace()">Add</button>
   </div>
   <table>
-    <thead><tr><th>Name</th><th>Path</th><th>Channel</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Path</th><th>Channel</th><th>Auto-Thread</th><th></th></tr></thead>
     <tbody id="ws-tbody"></tbody>
   </table>
 </div>
@@ -150,17 +156,29 @@ async function loadWorkspaces() {
   const res = await fetch('/api/workspaces');
   const list = await res.json();
   const tbody = $('#ws-tbody');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No workspaces configured</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No workspaces configured</td></tr>'; return; }
   tbody.innerHTML = list.map(w => {
     const ch = channels.find(c => c.id === w.channelId);
     const chName = ch ? (ch.category ? ch.category + '/' : '') + ch.name : w.channelId;
+    const checked = w.autoThread ? 'checked' : '';
     return \`<tr>
       <td>\${w.name}</td>
       <td class="mono">\${w.path}</td>
       <td>#\${chName}</td>
+      <td><label class="switch"><input type="checkbox" \${checked} onchange="toggleAutoThread('\${w.name}', this.checked)"><span class="slider"></span></label></td>
       <td><button class="btn btn-danger btn-sm" onclick="deleteWorkspace('\${w.name}')">Delete</button></td>
     </tr>\`;
   }).join('');
+}
+
+async function toggleAutoThread(name, enabled) {
+  const res = await fetch('/api/workspaces/' + encodeURIComponent(name), {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ autoThread: enabled })
+  });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Failed to toggle auto-thread', true); loadWorkspaces(); return; }
+  toast('Auto-thread ' + (enabled ? 'enabled' : 'disabled') + ' for ' + name);
 }
 
 async function addWorkspace() {

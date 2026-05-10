@@ -9,6 +9,7 @@ export interface WorkspaceEntry {
   name: string;
   path: string;
   channelId: string;
+  autoThread?: boolean;
 }
 
 interface WorkspaceData {
@@ -63,6 +64,18 @@ export class WorkspaceManager {
 
   findByName(name: string): WorkspaceEntry | undefined {
     return this.workspaces.find(w => w.name === name);
+  }
+
+  isAutoThreadChannel(channelId: string): boolean {
+    const entry = this.workspaces.find(w => w.channelId === channelId);
+    return !!entry?.autoThread;
+  }
+
+  setAutoThread(name: string, enabled: boolean): WorkspaceEntry | undefined {
+    const entry = this.workspaces.find(w => w.name === name);
+    if (!entry) return undefined;
+    entry.autoThread = enabled;
+    return entry;
   }
 
   getManagedChannelIds(): Set<string> {

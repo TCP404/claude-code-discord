@@ -645,16 +645,26 @@ export async function createDiscordBot(
     }
   });
 
-  // Auto-resume: plain text or voice messages in session threads trigger Claude
-  if (dependencies.onThreadMessage) {
+  // Auto-resume: plain text or voice messages in session threads trigger Claude.
+  // Auto-thread: plain text in workspace channels (with autoThread on) spawns a new thread.
+  if (dependencies.onThreadMessage || dependencies.onWorkspaceMessage) {
     const onThreadMessage = dependencies.onThreadMessage;
+    const onWorkspaceMessage = dependencies.onWorkspaceMessage;
+    const isAutoThreadChannel = dependencies.isAutoThreadChannel;
+
     client.on(Events.MessageCreate, async (message: Message) => {
-      // Ignore bot messages and slash commands
       if (message.author.bot) return;
       if (message.content.startsWith('/')) return;
 
-      // Only handle messages inside threads
-      if (!message.channel.isThread()) return;
+      const inThread = message.channel.isThread();
+      const autoThreadEnabled = !inThread &&
+        !!onWorkspaceMessage &&
+        !!isAutoThreadChannel &&
+        isAutoThreadChannel(message.channelId);
+
+      // Ignore messages that neither trigger thread-resume nor auto-thread
+      if (!inThread && !autoThreadEnabled) return;
+      if (inThread && !onThreadMessage) return;
 
       // Multi-bot coexistence: if the message mentions another bot but not us, skip
       const mentionedUsers = message.mentions.users;
@@ -696,9 +706,13 @@ export async function createDiscordBot(
       if (!textContent) return;
 
       try {
-        await onThreadMessage(message.channelId, textContent);
+        if (inThread) {
+          await onThreadMessage!(message.channelId, textContent);
+        } else {
+          await onWorkspaceMessage!(message.channelId, textContent);
+        }
       } catch (error) {
-        console.error('[ThreadMessage] Error handling thread message:', error);
+        console.error('[MessageCreate] Error handling message:', error);
       }
     });
   }

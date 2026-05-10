@@ -136,4 +136,8 @@ export interface BotDependencies {
   setResponseChannel?: (channel: any) => void;
   /** Returns set of channel IDs managed by workspace system (checked by isOurChannel) */
   getManagedChannelIds?: () => Set<string>;
+  /** Returns true when the given channel has the auto-thread workspace option enabled */
+  isAutoThreadChannel?: (channelId: string) => boolean;
+  /** Callback for plain text messages in auto-thread-enabled workspace channels */
+  onWorkspaceMessage?: (channelId: string, content: string) => Promise<void>;
 }

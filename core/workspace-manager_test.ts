@@ -133,3 +133,62 @@ Deno.test("loadFromDisk: handles missing file gracefully", async () => {
   await wm.loadFromDisk();
   assertEquals(wm.list().length, 0);
 });
+
+// --- isAutoThreadChannel() ---
+
+Deno.test("isAutoThreadChannel: returns false when not set", () => {
+  const wm = new WorkspaceManager("/default");
+  wm.add({ name: "crm", path: "/projects/crm", channelId: "chan-1" });
+  assertEquals(wm.isAutoThreadChannel("chan-1"), false);
+});
+
+Deno.test("isAutoThreadChannel: returns true when enabled", () => {
+  const wm = new WorkspaceManager("/default");
+  wm.add({ name: "crm", path: "/projects/crm", channelId: "chan-1", autoThread: true });
+  assertEquals(wm.isAutoThreadChannel("chan-1"), true);
+});
+
+Deno.test("isAutoThreadChannel: returns false for unknown channel", () => {
+  const wm = new WorkspaceManager("/default");
+  assertEquals(wm.isAutoThreadChannel("unknown"), false);
+});
+
+// --- setAutoThread() ---
+
+Deno.test("setAutoThread: enables auto-thread on existing workspace", () => {
+  const wm = new WorkspaceManager("/default");
+  wm.add({ name: "crm", path: "/projects/crm", channelId: "chan-1" });
+
+  const result = wm.setAutoThread("crm", true);
+  assertEquals(result?.autoThread, true);
+  assertEquals(wm.isAutoThreadChannel("chan-1"), true);
+});
+
+Deno.test("setAutoThread: disables auto-thread", () => {
+  const wm = new WorkspaceManager("/default");
+  wm.add({ name: "crm", path: "/projects/crm", channelId: "chan-1", autoThread: true });
+
+  const result = wm.setAutoThread("crm", false);
+  assertEquals(result?.autoThread, false);
+  assertEquals(wm.isAutoThreadChannel("chan-1"), false);
+});
+
+Deno.test("setAutoThread: returns undefined for non-existent workspace", () => {
+  const wm = new WorkspaceManager("/default");
+  assertEquals(wm.setAutoThread("nope", true), undefined);
+});
+
+Deno.test("saveToDisk + loadFromDisk: persists autoThread field", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  try {
+    const wm1 = new WorkspaceManager(tmpDir);
+    wm1.add({ name: "crm", path: "/projects/crm", channelId: "chan-1", autoThread: true });
+    await wm1.saveToDisk();
+
+    const wm2 = new WorkspaceManager(tmpDir);
+    await wm2.loadFromDisk();
+    assertEquals(wm2.isAutoThreadChannel("chan-1"), true);
+  } finally {
+    await Deno.remove(tmpDir, { recursive: true });
+  }
+});
