@@ -88,7 +88,9 @@ export class HotQueryRegistry {
     const existing = this.timers.get(sessionId);
     if (existing !== undefined) clearTimeout(existing);
     const timer = setTimeout(() => {
-      this.close(sessionId, "idle").catch(() => {});
+      this.close(sessionId, "idle").catch((err) => {
+        console.error(`[HotQueryRegistry] idle close failed for ${sessionId}:`, err);
+      });
     }, this.config.idleMs);
     this.timers.set(sessionId, timer);
   }
@@ -103,7 +105,9 @@ export class HotQueryRegistry {
       }
     }
     if (oldestId) {
-      this.close(oldestId, "lru").catch(() => {});
+      this.close(oldestId, "lru").catch((err) => {
+        console.error(`[HotQueryRegistry] LRU close failed for ${oldestId}:`, err);
+      });
     }
   }
 }
