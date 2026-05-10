@@ -81,6 +81,147 @@ function extractPermissionDenials(
   return denials;
 }
 
+/** Build the canUseTool callback used by both cold and hot query paths. */
+export function buildCanUseTool(
+  modelOptions?: ClaudeModelOptions,
+): (
+  toolName: string,
+  input: Record<string, unknown>,
+) => Promise<
+  { behavior: "allow"; updatedInput: Record<string, unknown> } | {
+    behavior: "deny";
+    message: string;
+  }
+> {
+  const readOnlyTools = new Set([
+    "Read",
+    "Glob",
+    "Grep",
+    "Skill",
+    "ToolSearch",
+    "WebFetch",
+    "WebSearch",
+    "LSP",
+    "TaskCreate",
+    "TaskGet",
+    "TaskList",
+    "TaskUpdate",
+    "TaskStop",
+    "TaskOutput",
+    "Agent",
+    "EnterPlanMode",
+    "ExitPlanMode",
+    "Bash",
+    "Write",
+    "Edit",
+    "NotebookEdit",
+  ]);
+
+  return async (toolName: string, input: Record<string, unknown>) => {
+    if (readOnlyTools.has(toolName)) {
+      return { behavior: "allow" as const, updatedInput: input };
+    }
+    if (toolName === "AskUserQuestion" && modelOptions?.onAskUser) {
+      try {
+        const askInput = input as unknown as AskUserQuestionInput;
+        const answers = await modelOptions.onAskUser(askInput);
+        return {
+          behavior: "allow" as const,
+          updatedInput: { questions: askInput.questions, answers },
+        };
+      } catch (err) {
+        console.error("[AskUserQuestion] Failed to collect answers:", err);
+        return { behavior: "deny" as const, message: "User did not respond in time" };
+      }
+    }
+    if (toolName.startsWith("mcp__")) {
+      return { behavior: "allow" as const, updatedInput: input };
+    }
+    if (modelOptions?.onPermissionRequest) {
+      try {
+        const allowed = await modelOptions.onPermissionRequest(toolName, input);
+        if (allowed) {
+          return { behavior: "allow" as const, updatedInput: input };
+        }
+        return { behavior: "deny" as const, message: `User denied tool: ${toolName}` };
+      } catch (err) {
+        console.error(`[PermissionRequest] Error for ${toolName}:`, err);
+        return {
+          behavior: "deny" as const,
+          message: `Permission request failed for: ${toolName}`,
+        };
+      }
+    }
+    return { behavior: "deny" as const, message: `Tool ${toolName} not pre-approved` };
+  };
+}
+
+/** Build the `options` block for claudeQuery({ prompt, options }). */
+export async function buildQueryOptions(
+  workDir: string,
+  modelOptions: ClaudeModelOptions | undefined,
+  resumeSessionId: string | undefined,
+  controller: AbortController,
+): Promise<{
+  cwd: string;
+  abortController: AbortController;
+  permissionMode: SDKPermissionMode;
+  // deno-lint-ignore no-explicit-any
+  options: any;
+}> {
+  const mcpServers = await loadMcpServers(workDir);
+  const permMode: SDKPermissionMode = modelOptions?.permissionMode ||
+    (Deno.env.get("DEFAULT_PERMISSION_MODE") as SDKPermissionMode | undefined) ||
+    "acceptEdits";
+
+  const envVars: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(Deno.env.toObject())),
+    CLAUDE_CODE_ENABLE_TASKS: "1",
+    ...(modelOptions?.enableAgentTeams && { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1" }),
+  };
+  if (modelOptions?.extraEnv) Object.assign(envVars, modelOptions.extraEnv);
+
+  const systemPromptConfig = modelOptions?.appendSystemPrompt
+    ? {
+      type: "preset" as const,
+      preset: "claude_code" as const,
+      append: modelOptions.appendSystemPrompt,
+    }
+    : { type: "preset" as const, preset: "claude_code" as const };
+
+  const options = {
+    cwd: workDir,
+    permissionMode: permMode,
+    systemPrompt: systemPromptConfig,
+    settingSources: ["project" as const, "local" as const, "user" as const],
+    ...(modelOptions?.thinking && { thinking: modelOptions.thinking }),
+    ...(modelOptions?.effort && { effort: modelOptions.effort }),
+    ...(modelOptions?.maxBudgetUsd && { maxBudgetUsd: modelOptions.maxBudgetUsd }),
+    ...(permMode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
+    ...(resumeSessionId && { resume: resumeSessionId }),
+    ...(modelOptions?.model && { model: modelOptions.model }),
+    ...(modelOptions?.maxTurns && { maxTurns: modelOptions.maxTurns }),
+    ...(modelOptions?.fallbackModel && { fallbackModel: modelOptions.fallbackModel }),
+    ...(modelOptions?.agents && { agents: modelOptions.agents }),
+    ...(modelOptions?.agent && { agent: modelOptions.agent }),
+    ...(modelOptions?.betas && modelOptions.betas.length > 0 && { betas: modelOptions.betas }),
+    ...(modelOptions?.enableFileCheckpointing && { enableFileCheckpointing: true }),
+    ...(modelOptions?.sandbox && { sandbox: modelOptions.sandbox }),
+    ...(modelOptions?.additionalDirectories &&
+      modelOptions.additionalDirectories.length > 0 &&
+      { additionalDirectories: modelOptions.additionalDirectories }),
+    ...(modelOptions?.forkSession && { forkSession: true }),
+    ...(modelOptions?.hooks && Object.keys(modelOptions.hooks).length > 0 &&
+      { hooks: modelOptions.hooks }),
+    ...(modelOptions?.outputFormat && { outputFormat: modelOptions.outputFormat }),
+    ...(mcpServers && { mcpServers }),
+    canUseTool: buildCanUseTool(modelOptions),
+    env: envVars,
+  };
+
+  return { cwd: workDir, abortController: controller, permissionMode: permMode, options };
+}
+
 // Clean session ID (remove unwanted characters)
 export function cleanSessionId(sessionId: string): string {
   return sessionId
@@ -209,9 +350,6 @@ export async function sendToClaudeCode(
   // Clean up session ID
   const cleanedSessionId = sessionId ? cleanSessionId(sessionId) : undefined;
 
-  // Load MCP servers from .claude/mcp.json
-  const mcpServers = await loadMcpServers(workDir);
-
   // Wrap with comprehensive error handling
   const executeWithErrorHandling = async (overrideModel?: string) => {
     let typingInterval: ReturnType<typeof setInterval> | undefined;
@@ -219,156 +357,18 @@ export async function sendToClaudeCode(
       // Determine which model to use
       const modelToUse = overrideModel || modelOptions?.model;
 
-      // Determine permission mode (env DEFAULT_PERMISSION_MODE, fallback acceptEdits)
-      const permMode = modelOptions?.permissionMode ||
-        (Deno.env.get("DEFAULT_PERMISSION_MODE") as SDKPermissionMode | undefined) ||
-        "acceptEdits";
-
-      // Build environment variables for the subprocess
-      const envVars: Record<string, string> = {
-        ...Object.fromEntries(Object.entries(Deno.env.toObject())),
-        // Enable the Tasks system for subagent background tasks (SDK v0.2.19+)
-        CLAUDE_CODE_ENABLE_TASKS: "1",
-        // Enable experimental Agent Teams if configured
-        ...(modelOptions?.enableAgentTeams && { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1" }),
-      };
-
-      // Apply extra env vars (proxy settings, etc.)
-      if (modelOptions?.extraEnv) {
-        Object.assign(envVars, modelOptions.extraEnv);
-      }
-
-      // Build system prompt — use Claude Code preset with optional append
-      const systemPromptConfig = modelOptions?.appendSystemPrompt
-        ? {
-          type: "preset" as const,
-          preset: "claude_code" as const,
-          append: modelOptions.appendSystemPrompt,
-        }
-        : { type: "preset" as const, preset: "claude_code" as const };
-
+      const built = await buildQueryOptions(
+        workDir,
+        modelToUse ? { ...modelOptions, model: modelToUse } : modelOptions,
+        cleanedSessionId,
+        controller,
+      );
       const queryOptions = {
         prompt,
-        abortController: controller,
-        options: {
-          cwd: workDir,
-          permissionMode: permMode,
-          // Use Claude Code's system prompt + optional append
-          systemPrompt: systemPromptConfig,
-          // Load project CLAUDE.md files
-          settingSources: ["project" as const, "local" as const, "user" as const],
-          // Native thinking config (replaces MAX_THINKING_TOKENS env var hack)
-          ...(modelOptions?.thinking && { thinking: modelOptions.thinking }),
-          // Effort level
-          ...(modelOptions?.effort && { effort: modelOptions.effort }),
-          // Budget cap
-          ...(modelOptions?.maxBudgetUsd && { maxBudgetUsd: modelOptions.maxBudgetUsd }),
-          // Guard for bypassPermissions
-          ...(permMode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
-          // resume: sessionId — SDK loads the exact session file by UUID
-          ...(cleanedSessionId && { resume: cleanedSessionId }),
-          ...(modelToUse && { model: modelToUse }),
-          ...(modelOptions?.maxTurns && { maxTurns: modelOptions.maxTurns }),
-          ...(modelOptions?.fallbackModel && { fallbackModel: modelOptions.fallbackModel }),
-          // Native SDK agent support
-          ...(modelOptions?.agents && { agents: modelOptions.agents }),
-          ...(modelOptions?.agent && { agent: modelOptions.agent }),
-          // Advanced features: betas, file checkpointing, sandbox, additional dirs, fork
-          ...(modelOptions?.betas && modelOptions.betas.length > 0 &&
-            { betas: modelOptions.betas }),
-          ...(modelOptions?.enableFileCheckpointing && { enableFileCheckpointing: true }),
-          ...(modelOptions?.sandbox && { sandbox: modelOptions.sandbox }),
-          ...(modelOptions?.additionalDirectories &&
-            modelOptions.additionalDirectories.length > 0 &&
-            { additionalDirectories: modelOptions.additionalDirectories }),
-          ...(modelOptions?.forkSession && { forkSession: true }),
-          // SDK hooks — deep integration callbacks
-          ...(modelOptions?.hooks && Object.keys(modelOptions.hooks).length > 0 &&
-            { hooks: modelOptions.hooks }),
-          ...(modelOptions?.outputFormat && { outputFormat: modelOptions.outputFormat }),
-          // MCP servers from .claude/mcp.json
-          ...(mcpServers && { mcpServers }),
-          // Permission / tool-use callback — handles:
-          //   1. AskUserQuestion tool → routes to onAskUser callback for interactive Discord flow
-          //   2. MCP tools → auto-allow tools from configured servers
-          //   3. Everything else → deny (dontAsk mode blocks unapproved tools)
-          // NOTE: The SDK's runtime Zod schema requires `updatedInput` on allow responses
-          // even though the TypeScript types mark it optional — pass through original input.
-          canUseTool: async (toolName: string, input: Record<string, unknown>) => {
-            // Tools to always allow without prompting
-            const readOnlyTools = new Set([
-              "Read",
-              "Glob",
-              "Grep",
-              "Skill",
-              "ToolSearch",
-              "WebFetch",
-              "WebSearch",
-              "LSP",
-              "TaskCreate",
-              "TaskGet",
-              "TaskList",
-              "TaskUpdate",
-              "TaskStop",
-              "TaskOutput",
-              "Agent",
-              "EnterPlanMode",
-              "ExitPlanMode",
-              "Bash",
-              "Write",
-              "Edit",
-              "NotebookEdit",
-            ]);
-            if (readOnlyTools.has(toolName)) {
-              return { behavior: "allow" as const, updatedInput: input };
-            }
-
-            // AskUserQuestion: route to Discord interactive flow
-            if (toolName === "AskUserQuestion" && modelOptions?.onAskUser) {
-              try {
-                const askInput = input as unknown as AskUserQuestionInput;
-                const answers = await modelOptions.onAskUser(askInput);
-                return {
-                  behavior: "allow" as const,
-                  updatedInput: {
-                    questions: askInput.questions,
-                    answers,
-                  },
-                };
-              } catch (err) {
-                console.error("[AskUserQuestion] Failed to collect answers:", err);
-                return { behavior: "deny" as const, message: "User did not respond in time" };
-              }
-            }
-
-            // MCP tools: auto-allow ALL MCP tools (SDK loads servers from
-            // project, user, and plugin configs — not just project mcp.json)
-            if (toolName.startsWith("mcp__")) {
-              return { behavior: "allow" as const, updatedInput: input };
-            }
-
-            // Interactive permission request — show Discord buttons for Allow/Deny
-            if (modelOptions?.onPermissionRequest) {
-              try {
-                const allowed = await modelOptions.onPermissionRequest(toolName, input);
-                if (allowed) {
-                  return { behavior: "allow" as const, updatedInput: input };
-                }
-                return { behavior: "deny" as const, message: `User denied tool: ${toolName}` };
-              } catch (err) {
-                console.error(`[PermissionRequest] Error for ${toolName}:`, err);
-                return {
-                  behavior: "deny" as const,
-                  message: `Permission request failed for: ${toolName}`,
-                };
-              }
-            }
-
-            return { behavior: "deny" as const, message: `Tool ${toolName} not pre-approved` };
-          },
-          env: envVars,
-        },
+        abortController: built.abortController,
+        options: built.options,
       };
+      const permMode = built.permissionMode;
 
       const thinkingLabel = modelOptions?.thinking
         ? `, thinking=${modelOptions.thinking.type}${
