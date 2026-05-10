@@ -66,6 +66,8 @@ const RECREATE_FIELDS: Array<keyof ClaudeModelOptions> = [
   "enableFileCheckpointing",
 ];
 
+// Array order matters. Fine here because options come from the same builder
+// every turn, so arrays are produced in stable order.
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
