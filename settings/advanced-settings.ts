@@ -8,29 +8,29 @@ export interface AdvancedBotSettings {
   // Notification settings
   mentionEnabled: boolean;
   mentionUserId: string | null;
-  
+
   // Claude Code settings (only features supported by CLI)
   defaultModel: string;
   defaultSystemPrompt: string | null;
   autoIncludeSystemInfo: boolean;
   autoIncludeGitContext: boolean;
-  
+
   // Output settings
   codeHighlighting: boolean;
   autoPageLongOutput: boolean;
   maxOutputLength: number;
-  timestampFormat: 'relative' | 'absolute' | 'both';
-  
+  timestampFormat: "relative" | "absolute" | "both";
+
   // Session settings
   autoSaveConversations: boolean;
   sessionTimeout: number; // in minutes
   maxSessionsPerUser: number;
-  
+
   // System monitoring settings
   defaultProcessLimit: number;
   defaultLogLines: number;
   showSystemWarnings: boolean;
-  
+
   // Developer settings
   enableDebugMode: boolean;
   verboseErrorReporting: boolean;
@@ -41,33 +41,33 @@ export const DEFAULT_SETTINGS: AdvancedBotSettings = {
   // Notifications
   mentionEnabled: false,
   mentionUserId: null,
-  
+
   // Claude Code (only CLI-supported options)
-  defaultModel: '',
+  defaultModel: "",
   defaultSystemPrompt: null,
   autoIncludeSystemInfo: false,
   autoIncludeGitContext: true,
-  
+
   // Output
   codeHighlighting: true,
   autoPageLongOutput: true,
   maxOutputLength: 4000,
-  timestampFormat: 'relative',
-  
+  timestampFormat: "relative",
+
   // Sessions
   autoSaveConversations: true,
   sessionTimeout: 60, // 1 hour
   maxSessionsPerUser: 10,
-  
+
   // System monitoring
   defaultProcessLimit: 20,
   defaultLogLines: 50,
   showSystemWarnings: true,
-  
+
   // Developer
   enableDebugMode: false,
   verboseErrorReporting: false,
-  enablePerformanceMetrics: false
+  enablePerformanceMetrics: false,
 };
 
 export const advancedSettingsCommands = [
@@ -76,10 +76,11 @@ export const advancedSettingsCommands = [
   // (category:claude and category:output respectively).
 
   new SlashCommandBuilder()
-    .setName('quick-model')
-    .setDescription('Quickly switch Claude model for next conversation')
-    .addStringOption(option =>
-      option.setName('model')
-        .setDescription('Claude model to use (e.g. sonnet, opus, haiku, claude-sonnet-4)')
-        .setRequired(true))
+    .setName("quick-model")
+    .setDescription("Quickly switch Claude model for next conversation")
+    .addStringOption((option) =>
+      option.setName("model")
+        .setDescription("Claude model to use (e.g. sonnet, opus, haiku, claude-sonnet-4)")
+        .setRequired(true)
+    ),
 ];

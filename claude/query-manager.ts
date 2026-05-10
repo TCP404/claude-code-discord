@@ -1,18 +1,38 @@
 /**
  * Query Manager — Manages active SDK Query references for mid-session controls,
  * info retrieval, and file rewind capabilities.
- * 
+ *
  * The SDK `query()` function returns a `Query` interface that extends AsyncGenerator
  * with control methods (interrupt, setModel, setPermissionMode, accountInfo, etc.).
  * This module stores the active Query so these methods can be called from Discord commands.
- * 
+ *
  * @module claude/query-manager
  */
 
-import { query as claudeQuery, type Query, type AccountInfo, type ModelInfo, type McpServerStatus, type SlashCommand, type RewindFilesResult, type PermissionMode, type McpSetServersResult, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type AccountInfo,
+  type McpServerConfig,
+  type McpServerStatus,
+  type McpSetServersResult,
+  type ModelInfo,
+  type PermissionMode,
+  type Query,
+  query as claudeQuery,
+  type RewindFilesResult,
+  type SlashCommand,
+} from "@anthropic-ai/claude-agent-sdk";
 
 // Re-export SDK types for consumers
-export type { Query, AccountInfo, ModelInfo as SDKModelInfoFull, McpServerStatus, SlashCommand as SDKSlashCommand, RewindFilesResult, McpSetServersResult, McpServerConfig };
+export type {
+  AccountInfo,
+  McpServerConfig,
+  McpServerStatus,
+  McpSetServersResult,
+  ModelInfo as SDKModelInfoFull,
+  Query,
+  RewindFilesResult,
+  SlashCommand as SDKSlashCommand,
+};
 
 /**
  * Full initialization result from the SDK.
@@ -136,11 +156,14 @@ export async function setActivePermissionMode(mode: PermissionMode): Promise<boo
 /**
  * Rewind files to their state at a specific user message.
  * Requires enableFileCheckpointing to have been set.
- * 
+ *
  * @param messageId - UUID of the user message to rewind to
  * @param dryRun - If true, preview changes without modifying files
  */
-export async function rewindToMessage(messageId: string, dryRun = false): Promise<RewindFilesResult | null> {
+export async function rewindToMessage(
+  messageId: string,
+  dryRun = false,
+): Promise<RewindFilesResult | null> {
   if (!activeQuery) return null;
   try {
     return await activeQuery.rewindFiles(messageId, { dryRun });
@@ -206,7 +229,7 @@ export async function getMcpServerStatus(): Promise<McpServerStatus[] | null> {
 /**
  * Stop a running background task (subagent).
  * A task_notification with status 'stopped' will be emitted.
- * 
+ *
  * @param taskId - The task ID from task_notification/task_started events
  */
 export async function stopActiveTask(taskId: string): Promise<boolean> {
@@ -225,11 +248,14 @@ export async function stopActiveTask(taskId: string): Promise<boolean> {
 
 /**
  * Toggle an MCP server on/off mid-session via the SDK Query.
- * 
+ *
  * @param serverName - The name of the MCP server to toggle
  * @param enabled - Whether the server should be enabled
  */
-export async function toggleMcpServerActive(serverName: string, enabled: boolean): Promise<boolean> {
+export async function toggleMcpServerActive(
+  serverName: string,
+  enabled: boolean,
+): Promise<boolean> {
   if (!activeQuery) return false;
   try {
     await activeQuery.toggleMcpServer(serverName, enabled);
@@ -242,7 +268,7 @@ export async function toggleMcpServerActive(serverName: string, enabled: boolean
 /**
  * Reconnect an MCP server mid-session via the SDK Query.
  * Useful when a server has failed or disconnected.
- * 
+ *
  * @param serverName - The name of the MCP server to reconnect
  */
 export async function reconnectMcpServerActive(serverName: string): Promise<boolean> {
@@ -259,10 +285,12 @@ export async function reconnectMcpServerActive(serverName: string): Promise<bool
  * Dynamically set MCP servers mid-session via the SDK Query.
  * Replaces the current set of dynamically-added servers.
  * Servers from settings files are not affected.
- * 
+ *
  * @param servers - Record of server name to configuration
  */
-export async function setMcpServersActive(servers: Record<string, McpServerConfig>): Promise<McpSetServersResult | null> {
+export async function setMcpServersActive(
+  servers: Record<string, McpServerConfig>,
+): Promise<McpSetServersResult | null> {
   if (!activeQuery) return null;
   try {
     return await activeQuery.setMcpServers(servers);
@@ -279,11 +307,14 @@ export async function setMcpServersActive(servers: Record<string, McpServerConfi
  * Open a short-lived query just to retrieve info (account, models, MCP status).
  * Creates a minimal session, gets initialization data, then closes.
  * Use this when no active query exists.
- * 
+ *
  * @param workDir - Working directory for the session
  * @param envVars - Environment variables (must include ANTHROPIC_API_KEY)
  */
-export async function fetchClaudeInfo(workDir: string, envVars?: Record<string, string>): Promise<ClaudeInitInfo | null> {
+export async function fetchClaudeInfo(
+  workDir: string,
+  envVars?: Record<string, string>,
+): Promise<ClaudeInitInfo | null> {
   let infoQuery: Query | null = null;
   try {
     // Create a minimal query — it will start the CLI subprocess
@@ -291,20 +322,20 @@ export async function fetchClaudeInfo(workDir: string, envVars?: Record<string, 
       prompt: "Say 'info' and nothing else.",
       options: {
         cwd: workDir,
-        permissionMode: 'plan', // Read-only, safest mode
+        permissionMode: "plan", // Read-only, safest mode
         maxTurns: 1,
-        thinking: { type: 'disabled' },
-        effort: 'low',
+        thinking: { type: "disabled" },
+        effort: "low",
         persistSession: false,
         env: envVars ?? Object.fromEntries(
-          Object.entries(Deno.env.toObject())
+          Object.entries(Deno.env.toObject()),
         ),
       },
     });
 
     // Get the initialization result (available immediately after the process starts)
     const initResult = await infoQuery.initializationResult();
-    
+
     const info: ClaudeInitInfo = {
       commands: initResult.commands,
       models: initResult.models,

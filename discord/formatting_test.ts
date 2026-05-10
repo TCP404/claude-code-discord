@@ -1,12 +1,12 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  formatText,
-  formatFileContent,
-  formatShellOutput,
-  formatGitOutput,
-  formatError,
-  needsFormatting,
   createFormattedEmbed,
+  formatError,
+  formatFileContent,
+  formatGitOutput,
+  formatShellOutput,
+  formatText,
+  needsFormatting,
 } from "./formatting.ts";
 
 // --- formatText ---

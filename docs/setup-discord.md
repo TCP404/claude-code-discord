@@ -32,20 +32,21 @@ Go to **OAuth2 > URL Generator** and select these scopes:
 bot
 applications.commands
 ```
+
 <img width="800" height="500" alt="oauth2" src="https://github.com/user-attachments/assets/3e1fe004-1ae5-4078-b1a4-882a11bc68cd" />
 
 Then select **all** of the following bot permissions:
 
-| Permission | Why It's Needed |
-|---|---|
-| **Manage Channels** | Creates categories and text channels on startup (one per branch) |
-| **View Channels** | Finds existing categories/channels to avoid duplicates |
-| **Send Messages** | Sends embeds, streaming output, completion messages, startup notification |
-| **Embed Links** | All bot output uses rich embeds (code, status, completions, errors) |
-| **Attach Files** | File attachment support in message payloads |
-| **Read Message History** | Reads channel to find its own messages |
-| **Use External Emojis** | Emoji formatting in status and completion embeds |
-| **Use Application Commands** | All 45+ slash commands |
+| Permission                   | Why It's Needed                                                           |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| **Manage Channels**          | Creates categories and text channels on startup (one per branch)          |
+| **View Channels**            | Finds existing categories/channels to avoid duplicates                    |
+| **Send Messages**            | Sends embeds, streaming output, completion messages, startup notification |
+| **Embed Links**              | All bot output uses rich embeds (code, status, completions, errors)       |
+| **Attach Files**             | File attachment support in message payloads                               |
+| **Read Message History**     | Reads channel to find its own messages                                    |
+| **Use External Emojis**      | Emoji formatting in status and completion embeds                          |
+| **Use Application Commands** | All 45+ slash commands                                                    |
 
 <img width="800" height="500" alt="botallowcommands" src="https://github.com/user-attachments/assets/9cd92467-2f3d-4c03-abb0-9f10ec979a1b" />
 

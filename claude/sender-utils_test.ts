@@ -1,12 +1,12 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  FILE_MARKER_REGEX,
   createActionButtons,
-  truncateContent,
+  FILE_MARKER_REGEX,
+  formatGenericTool,
   formatStopReason,
   getFileTypeInfo,
-  formatGenericTool,
   toStatusLine,
+  truncateContent,
 } from "./sender-utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 

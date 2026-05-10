@@ -161,14 +161,14 @@ This document tracks issues identified during a comprehensive code audit that we
 
 ## Summary
 
-| Category | Count | Action |
-|----------|-------|--------|
-| Security (accepted for personal use) | 4 | No fix needed — same trust boundary |
-| Memory (self-resolving) | 3 | Bot restarts clear state |
-| Race conditions (single-user) | 2 | Can't trigger with sequential usage |
-| Dead/non-functional code | 4 | No impact, leave as-is |
-| Fragile but functional | 6 | Works in practice, accept the tradeoff |
-| Rare edge cases | 3 | Not worth the complexity to fix |
-| **Total accepted** | **22** | |
+| Category                             | Count  | Action                                 |
+| ------------------------------------ | ------ | -------------------------------------- |
+| Security (accepted for personal use) | 4      | No fix needed — same trust boundary    |
+| Memory (self-resolving)              | 3      | Bot restarts clear state               |
+| Race conditions (single-user)        | 2      | Can't trigger with sequential usage    |
+| Dead/non-functional code             | 4      | No impact, leave as-is                 |
+| Fragile but functional               | 6      | Works in practice, accept the tradeoff |
+| Rare edge cases                      | 3      | Not worth the complexity to fix        |
+| **Total accepted**                   | **22** |                                        |
 
 **Issues that were fixed:** #1 (stale closure), #10 (missing abort checks), #11 (pagination title), #12 (unicode splitting), #13 (continue button session ID) — see git log for details.

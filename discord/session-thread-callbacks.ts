@@ -19,13 +19,21 @@ export interface SessionThreadCallbackDeps {
   commandChannels: Map<string, any>;
 }
 
-export function createSessionThreadCallbacks(deps: SessionThreadCallbackDeps): SessionThreadCallbacks {
+export function createSessionThreadCallbacks(
+  deps: SessionThreadCallbackDeps,
+): SessionThreadCallbacks {
   const { sessionThreadManager, getBot, commandChannels } = deps;
 
   return {
-    async createThreadSender(prompt: string, sessionId?: string, threadName?: string, channelId?: string) {
-      const channel = (channelId && commandChannels.get(channelId)) || getBot()?.getChannel() as TextChannel | null;
-      if (!channel) throw new Error('Bot channel not ready');
+    async createThreadSender(
+      prompt: string,
+      sessionId?: string,
+      threadName?: string,
+      channelId?: string,
+    ) {
+      const channel = (channelId && commandChannels.get(channelId)) ||
+        getBot()?.getChannel() as TextChannel | null;
+      if (!channel) throw new Error("Bot channel not ready");
 
       if (sessionId) {
         const existingThread = sessionThreadManager.getThread(sessionId);
@@ -34,27 +42,42 @@ export function createSessionThreadCallbacks(deps: SessionThreadCallbackDeps): S
             await existingThread.setArchived(false);
           }
           sessionThreadManager.recordActivity(sessionId);
-          const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), { isThread: true });
-          return { sender: threadSender, threadSessionKey: sessionId, threadChannelId: existingThread.id };
+          const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), {
+            isThread: true,
+          });
+          return {
+            sender: threadSender,
+            threadSessionKey: sessionId,
+            threadChannelId: existingThread.id,
+          };
         }
       }
 
       const placeholderKey = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const thread = await sessionThreadManager.createSessionThread(channel, placeholderKey, prompt, threadName);
+      const thread = await sessionThreadManager.createSessionThread(
+        channel,
+        placeholderKey,
+        prompt,
+        threadName,
+      );
 
       await sendMessageContent(channel, {
         embeds: [{
           color: 0x5865F2,
-          title: '🧵 New Claude Session',
-          description: `A new session thread has been created.\n\n**Prompt:** \`${prompt.substring(0, 200)}${prompt.length > 200 ? '...' : ''}\``,
+          title: "🧵 New Claude Session",
+          description: `A new session thread has been created.\n\n**Prompt:** \`${
+            prompt.substring(0, 200)
+          }${prompt.length > 200 ? "..." : ""}\``,
           fields: [
-            { name: 'Thread', value: `<#${thread.id}>`, inline: true },
+            { name: "Thread", value: `<#${thread.id}>`, inline: true },
           ],
           timestamp: true,
         }],
       });
 
-      const threadSender = createClaudeSender(createChannelSenderAdapter(thread), { isThread: true });
+      const threadSender = createClaudeSender(createChannelSenderAdapter(thread), {
+        isThread: true,
+      });
       return { sender: threadSender, threadSessionKey: placeholderKey, threadChannelId: thread.id };
     },
 
@@ -66,7 +89,9 @@ export function createSessionThreadCallbacks(deps: SessionThreadCallbackDeps): S
         await existingThread.setArchived(false);
       }
       sessionThreadManager.recordActivity(sessionId);
-      const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), { isThread: true });
+      const threadSender = createClaudeSender(createChannelSenderAdapter(existingThread), {
+        isThread: true,
+      });
       return { sender: threadSender, threadSessionKey: sessionId };
     },
 

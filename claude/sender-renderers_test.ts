@@ -1,16 +1,16 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  renderText,
-  renderToolUse,
-  renderToolResult,
-  renderThinking,
-  renderSystem,
   renderOther,
   renderPermissionDenied,
-  renderTaskStarted,
+  renderSystem,
   renderTaskNotification,
+  renderTaskStarted,
+  renderText,
+  renderThinking,
   renderToolProgress,
+  renderToolResult,
   renderToolSummary,
+  renderToolUse,
 } from "./sender-renderers.ts";
 import type { ClaudeMessage, RendererContext } from "./types.ts";
 
@@ -21,7 +21,9 @@ function createCtx(overrides: Partial<RendererContext> = {}): RendererContext {
     sentFilePaths: new Set(),
     isThread: false,
     currentSessionId: undefined,
-    setCurrentSessionId: (id: string) => { ctx.currentSessionId = id; },
+    setCurrentSessionId: (id: string) => {
+      ctx.currentSessionId = id;
+    },
     ...overrides,
   };
   return ctx;
@@ -261,7 +263,12 @@ Deno.test("renderSystem: completion outside thread shows action buttons", () => 
   const msg: ClaudeMessage = {
     type: "system",
     content: "",
-    metadata: { subtype: "completion", session_id: "sess-1", total_cost_usd: 0.01, duration_ms: 100 },
+    metadata: {
+      subtype: "completion",
+      session_id: "sess-1",
+      total_cost_usd: 0.01,
+      duration_ms: 100,
+    },
   };
   const ctx = createCtx({ isThread: false });
   const result = renderSystem(msg, ctx);
@@ -272,7 +279,12 @@ Deno.test("renderSystem: completion inside thread omits action buttons", () => {
   const msg: ClaudeMessage = {
     type: "system",
     content: "",
-    metadata: { subtype: "completion", session_id: "sess-1", total_cost_usd: 0.01, duration_ms: 100 },
+    metadata: {
+      subtype: "completion",
+      session_id: "sess-1",
+      total_cost_usd: 0.01,
+      duration_ms: 100,
+    },
   };
   const ctx = createCtx({ isThread: true });
   const result = renderSystem(msg, ctx);

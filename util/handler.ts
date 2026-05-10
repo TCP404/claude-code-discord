@@ -1,5 +1,5 @@
 /** @module util/handler — Bot settings handlers (pwd, update-settings). */
-import type { SettingsResult, PwdResult } from "./types.ts";
+import type { PwdResult, SettingsResult } from "./types.ts";
 import type { BotSettings, BotSettingsUpdater } from "../types/shared.ts";
 
 export interface UtilsHandlerDeps {
@@ -14,73 +14,75 @@ export interface UtilsHandlerDeps {
 }
 
 export function createUtilsHandlers(deps: UtilsHandlerDeps) {
-  const { workDir, repoName, branchName, actualCategoryName, botSettings, updateBotSettings } = deps;
-  
+  const { workDir, repoName, branchName, actualCategoryName, botSettings, updateBotSettings } =
+    deps;
+
   return {
     // deno-lint-ignore no-explicit-any
     onSettings(_ctx: any, action: string, value?: string): SettingsResult {
       switch (action) {
-        case 'mention-on': {
+        case "mention-on": {
           if (!value) {
             return {
               success: false,
-              message: '❌ Please specify user ID. Example: `/settings mention-on 123456789012345678`'
+              message:
+                "❌ Please specify user ID. Example: `/settings mention-on 123456789012345678`",
             };
           }
-          
+
           if (!/^\d{17,19}$/.test(value)) {
             return {
               success: false,
-              message: '❌ Invalid user ID. Discord user IDs are 17-19 digit numbers.'
+              message: "❌ Invalid user ID. Discord user IDs are 17-19 digit numbers.",
             };
           }
-          
+
           botSettings.mentionEnabled = true;
           botSettings.mentionUserId = value;
           updateBotSettings(botSettings);
-          
+
           return {
             success: true,
             mentionEnabled: true,
-            mentionUserId: value
+            mentionUserId: value,
           };
         }
-        
-        case 'mention-off': {
+
+        case "mention-off": {
           botSettings.mentionEnabled = false;
           updateBotSettings(botSettings);
-          
+
           return {
             success: true,
             mentionEnabled: false,
-            mentionUserId: botSettings.mentionUserId
+            mentionUserId: botSettings.mentionUserId,
           };
         }
-        
-        case 'show': {
+
+        case "show": {
           return {
             success: true,
             mentionEnabled: botSettings.mentionEnabled,
-            mentionUserId: botSettings.mentionUserId
+            mentionUserId: botSettings.mentionUserId,
           };
         }
-        
+
         default: {
           return {
             success: false,
-            message: '❌ Invalid action.'
+            message: "❌ Invalid action.",
           };
         }
       }
     },
-    
+
     getPwd(): PwdResult {
       return {
         workDir,
         categoryName: actualCategoryName,
         repoName,
-        branchName
+        branchName,
       };
-    }
+    },
   };
 }

@@ -1,6 +1,6 @@
 /** @module claude/command — /ask slash command: simple single-turn Claude query. */
-import type { ClaudeResponse, ClaudeMessage } from "./types.ts";
-import { sendToClaudeCode, type ClaudeModelOptions } from "./client.ts";
+import type { ClaudeMessage, ClaudeResponse } from "./types.ts";
+import { type ClaudeModelOptions, sendToClaudeCode } from "./client.ts";
 import { convertToClaudeMessages } from "./message-converter.ts";
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
@@ -15,8 +15,16 @@ export interface SessionThreadCallbacks {
    * @param sessionId Optional pre-existing session ID (reuses thread if one exists)
    * @returns Object with the thread-bound sender and a placeholder session key
    */
-  createThreadSender(prompt: string, sessionId?: string, threadName?: string, channelId?: string): Promise<{
-    sender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void };
+  createThreadSender(
+    prompt: string,
+    sessionId?: string,
+    threadName?: string,
+    channelId?: string,
+  ): Promise<{
+    sender: {
+      send: (messages: ClaudeMessage[]) => Promise<void>;
+      setSessionId: (id: string) => void;
+    };
     threadSessionKey: string;
     threadChannelId: string;
   }>;
@@ -24,10 +32,15 @@ export interface SessionThreadCallbacks {
    * Look up an existing thread for a session (does NOT create one).
    * Returns undefined if the session has no thread.
    */
-  getThreadSender(sessionId: string): Promise<{
-    sender: { send: (messages: ClaudeMessage[]) => Promise<void>; setSessionId: (id: string) => void };
-    threadSessionKey: string;
-  } | undefined>;
+  getThreadSender(sessionId: string): Promise<
+    {
+      sender: {
+        send: (messages: ClaudeMessage[]) => Promise<void>;
+        setSessionId: (id: string) => void;
+      };
+      threadSessionKey: string;
+    } | undefined
+  >;
   /**
    * Update the session key mapping when the real SDK session ID arrives.
    */
@@ -37,40 +50,45 @@ export interface SessionThreadCallbacks {
 // Discord command definitions
 export const claudeCommands = [
   new SlashCommandBuilder()
-    .setName('claude')
-    .setDescription('Send message to Claude Code (auto-continues in current channel)')
-    .addStringOption(option =>
-      option.setName('prompt')
-        .setDescription('Prompt for Claude Code')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('session_id')
-        .setDescription('Session ID to resume (optional)')
-        .setRequired(false)),
+    .setName("claude")
+    .setDescription("Send message to Claude Code (auto-continues in current channel)")
+    .addStringOption((option) =>
+      option.setName("prompt")
+        .setDescription("Prompt for Claude Code")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option.setName("session_id")
+        .setDescription("Session ID to resume (optional)")
+        .setRequired(false)
+    ),
 
   new SlashCommandBuilder()
-    .setName('claude-thread')
-    .setDescription('Start a new Claude session in a dedicated thread')
-    .addStringOption(option =>
-      option.setName('name')
-        .setDescription('Thread name')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('prompt')
-        .setDescription('Prompt for Claude Code')
-        .setRequired(true)),
+    .setName("claude-thread")
+    .setDescription("Start a new Claude session in a dedicated thread")
+    .addStringOption((option) =>
+      option.setName("name")
+        .setDescription("Thread name")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option.setName("prompt")
+        .setDescription("Prompt for Claude Code")
+        .setRequired(true)
+    ),
 
   new SlashCommandBuilder()
-    .setName('resume')
-    .setDescription('Resume the most recent Claude Code session (across all channels)')
-    .addStringOption(option =>
-      option.setName('prompt')
-        .setDescription('Prompt for Claude Code (optional)')
-        .setRequired(false)),
+    .setName("resume")
+    .setDescription("Resume the most recent Claude Code session (across all channels)")
+    .addStringOption((option) =>
+      option.setName("prompt")
+        .setDescription("Prompt for Claude Code (optional)")
+        .setRequired(false)
+    ),
 
   new SlashCommandBuilder()
-    .setName('claude-cancel')
-    .setDescription('Cancel currently running Claude Code command'),
+    .setName("claude-cancel")
+    .setDescription("Cancel currently running Claude Code command"),
 ];
 
 export interface ClaudeHandlerDeps {
@@ -104,7 +122,12 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
      * current channel/thread. Starts a new session only if there isn't one yet.
      */
     // deno-lint-ignore no-explicit-any
-    async onClaude(ctx: any, prompt: string, channelId: string, explicitSessionId?: string): Promise<ClaudeResponse> {
+    async onClaude(
+      ctx: any,
+      prompt: string,
+      channelId: string,
+      explicitSessionId?: string,
+    ): Promise<ClaudeResponse> {
       const existingController = deps.getClaudeController(channelId);
       if (existingController) {
         existingController.abort();
@@ -139,11 +162,11 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
       await ctx.editReply({
         embeds: [{
           color: 0xffff00,
-          title: isResuming ? 'Claude Code Continuing...' : 'Claude Code Running...',
-          description: isResuming ? 'Continuing session...' : 'Starting new session...',
-          fields: [{ name: 'Prompt', value: `\`${prompt.substring(0, 1020)}\``, inline: false }],
-          timestamp: true
-        }]
+          title: isResuming ? "Claude Code Continuing..." : "Claude Code Running...",
+          description: isResuming ? "Continuing session..." : "Starting new session...",
+          fields: [{ name: "Prompt", value: `\`${prompt.substring(0, 1020)}\``, inline: false }],
+          timestamp: true,
+        }],
       });
 
       const effectiveWorkDir = resolveWorkDir?.(channelId) ?? workDir;
@@ -166,7 +189,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
           try {
             ctx.channel?.sendTyping();
           } catch { /* ignore */ }
-        }
+        },
       );
 
       // Track session per-channel and globally
@@ -186,7 +209,12 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
      * /claude-thread — Start a brand-new session in a dedicated Discord thread.
      */
     // deno-lint-ignore no-explicit-any
-    async onClaudeThread(ctx: any, prompt: string, channelId: string, threadName?: string): Promise<ClaudeResponse> {
+    async onClaudeThread(
+      ctx: any,
+      prompt: string,
+      channelId: string,
+      threadName?: string,
+    ): Promise<ClaudeResponse> {
       const existingController = deps.getClaudeController(channelId);
       if (existingController) {
         existingController.abort();
@@ -205,26 +233,34 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
 
       if (deps.sessionThreads) {
         try {
-          const threadResult = await deps.sessionThreads.createThreadSender(prompt, undefined, threadName, channelId);
+          const threadResult = await deps.sessionThreads.createThreadSender(
+            prompt,
+            undefined,
+            threadName,
+            channelId,
+          );
           activeSender = threadResult.sender.send;
           senderSetSessionId = threadResult.sender.setSessionId;
           threadSessionKey = threadResult.threadSessionKey;
           threadChannelId = threadResult.threadChannelId;
         } catch (err) {
-          console.warn('[SessionThread] Could not create thread, falling back to main channel:', err);
+          console.warn(
+            "[SessionThread] Could not create thread, falling back to main channel:",
+            err,
+          );
         }
       }
 
       await ctx.editReply({
         embeds: [{
           color: 0xffff00,
-          title: 'Claude Code Running...',
+          title: "Claude Code Running...",
           description: threadSessionKey
-            ? 'Session started in a dedicated thread — check below ↓'
-            : 'Starting new session...',
-          fields: [{ name: 'Prompt', value: `\`${prompt.substring(0, 1020)}\``, inline: false }],
-          timestamp: true
-        }]
+            ? "Session started in a dedicated thread — check below ↓"
+            : "Starting new session...",
+          fields: [{ name: "Prompt", value: `\`${prompt.substring(0, 1020)}\``, inline: false }],
+          timestamp: true,
+        }],
       });
 
       const effectiveWorkDir = resolveWorkDir?.(channelId) ?? workDir;
@@ -249,7 +285,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
             try {
               ctx.channel?.sendTyping();
             } catch { /* ignore */ }
-          }
+          },
         );
       } catch (err) {
         // Clean up the pending placeholder so thread messages don't try to resume it
@@ -310,22 +346,32 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
               isReusingThread = true;
             }
           } catch (err) {
-            console.warn('[SessionThread] Could not reuse thread for continue, falling back:', err);
+            console.warn("[SessionThread] Could not reuse thread for continue, falling back:", err);
           }
         }
       }
 
-      const embedData: { color: number; title: string; description: string; timestamp: boolean; fields?: Array<{ name: string; value: string; inline: boolean }> } = {
+      const embedData: {
+        color: number;
+        title: string;
+        description: string;
+        timestamp: boolean;
+        fields?: Array<{ name: string; value: string; inline: boolean }>;
+      } = {
         color: 0xffff00,
-        title: 'Claude Code Continuing Conversation...',
+        title: "Claude Code Continuing Conversation...",
         description: isReusingThread
-          ? 'Continuing in session thread...'
-          : 'Loading latest conversation and waiting for response...',
-        timestamp: true
+          ? "Continuing in session thread..."
+          : "Loading latest conversation and waiting for response...",
+        timestamp: true,
       };
 
       if (prompt) {
-        embedData.fields = [{ name: 'Prompt', value: `\`${prompt.substring(0, 1020)}\``, inline: false }];
+        embedData.fields = [{
+          name: "Prompt",
+          value: `\`${prompt.substring(0, 1020)}\``,
+          inline: false,
+        }];
       }
 
       await ctx.editReply({ embeds: [embedData] });
@@ -350,7 +396,7 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
           try {
             ctx.channel?.sendTyping();
           } catch { /* ignore */ }
-        }
+        },
       );
 
       deps.setClaudeSessionId(result.sessionId, channelId);
@@ -375,6 +421,6 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
       deps.setClaudeSessionId(undefined, channelId);
 
       return true;
-    }
+    },
   };
 }

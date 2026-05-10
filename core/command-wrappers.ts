@@ -6,7 +6,7 @@
  */
 
 import type { CommandHandlers, InteractionContext } from "../discord/index.ts";
-import { formatError, createFormattedEmbed } from "../discord/index.ts";
+import { createFormattedEmbed, formatError } from "../discord/index.ts";
 import type { AllHandlers, MessageHistoryOps } from "./handler-registry.ts";
 import type { ProcessCrashHandler, ProcessHealthMonitor } from "../process/index.ts";
 import { expandableContent, hiddenMessageTypes } from "../claude/discord-sender.ts";
@@ -49,7 +49,7 @@ function createDeferredHandler<T>(
   formatSuccess: (result: T) => { title: string; data: string; color: number },
   errorTitle: string,
   crashHandler: ProcessCrashHandler,
-  crashContext?: string
+  crashContext?: string,
 ): { execute: (ctx: InteractionContext) => Promise<void> } {
   return {
     execute: async (ctx: InteractionContext) => {
@@ -60,15 +60,26 @@ function createDeferredHandler<T>(
         const { embed } = createFormattedEmbed(formatted.title, formatted.data, formatted.color);
         await ctx.editReply({ embeds: [embed] });
       } catch (error) {
-        const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), crashContext || errorTitle);
-        const { embed } = createFormattedEmbed(`❌ ${errorTitle}`, errorFormatted.formatted, 0xff0000);
+        const errorFormatted = formatError(
+          error instanceof Error ? error : new Error(String(error)),
+          crashContext || errorTitle,
+        );
+        const { embed } = createFormattedEmbed(
+          `❌ ${errorTitle}`,
+          errorFormatted.formatted,
+          0xff0000,
+        );
         await ctx.editReply({ embeds: [embed] });
 
         if (crashHandler && crashContext) {
-          await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), crashContext);
+          await crashHandler.reportCrash(
+            "main",
+            error instanceof Error ? error : new Error(String(error)),
+            crashContext,
+          );
         }
       }
-    }
+    },
   };
 }
 
@@ -81,41 +92,71 @@ function createDeferredHandler<T>(
  */
 export function createSystemCommandHandlers(
   handlers: AllHandlers,
-  crashHandler: ProcessCrashHandler
+  crashHandler: ProcessCrashHandler,
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
   const { system: systemHandlers } = handlers;
 
   return new Map([
-    ['system-info', createDeferredHandler(
-      async () => await systemHandlers.onSystemInfo({} as InteractionContext),
-      (r) => ({ title: '🖥️ System Information', data: r.data, color: 0x00ff00 }),
-      'System Info Error', crashHandler, 'system-info'
-    )],
-    ['system-resources', createDeferredHandler(
-      async () => await systemHandlers.onSystemResources({} as InteractionContext),
-      (r) => ({ title: '📊 System Resources', data: r.data, color: 0x00ffff }),
-      'Resource Monitor Error', crashHandler, 'system-resources'
-    )],
-    ['network-info', createDeferredHandler(
-      async () => await systemHandlers.onNetworkInfo({} as InteractionContext),
-      (r) => ({ title: '🌐 Network Information', data: r.data, color: 0x9932cc }),
-      'Network Info Error', crashHandler, 'network-info'
-    )],
-    ['disk-usage', createDeferredHandler(
-      async () => await systemHandlers.onDiskUsage({} as InteractionContext),
-      (r) => ({ title: '💽 Disk Usage', data: r.data, color: 0xff6600 }),
-      'Disk Usage Error', crashHandler, 'disk-usage'
-    )],
-    ['uptime', createDeferredHandler(
-      async () => await systemHandlers.onUptime({} as InteractionContext),
-      (r) => ({ title: '⏰ System Uptime', data: r.data, color: 0x339933 }),
-      'Uptime Error', crashHandler, 'uptime'
-    )],
-    ['refresh-bedrock', createDeferredHandler(
-      async () => await systemHandlers.onRefreshBedrock({} as InteractionContext),
-      (r) => ({ title: '🔑 Bedrock Credentials', data: r.data, color: 0xff9900 }),
-      'Bedrock Refresh Error', crashHandler, 'refresh-bedrock'
-    )],
+    [
+      "system-info",
+      createDeferredHandler(
+        async () => await systemHandlers.onSystemInfo({} as InteractionContext),
+        (r) => ({ title: "🖥️ System Information", data: r.data, color: 0x00ff00 }),
+        "System Info Error",
+        crashHandler,
+        "system-info",
+      ),
+    ],
+    [
+      "system-resources",
+      createDeferredHandler(
+        async () => await systemHandlers.onSystemResources({} as InteractionContext),
+        (r) => ({ title: "📊 System Resources", data: r.data, color: 0x00ffff }),
+        "Resource Monitor Error",
+        crashHandler,
+        "system-resources",
+      ),
+    ],
+    [
+      "network-info",
+      createDeferredHandler(
+        async () => await systemHandlers.onNetworkInfo({} as InteractionContext),
+        (r) => ({ title: "🌐 Network Information", data: r.data, color: 0x9932cc }),
+        "Network Info Error",
+        crashHandler,
+        "network-info",
+      ),
+    ],
+    [
+      "disk-usage",
+      createDeferredHandler(
+        async () => await systemHandlers.onDiskUsage({} as InteractionContext),
+        (r) => ({ title: "💽 Disk Usage", data: r.data, color: 0xff6600 }),
+        "Disk Usage Error",
+        crashHandler,
+        "disk-usage",
+      ),
+    ],
+    [
+      "uptime",
+      createDeferredHandler(
+        async () => await systemHandlers.onUptime({} as InteractionContext),
+        (r) => ({ title: "⏰ System Uptime", data: r.data, color: 0x339933 }),
+        "Uptime Error",
+        crashHandler,
+        "uptime",
+      ),
+    ],
+    [
+      "refresh-bedrock",
+      createDeferredHandler(
+        async () => await systemHandlers.onRefreshBedrock({} as InteractionContext),
+        (r) => ({ title: "🔑 Bedrock Credentials", data: r.data, color: 0xff9900 }),
+        "Bedrock Refresh Error",
+        crashHandler,
+        "refresh-bedrock",
+      ),
+    ],
   ]);
 }
 
@@ -124,88 +165,123 @@ export function createSystemCommandHandlers(
  */
 export function createParameterizedSystemHandlers(
   handlers: AllHandlers,
-  _crashHandler: ProcessCrashHandler
+  _crashHandler: ProcessCrashHandler,
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
   const { system: systemHandlers } = handlers;
 
   return new Map([
-    ['processes', {
+    ["processes", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const filter = ctx.getString('filter');
-        const limit = ctx.getInteger('limit') || 20;
+        const filter = ctx.getString("filter");
+        const limit = ctx.getInteger("limit") || 20;
         try {
           const result = await systemHandlers.onProcesses(ctx, filter || undefined, limit);
-          const { embed } = createFormattedEmbed('⚙️ Running Processes', result.data, 0x0099ff);
+          const { embed } = createFormattedEmbed("⚙️ Running Processes", result.data, 0x0099ff);
           await ctx.editReply({ embeds: [embed] });
         } catch (error) {
-          const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), 'processes');
-          const { embed } = createFormattedEmbed('❌ Process List Error', errorFormatted.formatted, 0xff0000);
+          const errorFormatted = formatError(
+            error instanceof Error ? error : new Error(String(error)),
+            "processes",
+          );
+          const { embed } = createFormattedEmbed(
+            "❌ Process List Error",
+            errorFormatted.formatted,
+            0xff0000,
+          );
           await ctx.editReply({ embeds: [embed] });
         }
-      }
+      },
     }],
-    ['env-vars', {
+    ["env-vars", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const filter = ctx.getString('filter');
+        const filter = ctx.getString("filter");
         try {
           const result = await systemHandlers.onEnvVars(ctx, filter || undefined);
-          const { embed } = createFormattedEmbed('🔧 Environment Variables', result.data, 0x663399);
+          const { embed } = createFormattedEmbed("🔧 Environment Variables", result.data, 0x663399);
           await ctx.editReply({ embeds: [embed] });
         } catch (error) {
-          const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), 'env-vars');
-          const { embed } = createFormattedEmbed('❌ Environment Variables Error', errorFormatted.formatted, 0xff0000);
+          const errorFormatted = formatError(
+            error instanceof Error ? error : new Error(String(error)),
+            "env-vars",
+          );
+          const { embed } = createFormattedEmbed(
+            "❌ Environment Variables Error",
+            errorFormatted.formatted,
+            0xff0000,
+          );
           await ctx.editReply({ embeds: [embed] });
         }
-      }
+      },
     }],
-    ['system-logs', {
+    ["system-logs", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const lines = ctx.getInteger('lines') || 50;
-        const service = ctx.getString('service');
+        const lines = ctx.getInteger("lines") || 50;
+        const service = ctx.getString("service");
         try {
           const result = await systemHandlers.onSystemLogs(ctx, lines, service || undefined);
-          const { embed } = createFormattedEmbed('📋 System Logs', result.data, 0x990000);
+          const { embed } = createFormattedEmbed("📋 System Logs", result.data, 0x990000);
           await ctx.editReply({ embeds: [embed] });
         } catch (error) {
-          const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), 'system-logs');
-          const { embed } = createFormattedEmbed('❌ System Logs Error', errorFormatted.formatted, 0xff0000);
+          const errorFormatted = formatError(
+            error instanceof Error ? error : new Error(String(error)),
+            "system-logs",
+          );
+          const { embed } = createFormattedEmbed(
+            "❌ System Logs Error",
+            errorFormatted.formatted,
+            0xff0000,
+          );
           await ctx.editReply({ embeds: [embed] });
         }
-      }
+      },
     }],
-    ['port-scan', {
+    ["port-scan", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const host = ctx.getString('host') || 'localhost';
-        const ports = ctx.getString('ports');
+        const host = ctx.getString("host") || "localhost";
+        const ports = ctx.getString("ports");
         try {
           const result = await systemHandlers.onPortScan(ctx, host, ports || undefined);
-          const { embed } = createFormattedEmbed('🔍 Port Scan Results', result.data, 0x006600);
+          const { embed } = createFormattedEmbed("🔍 Port Scan Results", result.data, 0x006600);
           await ctx.editReply({ embeds: [embed] });
         } catch (error) {
-          const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), 'port-scan');
-          const { embed } = createFormattedEmbed('❌ Port Scan Error', errorFormatted.formatted, 0xff0000);
+          const errorFormatted = formatError(
+            error instanceof Error ? error : new Error(String(error)),
+            "port-scan",
+          );
+          const { embed } = createFormattedEmbed(
+            "❌ Port Scan Error",
+            errorFormatted.formatted,
+            0xff0000,
+          );
           await ctx.editReply({ embeds: [embed] });
         }
-      }
+      },
     }],
-    ['service-status', {
+    ["service-status", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const service = ctx.getString('service');
+        const service = ctx.getString("service");
         try {
           const result = await systemHandlers.onServiceStatus(ctx, service || undefined);
-          const { embed } = createFormattedEmbed('🔧 Service Status', result.data, 0x0066cc);
+          const { embed } = createFormattedEmbed("🔧 Service Status", result.data, 0x0066cc);
           await ctx.editReply({ embeds: [embed] });
         } catch (error) {
-          const errorFormatted = formatError(error instanceof Error ? error : new Error(String(error)), 'service-status');
-          const { embed } = createFormattedEmbed('❌ Service Status Error', errorFormatted.formatted, 0xff0000);
+          const errorFormatted = formatError(
+            error instanceof Error ? error : new Error(String(error)),
+            "service-status",
+          );
+          const { embed } = createFormattedEmbed(
+            "❌ Service Status Error",
+            errorFormatted.formatted,
+            0xff0000,
+          );
           await ctx.editReply({ embeds: [embed] });
         }
-      }
+      },
     }],
   ]);
 }
@@ -220,22 +296,32 @@ export function createParameterizedSystemHandlers(
 export function createClaudeCommandHandlers(
   handlers: AllHandlers,
   messageHistory: MessageHistoryOps,
-  _getClaudeController: () => AbortController | null
-): Map<string, { execute: (ctx: InteractionContext) => Promise<void>; handleButton?: (ctx: InteractionContext, customId: string) => Promise<void> }> {
-  const { claude: claudeHandlers, enhancedClaude: enhancedClaudeHandlers, additionalClaude: additionalClaudeHandlers } = handlers;
+  _getClaudeController: () => AbortController | null,
+): Map<
+  string,
+  {
+    execute: (ctx: InteractionContext) => Promise<void>;
+    handleButton?: (ctx: InteractionContext, customId: string) => Promise<void>;
+  }
+> {
+  const {
+    claude: claudeHandlers,
+    enhancedClaude: enhancedClaudeHandlers,
+    additionalClaude: additionalClaudeHandlers,
+  } = handlers;
   const { addToHistory } = messageHistory;
 
   return new Map([
-    ['claude', {
+    ["claude", {
       execute: async (ctx: InteractionContext) => {
-        const prompt = ctx.getString('prompt', true)!;
-        const sessionId = ctx.getString('session_id');
+        const prompt = ctx.getString("prompt", true)!;
+        const sessionId = ctx.getString("session_id");
         const channelId = ctx.getChannelId();
         addToHistory(prompt);
         await claudeHandlers.onClaude(ctx, prompt, channelId, sessionId || undefined);
       },
       handleButton: async (ctx: InteractionContext, customId: string) => {
-        if (customId.startsWith('expand:')) {
+        if (customId.startsWith("expand:")) {
           const expandId = customId.substring(7);
           const fullContent = expandableContent.get(expandId);
 
@@ -243,11 +329,11 @@ export function createClaudeCommandHandlers(
             await ctx.update({
               embeds: [{
                 color: 0xffaa00,
-                title: '📖 Content Not Available',
-                description: 'The full content is no longer available for expansion.',
-                timestamp: true
+                title: "📖 Content Not Available",
+                description: "The full content is no longer available for expansion.",
+                timestamp: true,
               }],
-              components: []
+              components: [],
             });
             return;
           }
@@ -257,179 +343,230 @@ export function createClaudeCommandHandlers(
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${fullContent}\n\`\`\`` :
-                  `\`\`\`json\n${fullContent}\n\`\`\``,
-                timestamp: true
+                title: "📖 Full Content",
+                description: expandId.startsWith("result-")
+                  ? `\`\`\`\n${fullContent}\n\`\`\``
+                  : `\`\`\`json\n${fullContent}\n\`\`\``,
+                timestamp: true,
               }],
               components: [{
-                type: 'actionRow',
+                type: "actionRow",
                 components: [{
-                  type: 'button',
-                  customId: 'collapse-content',
-                  label: '🔼 Collapse',
-                  style: 'secondary'
-                }]
-              }]
+                  type: "button",
+                  customId: "collapse-content",
+                  label: "🔼 Collapse",
+                  style: "secondary",
+                }],
+              }],
             });
           } else {
             const chunk = fullContent.substring(0, maxLength - 100);
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content (Large - Showing First Part)',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${chunk}...\n\`\`\`` :
-                  `\`\`\`json\n${chunk}...\n\`\`\``,
+                title: "📖 Full Content (Large - Showing First Part)",
+                description: expandId.startsWith("result-")
+                  ? `\`\`\`\n${chunk}...\n\`\`\``
+                  : `\`\`\`json\n${chunk}...\n\`\`\``,
                 fields: [
-                  { name: 'Note', value: 'Content is very large. This shows the first portion.', inline: false }
+                  {
+                    name: "Note",
+                    value: "Content is very large. This shows the first portion.",
+                    inline: false,
+                  },
                 ],
-                timestamp: true
+                timestamp: true,
               }],
               components: [{
-                type: 'actionRow',
+                type: "actionRow",
                 components: [{
-                  type: 'button',
-                  customId: 'collapse-content',
-                  label: '🔼 Collapse',
-                  style: 'secondary'
-                }]
-              }]
+                  type: "button",
+                  customId: "collapse-content",
+                  label: "🔼 Collapse",
+                  style: "secondary",
+                }],
+              }],
             });
           }
         }
-      }
+      },
     }],
-    ['claude-thread', {
+    ["claude-thread", {
       execute: async (ctx: InteractionContext) => {
-        const prompt = ctx.getString('prompt', true)!;
-        const threadName = ctx.getString('name') || undefined;
+        const prompt = ctx.getString("prompt", true)!;
+        const threadName = ctx.getString("name") || undefined;
         const channelId = ctx.getChannelId();
         addToHistory(prompt);
         await claudeHandlers.onClaudeThread(ctx, prompt, channelId, threadName);
-      }
+      },
     }],
-    ['resume', {
+    ["resume", {
       execute: async (ctx: InteractionContext) => {
-        const prompt = ctx.getString('prompt');
+        const prompt = ctx.getString("prompt");
         if (prompt) addToHistory(prompt);
         await claudeHandlers.onContinue(ctx, prompt || undefined, ctx.getChannelId());
-      }
+      },
     }],
-    ['claude-cancel', {
+    ["claude-cancel", {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
         const cancelled = claudeHandlers.onClaudeCancel(ctx);
         await ctx.editReply({
           embeds: [{
             color: cancelled ? 0xff0000 : 0x808080,
-            title: cancelled ? 'Cancel Successful' : 'Cancel Failed',
-            description: cancelled ? 'Claude Code session cancelled.' : 'No running Claude Code session.',
-            timestamp: true
-          }]
+            title: cancelled ? "Cancel Successful" : "Cancel Failed",
+            description: cancelled
+              ? "Claude Code session cancelled."
+              : "No running Claude Code session.",
+            timestamp: true,
+          }],
         });
-      }
+      },
     }],
-    ['claude-enhanced', {
+    ["claude-enhanced", {
       execute: async (ctx: InteractionContext) => {
-        const prompt = ctx.getString('prompt', true)!;
-        const model = ctx.getString('model');
-        const template = ctx.getString('template');
-        const includeSystemInfo = ctx.getBoolean('include_system_info');
-        const includeGitContext = ctx.getBoolean('include_git_context');
-        const contextFiles = ctx.getString('context_files');
-        const sessionId = ctx.getString('session_id');
+        const prompt = ctx.getString("prompt", true)!;
+        const model = ctx.getString("model");
+        const template = ctx.getString("template");
+        const includeSystemInfo = ctx.getBoolean("include_system_info");
+        const includeGitContext = ctx.getBoolean("include_git_context");
+        const contextFiles = ctx.getString("context_files");
+        const sessionId = ctx.getString("session_id");
 
         await enhancedClaudeHandlers.onClaudeEnhanced(
-          ctx, prompt, model || undefined, template || undefined,
-          includeSystemInfo || undefined, includeGitContext || undefined,
-          contextFiles || undefined, sessionId || undefined
+          ctx,
+          prompt,
+          model || undefined,
+          template || undefined,
+          includeSystemInfo || undefined,
+          includeGitContext || undefined,
+          contextFiles || undefined,
+          sessionId || undefined,
         );
-      }
+      },
     }],
-    ['claude-models', {
+    ["claude-models", {
       execute: async (ctx: InteractionContext) => {
         await enhancedClaudeHandlers.onClaudeModels(ctx);
-      }
+      },
     }],
-    ['claude-sessions', {
+    ["claude-sessions", {
       execute: async (ctx: InteractionContext) => {
-        const action = ctx.getString('action', true)!;
-        const sessionId = ctx.getString('session_id');
+        const action = ctx.getString("action", true)!;
+        const sessionId = ctx.getString("session_id");
         await enhancedClaudeHandlers.onClaudeSessions(ctx, action, sessionId || undefined);
-      }
+      },
     }],
-    ['claude-context', {
+    ["claude-context", {
       execute: async (ctx: InteractionContext) => {
-        const includeSystemInfo = ctx.getBoolean('include_system_info');
-        const includeGitContext = ctx.getBoolean('include_git_context');
-        const contextFiles = ctx.getString('context_files');
+        const includeSystemInfo = ctx.getBoolean("include_system_info");
+        const includeGitContext = ctx.getBoolean("include_git_context");
+        const contextFiles = ctx.getString("context_files");
         await enhancedClaudeHandlers.onClaudeContext(
-          ctx, includeSystemInfo || undefined, includeGitContext || undefined,
-          contextFiles || undefined
+          ctx,
+          includeSystemInfo || undefined,
+          includeGitContext || undefined,
+          contextFiles || undefined,
         );
-      }
+      },
     }],
     // Additional Claude commands
-    ['claude-explain', {
+    ["claude-explain", {
       execute: async (ctx: InteractionContext) => {
-        const content = ctx.getString('content', true)!;
-        const detailLevel = ctx.getString('detail_level');
-        const includeExamples = ctx.getBoolean('include_examples');
-        await additionalClaudeHandlers.onClaudeExplain(ctx, content, detailLevel || undefined, includeExamples || undefined);
-      }
+        const content = ctx.getString("content", true)!;
+        const detailLevel = ctx.getString("detail_level");
+        const includeExamples = ctx.getBoolean("include_examples");
+        await additionalClaudeHandlers.onClaudeExplain(
+          ctx,
+          content,
+          detailLevel || undefined,
+          includeExamples || undefined,
+        );
+      },
     }],
-    ['claude-debug', {
+    ["claude-debug", {
       execute: async (ctx: InteractionContext) => {
-        const errorOrCode = ctx.getString('error_or_code', true)!;
-        const language = ctx.getString('language');
-        const contextFiles = ctx.getString('context_files');
-        await additionalClaudeHandlers.onClaudeDebug(ctx, errorOrCode, language || undefined, contextFiles || undefined);
-      }
+        const errorOrCode = ctx.getString("error_or_code", true)!;
+        const language = ctx.getString("language");
+        const contextFiles = ctx.getString("context_files");
+        await additionalClaudeHandlers.onClaudeDebug(
+          ctx,
+          errorOrCode,
+          language || undefined,
+          contextFiles || undefined,
+        );
+      },
     }],
-    ['claude-optimize', {
+    ["claude-optimize", {
       execute: async (ctx: InteractionContext) => {
-        const code = ctx.getString('code', true)!;
-        const focus = ctx.getString('focus');
-        const preserveFunctionality = ctx.getBoolean('preserve_functionality');
-        await additionalClaudeHandlers.onClaudeOptimize(ctx, code, focus || undefined, preserveFunctionality || undefined);
-      }
+        const code = ctx.getString("code", true)!;
+        const focus = ctx.getString("focus");
+        const preserveFunctionality = ctx.getBoolean("preserve_functionality");
+        await additionalClaudeHandlers.onClaudeOptimize(
+          ctx,
+          code,
+          focus || undefined,
+          preserveFunctionality || undefined,
+        );
+      },
     }],
-    ['claude-review', {
+    ["claude-review", {
       execute: async (ctx: InteractionContext) => {
-        const codeOrFile = ctx.getString('code_or_file', true)!;
-        const reviewType = ctx.getString('review_type');
-        const includeSecurity = ctx.getBoolean('include_security');
-        const includePerformance = ctx.getBoolean('include_performance');
-        await additionalClaudeHandlers.onClaudeReview(ctx, codeOrFile, reviewType || undefined, includeSecurity || undefined, includePerformance || undefined);
-      }
+        const codeOrFile = ctx.getString("code_or_file", true)!;
+        const reviewType = ctx.getString("review_type");
+        const includeSecurity = ctx.getBoolean("include_security");
+        const includePerformance = ctx.getBoolean("include_performance");
+        await additionalClaudeHandlers.onClaudeReview(
+          ctx,
+          codeOrFile,
+          reviewType || undefined,
+          includeSecurity || undefined,
+          includePerformance || undefined,
+        );
+      },
     }],
-    ['claude-generate', {
+    ["claude-generate", {
       execute: async (ctx: InteractionContext) => {
-        const request = ctx.getString('request', true)!;
-        const type = ctx.getString('type');
-        const style = ctx.getString('style');
-        await additionalClaudeHandlers.onClaudeGenerate(ctx, request, type || undefined, style || undefined);
-      }
+        const request = ctx.getString("request", true)!;
+        const type = ctx.getString("type");
+        const style = ctx.getString("style");
+        await additionalClaudeHandlers.onClaudeGenerate(
+          ctx,
+          request,
+          type || undefined,
+          style || undefined,
+        );
+      },
     }],
-    ['claude-refactor', {
+    ["claude-refactor", {
       execute: async (ctx: InteractionContext) => {
-        const code = ctx.getString('code', true)!;
-        const goal = ctx.getString('goal');
-        const preserveBehavior = ctx.getBoolean('preserve_behavior');
-        const addTests = ctx.getBoolean('add_tests');
-        await additionalClaudeHandlers.onClaudeRefactor(ctx, code, goal || undefined, preserveBehavior || undefined, addTests || undefined);
-      }
+        const code = ctx.getString("code", true)!;
+        const goal = ctx.getString("goal");
+        const preserveBehavior = ctx.getBoolean("preserve_behavior");
+        const addTests = ctx.getBoolean("add_tests");
+        await additionalClaudeHandlers.onClaudeRefactor(
+          ctx,
+          code,
+          goal || undefined,
+          preserveBehavior || undefined,
+          addTests || undefined,
+        );
+      },
     }],
-    ['claude-learn', {
+    ["claude-learn", {
       execute: async (ctx: InteractionContext) => {
-        const topic = ctx.getString('topic', true)!;
-        const level = ctx.getString('level');
-        const includeExercises = ctx.getBoolean('include_exercises');
-        const stepByStep = ctx.getBoolean('step_by_step');
-        await additionalClaudeHandlers.onClaudeLearn(ctx, topic, level || undefined, includeExercises || undefined, stepByStep || undefined);
-      }
+        const topic = ctx.getString("topic", true)!;
+        const level = ctx.getString("level");
+        const includeExercises = ctx.getBoolean("include_exercises");
+        const stepByStep = ctx.getBoolean("step_by_step");
+        await additionalClaudeHandlers.onClaudeLearn(
+          ctx,
+          topic,
+          level || undefined,
+          includeExercises || undefined,
+          stepByStep || undefined,
+        );
+      },
     }],
   ]);
 }
@@ -442,54 +579,83 @@ export function createClaudeCommandHandlers(
  * Create settings command handlers.
  */
 export function createSettingsCommandHandlers(
-  handlers: AllHandlers
+  handlers: AllHandlers,
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
-  const { advancedSettings: advancedSettingsHandlers, unifiedSettings: unifiedSettingsHandlers, agent: agentHandlers } = handlers;
+  const {
+    advancedSettings: advancedSettingsHandlers,
+    unifiedSettings: unifiedSettingsHandlers,
+    agent: agentHandlers,
+  } = handlers;
 
   return new Map([
-    ['settings', {
+    ["settings", {
       execute: async (ctx: InteractionContext) => {
-        const category = ctx.getString('category', true)!;
-        const action = ctx.getString('action');
-        const value = ctx.getString('value');
-        await unifiedSettingsHandlers.onUnifiedSettings(ctx, category, action || undefined, value || undefined);
-      }
+        const category = ctx.getString("category", true)!;
+        const action = ctx.getString("action");
+        const value = ctx.getString("value");
+        await unifiedSettingsHandlers.onUnifiedSettings(
+          ctx,
+          category,
+          action || undefined,
+          value || undefined,
+        );
+      },
     }],
-    ['todos', {
+    ["todos", {
       execute: async (ctx: InteractionContext) => {
-        const action = ctx.getString('action', true)!;
-        const content = ctx.getString('content');
-        const priority = ctx.getString('priority');
-        const rateTier = ctx.getString('rate_tier');
-        await unifiedSettingsHandlers.onTodos(ctx, action, content || undefined, priority || undefined, rateTier || undefined);
-      }
+        const action = ctx.getString("action", true)!;
+        const content = ctx.getString("content");
+        const priority = ctx.getString("priority");
+        const rateTier = ctx.getString("rate_tier");
+        await unifiedSettingsHandlers.onTodos(
+          ctx,
+          action,
+          content || undefined,
+          priority || undefined,
+          rateTier || undefined,
+        );
+      },
     }],
-    ['mcp', {
+    ["mcp", {
       execute: async (ctx: InteractionContext) => {
-        const action = ctx.getString('action', true)!;
-        const serverName = ctx.getString('server_name');
-        const command = ctx.getString('command');
-        const description = ctx.getString('description');
-        const value = ctx.getString('value');
-        await unifiedSettingsHandlers.onMCP(ctx, action, serverName || undefined, command || undefined, description || undefined, value || undefined);
-      }
+        const action = ctx.getString("action", true)!;
+        const serverName = ctx.getString("server_name");
+        const command = ctx.getString("command");
+        const description = ctx.getString("description");
+        const value = ctx.getString("value");
+        await unifiedSettingsHandlers.onMCP(
+          ctx,
+          action,
+          serverName || undefined,
+          command || undefined,
+          description || undefined,
+          value || undefined,
+        );
+      },
     }],
-    ['agent', {
+    ["agent", {
       execute: async (ctx: InteractionContext) => {
-        const action = ctx.getString('action', true)!;
-        const agentName = ctx.getString('agent_name');
-        const message = ctx.getString('message');
-        const contextFiles = ctx.getString('context_files');
-        const includeSystemInfo = ctx.getBoolean('include_system_info');
-        await agentHandlers.onAgent(ctx, action, agentName || undefined, message || undefined, contextFiles || undefined, includeSystemInfo || undefined);
-      }
+        const action = ctx.getString("action", true)!;
+        const agentName = ctx.getString("agent_name");
+        const message = ctx.getString("message");
+        const contextFiles = ctx.getString("context_files");
+        const includeSystemInfo = ctx.getBoolean("include_system_info");
+        await agentHandlers.onAgent(
+          ctx,
+          action,
+          agentName || undefined,
+          message || undefined,
+          contextFiles || undefined,
+          includeSystemInfo || undefined,
+        );
+      },
     }],
-    ['quick-model', {
+    ["quick-model", {
       execute: async (ctx: InteractionContext) => {
-        const model = ctx.getString('model', true)!;
+        const model = ctx.getString("model", true)!;
         await advancedSettingsHandlers.onQuickModel(ctx, model);
-      }
-    }]
+      },
+    }],
   ]);
 }
 
@@ -501,16 +667,16 @@ export function createSettingsCommandHandlers(
  * Create screenshot command handlers.
  */
 function createScreenshotCommandHandlers(
-  handlers: AllHandlers
+  handlers: AllHandlers,
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
   const { screenshot: screenshotHandlers } = handlers;
 
   return new Map([
-    ['screenshot', {
+    ["screenshot", {
       execute: async (ctx: InteractionContext) => {
         await screenshotHandlers.screenshot(ctx);
-      }
-    }]
+      },
+    }],
   ]);
 }
 
@@ -522,35 +688,35 @@ function createScreenshotCommandHandlers(
  * Create info/control command handlers (/claude-info, /rewind, /claude-control).
  */
 function createInfoCommandsMap(
-  handlers: AllHandlers
+  handlers: AllHandlers,
 ): Map<string, { execute: (ctx: InteractionContext) => Promise<void> }> {
   const { infoCommands: infoHandlers } = handlers;
 
   return new Map([
-    ['claude-info', {
+    ["claude-info", {
       execute: async (ctx: InteractionContext) => {
-        const section = ctx.getString('section');
+        const section = ctx.getString("section");
         await infoHandlers.onClaudeInfo(ctx, section || undefined);
-      }
+      },
     }],
-    ['rewind', {
+    ["rewind", {
       execute: async (ctx: InteractionContext) => {
-        const turn = ctx.getInteger('turn');
-        const dryRun = ctx.getBoolean('dry_run');
+        const turn = ctx.getInteger("turn");
+        const dryRun = ctx.getBoolean("dry_run");
         await infoHandlers.onRewind(ctx, turn ?? undefined, dryRun ?? undefined);
-      }
+      },
     }],
-    ['claude-control', {
+    ["claude-control", {
       execute: async (ctx: InteractionContext) => {
-        const action = ctx.getString('action', true)!;
-        const value = ctx.getString('value');
+        const action = ctx.getString("action", true)!;
+        const value = ctx.getString("value");
         await infoHandlers.onClaudeControl(ctx, action, value || undefined);
-      }
+      },
     }],
-    ['fast', {
+    ["fast", {
       execute: async (ctx: InteractionContext) => {
         await infoHandlers.onFast(ctx);
-      }
+      },
     }],
   ]);
 }
@@ -560,7 +726,12 @@ function createInfoCommandsMap(
 // ================================
 
 // Import git/shell handlers for complete factory
-import { createGitCommandHandlers, createShellCommandHandlers, createUtilityCommandHandlers, type GitShellHandlerDeps } from "./git-shell-handlers.ts";
+import {
+  createGitCommandHandlers,
+  createShellCommandHandlers,
+  createUtilityCommandHandlers,
+  type GitShellHandlerDeps,
+} from "./git-shell-handlers.ts";
 
 /**
  * Extended dependencies for complete command handler creation.
@@ -574,7 +745,15 @@ export interface CompleteCommandWrapperDeps extends CommandWrapperDeps {
  * This significantly reduces code in index.ts by consolidating handler creation.
  */
 export function createAllCommandHandlers(deps: CommandWrapperDeps): CommandHandlers {
-  const { handlers, messageHistory, getClaudeController, crashHandler, healthMonitor, botSettings, cleanupInterval } = deps;
+  const {
+    handlers,
+    messageHistory,
+    getClaudeController,
+    crashHandler,
+    healthMonitor,
+    botSettings,
+    cleanupInterval,
+  } = deps;
 
   // Get handlers from individual factories
   const systemHandlers = createSystemCommandHandlers(handlers, crashHandler);
@@ -601,44 +780,50 @@ export function createAllCommandHandlers(deps: CommandWrapperDeps): CommandHandl
   // Display toggle handlers
   const displayToggleHandlers: CommandHandlers = new Map();
 
-  displayToggleHandlers.set('show-system', {
+  displayToggleHandlers.set("show-system", {
     async execute(ctx: InteractionContext) {
-      const systemTypes = ['system', 'system:completion'];
-      const allHidden = systemTypes.every(t => hiddenMessageTypes.has(t));
+      const systemTypes = ["system", "system:completion"];
+      const allHidden = systemTypes.every((t) => hiddenMessageTypes.has(t));
       if (allHidden) {
-        systemTypes.forEach(t => hiddenMessageTypes.delete(t));
-        await ctx.reply({ content: 'System messages **enabled** (init, completion).', ephemeral: true });
+        systemTypes.forEach((t) => hiddenMessageTypes.delete(t));
+        await ctx.reply({
+          content: "System messages **enabled** (init, completion).",
+          ephemeral: true,
+        });
       } else {
-        systemTypes.forEach(t => hiddenMessageTypes.add(t));
-        await ctx.reply({ content: 'System messages **hidden**.', ephemeral: true });
+        systemTypes.forEach((t) => hiddenMessageTypes.add(t));
+        await ctx.reply({ content: "System messages **hidden**.", ephemeral: true });
       }
-    }
+    },
   });
 
-  displayToggleHandlers.set('show-tool-details', {
+  displayToggleHandlers.set("show-tool-details", {
     async execute(ctx: InteractionContext) {
-      const toolTypes = ['tool_use', 'tool_result', 'tool_progress', 'tool_summary'];
-      const allHidden = toolTypes.every(t => hiddenMessageTypes.has(t));
+      const toolTypes = ["tool_use", "tool_result", "tool_progress", "tool_summary"];
+      const allHidden = toolTypes.every((t) => hiddenMessageTypes.has(t));
       if (allHidden) {
-        toolTypes.forEach(t => hiddenMessageTypes.delete(t));
-        await ctx.reply({ content: 'Tool detail messages **enabled** (tool_use, tool_result, progress, summary).', ephemeral: true });
+        toolTypes.forEach((t) => hiddenMessageTypes.delete(t));
+        await ctx.reply({
+          content: "Tool detail messages **enabled** (tool_use, tool_result, progress, summary).",
+          ephemeral: true,
+        });
       } else {
-        toolTypes.forEach(t => hiddenMessageTypes.add(t));
-        await ctx.reply({ content: 'Tool detail messages **hidden**.', ephemeral: true });
+        toolTypes.forEach((t) => hiddenMessageTypes.add(t));
+        await ctx.reply({ content: "Tool detail messages **hidden**.", ephemeral: true });
       }
-    }
+    },
   });
 
-  displayToggleHandlers.set('show-thinking', {
+  displayToggleHandlers.set("show-thinking", {
     async execute(ctx: InteractionContext) {
-      if (hiddenMessageTypes.has('thinking')) {
-        hiddenMessageTypes.delete('thinking');
-        await ctx.reply({ content: 'Thinking messages **enabled**.', ephemeral: true });
+      if (hiddenMessageTypes.has("thinking")) {
+        hiddenMessageTypes.delete("thinking");
+        await ctx.reply({ content: "Thinking messages **enabled**.", ephemeral: true });
       } else {
-        hiddenMessageTypes.add('thinking');
-        await ctx.reply({ content: 'Thinking messages **hidden**.', ephemeral: true });
+        hiddenMessageTypes.add("thinking");
+        await ctx.reply({ content: "Thinking messages **hidden**.", ephemeral: true });
       }
-    }
+    },
   });
 
   // Combine all handlers into single map

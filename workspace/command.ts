@@ -1,48 +1,60 @@
 /** @module workspace/command — /workspace add|remove|list command definition and handlers. */
-import { SlashCommandBuilder, ChannelType } from "npm:discord.js@14.14.1";
+import { ChannelType, SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import type { WorkspaceManager } from "../core/workspace-manager.ts";
 import type { SessionThreadManager } from "../discord/session-threads.ts";
 import { sanitizeChannelName } from "../discord/utils.ts";
 
 export const workspaceCommands = [
   new SlashCommandBuilder()
-    .setName('workspace')
-    .setDescription('Manage workspace-channel mappings')
-    .addSubcommand(sub =>
-      sub.setName('add')
-        .setDescription('Add a workspace and create a channel for it')
-        .addStringOption(opt =>
-          opt.setName('name')
-            .setDescription('Workspace name (used as channel name)')
-            .setRequired(true))
-        .addStringOption(opt =>
-          opt.setName('path')
-            .setDescription('Absolute path to the project working directory')
-            .setRequired(true)))
-    .addSubcommand(sub =>
-      sub.setName('list')
-        .setDescription('List all registered workspaces'))
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Remove a workspace and its channel')
-        .addStringOption(opt =>
-          opt.setName('name')
-            .setDescription('Workspace name to remove')
-            .setRequired(true)))
-    .addSubcommand(sub =>
-      sub.setName('list-sessions')
-        .setDescription('List all session threads in the current channel'))
-    .addSubcommand(sub =>
-      sub.setName('auto-thread')
-        .setDescription('Toggle auto-thread: plain text in the workspace channel spawns a Claude thread')
-        .addStringOption(opt =>
-          opt.setName('name')
-            .setDescription('Workspace name')
-            .setRequired(true))
-        .addBooleanOption(opt =>
-          opt.setName('enabled')
-            .setDescription('Turn auto-thread on or off')
-            .setRequired(true))),
+    .setName("workspace")
+    .setDescription("Manage workspace-channel mappings")
+    .addSubcommand((sub) =>
+      sub.setName("add")
+        .setDescription("Add a workspace and create a channel for it")
+        .addStringOption((opt) =>
+          opt.setName("name")
+            .setDescription("Workspace name (used as channel name)")
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt.setName("path")
+            .setDescription("Absolute path to the project working directory")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub.setName("list")
+        .setDescription("List all registered workspaces")
+    )
+    .addSubcommand((sub) =>
+      sub.setName("remove")
+        .setDescription("Remove a workspace and its channel")
+        .addStringOption((opt) =>
+          opt.setName("name")
+            .setDescription("Workspace name to remove")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub.setName("list-sessions")
+        .setDescription("List all session threads in the current channel")
+    )
+    .addSubcommand((sub) =>
+      sub.setName("auto-thread")
+        .setDescription(
+          "Toggle auto-thread: plain text in the workspace channel spawns a Claude thread",
+        )
+        .addStringOption((opt) =>
+          opt.setName("name")
+            .setDescription("Workspace name")
+            .setRequired(true)
+        )
+        .addBooleanOption((opt) =>
+          opt.setName("enabled")
+            .setDescription("Turn auto-thread on or off")
+            .setRequired(true)
+        )
+    ),
 ];
 
 export interface WorkspaceHandlerDeps {
@@ -62,15 +74,15 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     async onWorkspace(ctx: any) {
       const subcommand = ctx.getSubcommand();
 
-      if (subcommand === 'add') {
+      if (subcommand === "add") {
         await handleAdd(ctx);
-      } else if (subcommand === 'list') {
+      } else if (subcommand === "list") {
         await handleList(ctx);
-      } else if (subcommand === 'remove') {
+      } else if (subcommand === "remove") {
         await handleRemove(ctx);
-      } else if (subcommand === 'list-sessions') {
+      } else if (subcommand === "list-sessions") {
         await handleListSessions(ctx);
-      } else if (subcommand === 'auto-thread') {
+      } else if (subcommand === "auto-thread") {
         await handleAutoThread(ctx);
       }
     },
@@ -78,8 +90,8 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
   // deno-lint-ignore no-explicit-any
   async function handleAutoThread(ctx: any) {
-    const name = ctx.getString('name', true);
-    const enabled = ctx.getBoolean('enabled', true);
+    const name = ctx.getString("name", true);
+    const enabled = ctx.getBoolean("enabled", true);
 
     const updated = workspaceManager.setAutoThread(name, enabled);
     if (!updated) {
@@ -95,13 +107,13 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     await ctx.reply({
       embeds: [{
         color: enabled ? 0x00ff00 : 0xff9900,
-        title: enabled ? 'Auto-Thread Enabled' : 'Auto-Thread Disabled',
+        title: enabled ? "Auto-Thread Enabled" : "Auto-Thread Disabled",
         description: enabled
           ? `Plain text in <#${updated.channelId}> will now open a Claude thread automatically.`
           : `Plain text in <#${updated.channelId}> will no longer create threads.`,
         fields: [
-          { name: 'Workspace', value: name, inline: true },
-          { name: 'Channel', value: `<#${updated.channelId}>`, inline: true },
+          { name: "Workspace", value: name, inline: true },
+          { name: "Channel", value: `<#${updated.channelId}>`, inline: true },
         ],
       }],
     });
@@ -109,8 +121,8 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
   // deno-lint-ignore no-explicit-any
   async function handleAdd(ctx: any) {
-    const name = ctx.getString('name', true);
-    const workPath = ctx.getString('path', true);
+    const name = ctx.getString("name", true);
+    const workPath = ctx.getString("path", true);
 
     await ctx.deferReply();
 
@@ -129,7 +141,9 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     // Check if name already exists
     const existing = workspaceManager.findByName(name);
     if (existing) {
-      await ctx.editReply({ content: `Workspace \`${name}\` already exists (channel: <#${existing.channelId}>).` });
+      await ctx.editReply({
+        content: `Workspace \`${name}\` already exists (channel: <#${existing.channelId}>).`,
+      });
       return;
     }
 
@@ -156,11 +170,11 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: 'Workspace Added',
+          title: "Workspace Added",
           fields: [
-            { name: 'Name', value: name, inline: true },
-            { name: 'Path', value: `\`${workPath}\``, inline: true },
-            { name: 'Channel', value: `<#${channel.id}>`, inline: true },
+            { name: "Name", value: name, inline: true },
+            { name: "Path", value: `\`${workPath}\``, inline: true },
+            { name: "Channel", value: `<#${channel.id}>`, inline: true },
           ],
         }],
       });
@@ -175,22 +189,24 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
     if (workspaces.length === 0) {
       await ctx.reply({
-        content: 'No workspaces registered. Use `/workspace add` to create one.',
+        content: "No workspaces registered. Use `/workspace add` to create one.",
         ephemeral: true,
       });
       return;
     }
 
-    const fields = workspaces.map(w => ({
+    const fields = workspaces.map((w) => ({
       name: w.name,
-      value: `Path: \`${w.path}\`\nChannel: <#${w.channelId}>\nAuto-Thread: ${w.autoThread ? 'on' : 'off'}`,
+      value: `Path: \`${w.path}\`\nChannel: <#${w.channelId}>\nAuto-Thread: ${
+        w.autoThread ? "on" : "off"
+      }`,
       inline: false,
     }));
 
     await ctx.reply({
       embeds: [{
         color: 0x5865f2,
-        title: 'Registered Workspaces',
+        title: "Registered Workspaces",
         fields,
       }],
     });
@@ -198,7 +214,7 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
   // deno-lint-ignore no-explicit-any
   async function handleRemove(ctx: any) {
-    const name = ctx.getString('name', true);
+    const name = ctx.getString("name", true);
 
     await ctx.deferReply();
 
@@ -222,10 +238,10 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     await ctx.editReply({
       embeds: [{
         color: 0xff9900,
-        title: 'Workspace Removed',
+        title: "Workspace Removed",
         fields: [
-          { name: 'Name', value: removed.name, inline: true },
-          { name: 'Path', value: `\`${removed.path}\``, inline: true },
+          { name: "Name", value: removed.name, inline: true },
+          { name: "Path", value: `\`${removed.path}\``, inline: true },
         ],
       }],
     });
@@ -238,7 +254,7 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 
     if (sessions.length === 0) {
       await ctx.reply({
-        content: 'No session threads in this channel.',
+        content: "No session threads in this channel.",
         ephemeral: true,
       });
       return;
@@ -247,11 +263,13 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     // Sort by last activity (most recent first)
     sessions.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
 
-    const fields = sessions.map(s => {
+    const fields = sessions.map((s) => {
       const age = formatAge(s.lastActivity);
       return {
         name: s.threadName || s.sessionId.substring(0, 12),
-        value: `Session: \`${s.sessionId.substring(0, 12)}…\`\nThread: <#${s.threadId}>\nMessages: ${s.messageCount} | Last active: ${age}`,
+        value: `Session: \`${
+          s.sessionId.substring(0, 12)
+        }…\`\nThread: <#${s.threadId}>\nMessages: ${s.messageCount} | Last active: ${age}`,
         inline: false,
       };
     });
@@ -269,7 +287,7 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
 function formatAge(date: Date): string {
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;

@@ -213,7 +213,6 @@ export async function sendToClaudeCode(
   // Load MCP servers from .claude/mcp.json
   const mcpServers = await loadMcpServers(workDir);
 
-
   // Wrap with comprehensive error handling
   const executeWithErrorHandling = async (overrideModel?: string) => {
     let typingInterval: ReturnType<typeof setInterval> | undefined;
@@ -222,9 +221,9 @@ export async function sendToClaudeCode(
       const modelToUse = overrideModel || modelOptions?.model;
 
       // Determine permission mode (env DEFAULT_PERMISSION_MODE, fallback acceptEdits)
-      const permMode = modelOptions?.permissionMode
-        || (Deno.env.get("DEFAULT_PERMISSION_MODE") as SDKPermissionMode | undefined)
-        || "acceptEdits";
+      const permMode = modelOptions?.permissionMode ||
+        (Deno.env.get("DEFAULT_PERMISSION_MODE") as SDKPermissionMode | undefined) ||
+        "acceptEdits";
 
       // Build environment variables for the subprocess
       const envVars: Record<string, string> = {

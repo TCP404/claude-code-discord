@@ -21,29 +21,30 @@
 
 ```ts
 interface WorkspaceEntry {
-  name: string;       // 显示名/channel 名
-  path: string;       // workDir 绝对路径
-  channelId: string;  // 对应的 Discord channel ID
+  name: string; // 显示名/channel 名
+  path: string; // workDir 绝对路径
+  channelId: string; // 对应的 Discord channel ID
 }
 
 class WorkspaceManager {
   constructor(private defaultWorkDir: string) {}
-  
-  resolve(channelId: string): string  // 返回 workDir，fallback 到 defaultWorkDir
-  add(entry: WorkspaceEntry): void
-  remove(name: string): WorkspaceEntry | undefined
-  list(): WorkspaceEntry[]
-  findByChannel(channelId: string): WorkspaceEntry | undefined
-  getManagedChannelIds(): Set<string>  // 包含 default channel + 所有 workspace channels
-  
-  async loadFromDisk(): Promise<void>   // .bot-data/workspaces.json
-  async saveToDisk(): Promise<void>
+
+  resolve(channelId: string): string; // 返回 workDir，fallback 到 defaultWorkDir
+  add(entry: WorkspaceEntry): void;
+  remove(name: string): WorkspaceEntry | undefined;
+  list(): WorkspaceEntry[];
+  findByChannel(channelId: string): WorkspaceEntry | undefined;
+  getManagedChannelIds(): Set<string>; // 包含 default channel + 所有 workspace channels
+
+  async loadFromDisk(): Promise<void>; // .bot-data/workspaces.json
+  async saveToDisk(): Promise<void>;
 }
 ```
 
 ### Step 2: 创建 `/workspace` slash command — `workspace/command.ts`
 
 子命令：
+
 - `/workspace add name:crm path:/path/to/crm` — 验证路径存在，创建 channel，保存映射
 - `/workspace list` — embed 展示所有 workspace
 - `/workspace remove name:crm` — 删除映射，可选删除 channel
@@ -60,6 +61,7 @@ class WorkspaceManager {
 ```
 
 修改 `getController`/`setController` 接口，改为接收 `channelId` 参数：
+
 - `getController(channelId)` → `claudeControllers.get(channelId)`
 - `setController(channelId, controller)` → `claudeControllers.set(channelId, controller)`
 - abort 时只 abort 对应 channel 的 controller
@@ -101,18 +103,18 @@ class WorkspaceManager {
 
 ## 文件变更清单
 
-| 文件 | 类型 | 说明 |
-|------|------|------|
-| `core/workspace-manager.ts` | 新建 | WorkspaceManager 类 |
-| `workspace/command.ts` | 新建 | /workspace 命令定义和 handler |
-| `workspace/index.ts` | 新建 | barrel export |
-| `index.ts` | 修改 | claudeControllers 改为 Map，实例化 WorkspaceManager，注册命令 |
-| `core/handler-registry.ts` | 修改 | 增加 resolveWorkDir，传递给各 handler factory |
-| `claude/command.ts` | 修改 | 使用 resolveWorkDir(channelId) 替代静态 workDir |
-| `discord/bot.ts` | 修改 | isOurChannel 支持 managed channel set |
-| `discord/types.ts` | 修改 | BotDependencies 增加 getManagedChannelIds |
-| `core/signal-handler.ts` | 修改 | abort 改为按 channel |
-| `core/git-shell-handlers.ts` | 修改 | status/abort 命令适配 per-channel controller |
+| 文件                         | 类型 | 说明                                                          |
+| ---------------------------- | ---- | ------------------------------------------------------------- |
+| `core/workspace-manager.ts`  | 新建 | WorkspaceManager 类                                           |
+| `workspace/command.ts`       | 新建 | /workspace 命令定义和 handler                                 |
+| `workspace/index.ts`         | 新建 | barrel export                                                 |
+| `index.ts`                   | 修改 | claudeControllers 改为 Map，实例化 WorkspaceManager，注册命令 |
+| `core/handler-registry.ts`   | 修改 | 增加 resolveWorkDir，传递给各 handler factory                 |
+| `claude/command.ts`          | 修改 | 使用 resolveWorkDir(channelId) 替代静态 workDir               |
+| `discord/bot.ts`             | 修改 | isOurChannel 支持 managed channel set                         |
+| `discord/types.ts`           | 修改 | BotDependencies 增加 getManagedChannelIds                     |
+| `core/signal-handler.ts`     | 修改 | abort 改为按 channel                                          |
+| `core/git-shell-handlers.ts` | 修改 | status/abort 命令适配 per-channel controller                  |
 
 ## 向后兼容
 

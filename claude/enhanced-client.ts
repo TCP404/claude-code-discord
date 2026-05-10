@@ -1,7 +1,15 @@
 /** @module claude/enhanced-client — High-level session manager, model registry, and template support. */
-import { sendToClaudeCode, type ClaudeModelOptions, type SDKPermissionMode, type ThinkingConfig, type EffortLevel, type SDKAgentDefinition, type SDKModelInfo } from "./client.ts";
+import {
+  type ClaudeModelOptions,
+  type EffortLevel,
+  type SDKAgentDefinition,
+  type SDKModelInfo,
+  type SDKPermissionMode,
+  sendToClaudeCode,
+  type ThinkingConfig,
+} from "./client.ts";
 import { recordAPIUsage } from "../util/usage-tracker.ts";
-import { startModelRefresh, fetchModels } from "./model-fetcher.ts";
+import { fetchModels, startModelRefresh } from "./model-fetcher.ts";
 
 // Enhanced Claude Code client with additional features
 // Maps user-facing settings to actual Claude Agent SDK parameters
@@ -49,8 +57,8 @@ export class ClaudeSessionManager {
       lastActivity: new Date(),
       messageCount: 0,
       totalCost: 0,
-      model: model || 'claude-3-5-sonnet-20241022',
-      workDir
+      model: model || "claude-3-5-sonnet-20241022",
+      workDir,
     };
 
     this.sessions.set(session.id, session);
@@ -79,7 +87,7 @@ export class ClaudeSessionManager {
   getActiveSessions(maxAge: number = 3600000): ClaudeSession[] { // 1 hour default
     const cutoff = Date.now() - maxAge;
     return Array.from(this.sessions.values()).filter(
-      session => session.lastActivity.getTime() > cutoff
+      (session) => session.lastActivity.getTime() > cutoff,
     );
   }
 
@@ -90,14 +98,14 @@ export class ClaudeSessionManager {
   cleanup(maxAge: number = 24 * 3600000): number { // 24 hours default
     const cutoff = Date.now() - maxAge;
     let deleted = 0;
-    
+
     for (const [id, session] of this.sessions.entries()) {
       if (session.lastActivity.getTime() < cutoff) {
         this.sessions.delete(id);
         deleted++;
       }
     }
-    
+
     return deleted;
   }
 }
@@ -110,7 +118,7 @@ export async function enhancedClaudeQuery(
   sessionId?: string,
   onChunk?: (text: string) => void,
   onStreamJson?: (json: any) => void,
-  continueMode?: boolean
+  continueMode?: boolean,
 ) {
   let enhancedPrompt = prompt;
 
@@ -181,18 +189,18 @@ export async function enhancedClaudeQuery(
     onStreamJson,
     continueMode,
     modelOptions,
-    undefined // no typing callback in enhanced client
+    undefined, // no typing callback in enhanced client
   );
-  
+
   // Record API usage for tracking
   await recordAPIUsage(
-    result.modelUsed || options.model || 'default',
+    result.modelUsed || options.model || "default",
     result.cost,
     result.duration,
-    'enhanced',
-    result.sessionId
+    "enhanced",
+    result.sessionId,
   );
-  
+
   return result;
 }
 
@@ -202,7 +210,7 @@ async function getSystemContext(workDir: string): Promise<string> {
     const [osInfo, nodeInfo, denoInfo] = await Promise.all([
       getOSInfo(),
       getNodeInfo(),
-      getDenoInfo()
+      getDenoInfo(),
     ]);
 
     return `<system-context>
@@ -215,7 +223,7 @@ Current Time: ${new Date().toISOString()}
   } catch (error) {
     return `<system-context>
 Working Directory: ${workDir}
-System Info: Unable to gather (${error instanceof Error ? error.message : 'Unknown error'})
+System Info: Unable to gather (${error instanceof Error ? error.message : "Unknown error"})
 Current Time: ${new Date().toISOString()}
 </system-context>`;
   }
@@ -225,20 +233,20 @@ Current Time: ${new Date().toISOString()}
 async function getGitContext(workDir: string): Promise<string | null> {
   try {
     const { executeGitCommand } = await import("../git/handler.ts");
-    
+
     const [status, branch, remotes, recentCommits] = await Promise.all([
       executeGitCommand(workDir, "git status --porcelain"),
       executeGitCommand(workDir, "git branch --show-current"),
       executeGitCommand(workDir, "git remote -v"),
-      executeGitCommand(workDir, "git log --oneline -5")
+      executeGitCommand(workDir, "git log --oneline -5"),
     ]);
 
     return `<git-context>
 Current Branch: ${branch.trim()}
-Status: ${status || 'Clean working directory'}
-Remotes: ${remotes || 'No remotes'}
+Status: ${status || "Clean working directory"}
+Remotes: ${remotes || "No remotes"}
 Recent Commits:
-${recentCommits || 'No commits'}
+${recentCommits || "No commits"}
 </git-context>`;
   } catch (_error) {
     return null;
@@ -253,22 +261,22 @@ async function getFileContext(filePaths: string[]): Promise<string | null> {
     for (const filePath of filePaths) {
       try {
         const content = await Deno.readTextFile(filePath);
-        const truncatedContent = content.length > 2000 
-          ? content.substring(0, 2000) + '\n... (truncated)'
+        const truncatedContent = content.length > 2000
+          ? content.substring(0, 2000) + "\n... (truncated)"
           : content;
-        
+
         fileContents.push(`<file path="${filePath}">
 ${truncatedContent}
 </file>`);
       } catch (error) {
         fileContents.push(`<file path="${filePath}">
-Error reading file: ${error instanceof Error ? error.message : 'Unknown error'}
+Error reading file: ${error instanceof Error ? error.message : "Unknown error"}
 </file>`);
       }
     }
 
     return `<file-context>
-${fileContents.join('\n')}
+${fileContents.join("\n")}
 </file-context>`;
   } catch (_error) {
     return null;
@@ -282,7 +290,7 @@ async function getOSInfo(): Promise<string> {
     const arch = Deno.build.arch;
     return `OS: ${os} (${arch})`;
   } catch {
-    return 'OS: Unknown';
+    return "OS: Unknown";
   }
 }
 
@@ -291,14 +299,14 @@ async function getNodeInfo(): Promise<string> {
     const process = new Deno.Command("node", {
       args: ["--version"],
       stdout: "piped",
-      stderr: "piped"
+      stderr: "piped",
     });
-    
+
     const { stdout } = await process.output();
     const version = new TextDecoder().decode(stdout).trim();
     return `Node.js: ${version}`;
   } catch {
-    return 'Node.js: Not available';
+    return "Node.js: Not available";
   }
 }
 
@@ -306,7 +314,7 @@ async function getDenoInfo(): Promise<string> {
   try {
     return `Deno: ${Deno.version.deno}`;
   } catch {
-    return 'Deno: Unknown version';
+    return "Deno: Unknown version";
   }
 }
 
@@ -317,7 +325,7 @@ export interface ModelInfo {
   contextWindow: number;
   recommended: boolean;
   supportsThinking: boolean;
-  tier: 'flagship' | 'balanced' | 'fast' | 'legacy';
+  tier: "flagship" | "balanced" | "fast" | "legacy";
   aliasFor?: string;
   thinkingMode?: boolean;
   deprecated?: boolean;
@@ -329,116 +337,117 @@ export interface ModelInfo {
 // This object is updated dynamically at runtime when ANTHROPIC_API_KEY is set
 export let CLAUDE_MODELS: Record<string, ModelInfo> = {
   // === Aliases (always resolve to latest via CLI) ===
-  'opus': {
-    name: 'Claude Opus (Latest)',
-    description: 'Most powerful model — auto-resolves to latest Opus via CLI alias',
+  "opus": {
+    name: "Claude Opus (Latest)",
+    description: "Most powerful model — auto-resolves to latest Opus via CLI alias",
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true,
-    tier: 'flagship',
-    aliasFor: 'claude-opus-4-5-20251101'
+    tier: "flagship",
+    aliasFor: "claude-opus-4-5-20251101",
   },
-  'sonnet': {
-    name: 'Claude Sonnet (Latest)',
-    description: 'High-performance model — auto-resolves to latest Sonnet via CLI alias',
+  "sonnet": {
+    name: "Claude Sonnet (Latest)",
+    description: "High-performance model — auto-resolves to latest Sonnet via CLI alias",
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true,
-    tier: 'balanced',
-    aliasFor: 'claude-sonnet-4-5-20250929'
+    tier: "balanced",
+    aliasFor: "claude-sonnet-4-5-20250929",
   },
-  'haiku': {
-    name: 'Claude Haiku (Latest)',
-    description: 'Fast model for quick tasks — auto-resolves to latest Haiku via CLI alias',
+  "haiku": {
+    name: "Claude Haiku (Latest)",
+    description: "Fast model for quick tasks — auto-resolves to latest Haiku via CLI alias",
     contextWindow: 200000,
     recommended: true,
     supportsThinking: false,
-    tier: 'fast',
-    aliasFor: 'claude-haiku-4-5-20251001'
+    tier: "fast",
+    aliasFor: "claude-haiku-4-5-20251001",
   },
 
   // === Opus Family (Flagship) ===
-  'claude-opus-4-5-20251101': {
-    name: 'Claude Opus 4.5',
-    description: 'Latest flagship model — superior agentic coding, long task sustenance, self-debugging',
+  "claude-opus-4-5-20251101": {
+    name: "Claude Opus 4.5",
+    description:
+      "Latest flagship model — superior agentic coding, long task sustenance, self-debugging",
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true,
-    tier: 'flagship'
+    tier: "flagship",
   },
-  'claude-opus-4-1-20250805': {
-    name: 'Claude Opus 4.1',
-    description: 'Previous Opus — strong agentic coding and reasoning',
+  "claude-opus-4-1-20250805": {
+    name: "Claude Opus 4.1",
+    description: "Previous Opus — strong agentic coding and reasoning",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: true,
-    tier: 'flagship'
+    tier: "flagship",
   },
-  'claude-opus-4-20250514': {
-    name: 'Claude Opus 4',
-    description: 'First Opus 4 release — powerful reasoning and coding',
+  "claude-opus-4-20250514": {
+    name: "Claude Opus 4",
+    description: "First Opus 4 release — powerful reasoning and coding",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: true,
-    tier: 'flagship'
+    tier: "flagship",
   },
 
   // === Sonnet Family (Balanced) ===
-  'claude-sonnet-4-5-20250929': {
-    name: 'Claude Sonnet 4.5',
-    description: 'Latest Sonnet — excellent reasoning with balanced speed/cost',
+  "claude-sonnet-4-5-20250929": {
+    name: "Claude Sonnet 4.5",
+    description: "Latest Sonnet — excellent reasoning with balanced speed/cost",
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true,
-    tier: 'balanced'
+    tier: "balanced",
   },
-  'claude-sonnet-4-20250514': {
-    name: 'Claude Sonnet 4',
-    description: 'Previous Sonnet — high-performance reasoning',
+  "claude-sonnet-4-20250514": {
+    name: "Claude Sonnet 4",
+    description: "Previous Sonnet — high-performance reasoning",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: true,
-    tier: 'balanced'
+    tier: "balanced",
   },
 
   // === Haiku Family (Fast) ===
-  'claude-haiku-4-5-20251001': {
-    name: 'Claude Haiku 4.5',
-    description: 'Latest Haiku — fast and efficient for quick tasks',
+  "claude-haiku-4-5-20251001": {
+    name: "Claude Haiku 4.5",
+    description: "Latest Haiku — fast and efficient for quick tasks",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false,
-    tier: 'fast'
+    tier: "fast",
   },
 
   // === Legacy Models ===
-  'claude-3-5-sonnet-20241022': {
-    name: 'Claude 3.5 Sonnet',
-    description: 'Previous generation — still capable, lower cost',
+  "claude-3-5-sonnet-20241022": {
+    name: "Claude 3.5 Sonnet",
+    description: "Previous generation — still capable, lower cost",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false,
-    tier: 'legacy',
-    deprecated: true
+    tier: "legacy",
+    deprecated: true,
   },
-  'claude-3-5-haiku-20241022': {
-    name: 'Claude 3.5 Haiku',
-    description: 'Previous generation fast model',
+  "claude-3-5-haiku-20241022": {
+    name: "Claude 3.5 Haiku",
+    description: "Previous generation fast model",
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false,
-    tier: 'fast',
-    deprecated: true
+    tier: "fast",
+    deprecated: true,
   },
-  'claude-3-opus-20240229': {
-    name: 'Claude 3 Opus',
+  "claude-3-opus-20240229": {
+    name: "Claude 3 Opus",
     description: 'Legacy Opus — deprecated, use "opus" alias instead',
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false,
-    tier: 'legacy',
-    deprecated: true
-  }
+    tier: "legacy",
+    deprecated: true,
+  },
 };
 
 // Resolve model alias to full model ID
@@ -457,9 +466,9 @@ export function isValidModel(modelInput: string): boolean {
   // Known models are always valid
   if (modelInput in CLAUDE_MODELS) return true;
   // Accept any string that looks like a Claude model ID
-  if (modelInput.startsWith('claude-')) return true;
+  if (modelInput.startsWith("claude-")) return true;
   // Accept known alias patterns
-  if (['opus', 'sonnet', 'haiku'].includes(modelInput.toLowerCase())) return true;
+  if (["opus", "sonnet", "haiku"].includes(modelInput.toLowerCase())) return true;
   // Accept any custom string — the CLI will validate
   return true;
 }
@@ -473,7 +482,11 @@ export function isValidModel(modelInput: string): boolean {
 export function initModels(): void {
   startModelRefresh((newModels) => {
     CLAUDE_MODELS = newModels;
-    console.log(`[Models] Dynamically updated to ${Object.keys(CLAUDE_MODELS).length} models from Anthropic API`);
+    console.log(
+      `[Models] Dynamically updated to ${
+        Object.keys(CLAUDE_MODELS).length
+      } models from Anthropic API`,
+    );
   });
 }
 
@@ -511,19 +524,23 @@ export function updateModelsFromSDK(sdkModels: SDKModelInfo[]): void {
       updated++;
     } else {
       // Add new model discovered via SDK
-      const tier = id.includes('opus') ? 'flagship' as const
-        : id.includes('haiku') ? 'fast' as const
-        : id.includes('sonnet') ? 'balanced' as const
-        : 'balanced' as const;
+      const tier = id.includes("opus")
+        ? "flagship" as const
+        : id.includes("haiku")
+        ? "fast" as const
+        : id.includes("sonnet")
+        ? "balanced" as const
+        : "balanced" as const;
 
       CLAUDE_MODELS[id] = {
         name: sdkModel.displayName || id,
         description: sdkModel.description || `${sdkModel.displayName || id} (discovered via SDK)`,
         contextWindow: 200_000,
         recommended: false,
-        supportsThinking: id.includes('opus') || (id.includes('sonnet') && !id.startsWith('claude-3-5-')),
+        supportsThinking: id.includes("opus") ||
+          (id.includes("sonnet") && !id.startsWith("claude-3-5-")),
         tier,
-        deprecated: id.startsWith('claude-3-') && !id.startsWith('claude-3-5-'),
+        deprecated: id.startsWith("claude-3-") && !id.startsWith("claude-3-5-"),
       };
       updated++;
     }
@@ -543,5 +560,5 @@ export const CLAUDE_TEMPLATES = {
   refactor: "Please refactor this code to improve maintainability and follow best practices:",
   document: "Please add comprehensive documentation to this code including JSDoc comments:",
   security: "Please review this code for security vulnerabilities and suggest fixes:",
-  convert: "Please convert this code to TypeScript with proper types and interfaces:"
+  convert: "Please convert this code to TypeScript with proper types and interfaces:",
 };

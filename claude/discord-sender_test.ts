@@ -27,8 +27,12 @@ function createMockSender(): MockSender {
       const t: MockTracked = { content, edited: [], deleted: false };
       tracked.push(t);
       const msg: TrackedMessage = {
-        edit: async (c: MessageContent) => { t.edited.push(c); },
-        delete: async () => { t.deleted = true; },
+        edit: async (c: MessageContent) => {
+          t.edited.push(c);
+        },
+        delete: async () => {
+          t.deleted = true;
+        },
       };
       return msg;
     },
@@ -156,7 +160,12 @@ Deno.test("discord-sender: hidden completion with cost finalizes status line", a
   await cs.send([{
     type: "system",
     content: "",
-    metadata: { subtype: "completion", total_cost_usd: 0.05, duration_ms: 3000, session_id: "sess-1" },
+    metadata: {
+      subtype: "completion",
+      total_cost_usd: 0.05,
+      duration_ms: 3000,
+      session_id: "sess-1",
+    },
   }]);
 
   // Status message should have been edited to show cost
@@ -205,7 +214,12 @@ Deno.test("discord-sender: visible system completion clears status and sends emb
     await cs.send([{
       type: "system",
       content: "",
-      metadata: { subtype: "completion", session_id: "sess-1", total_cost_usd: 0.02, duration_ms: 500 },
+      metadata: {
+        subtype: "completion",
+        session_id: "sess-1",
+        total_cost_usd: 0.02,
+        duration_ms: 500,
+      },
     }]);
     // Status should be deleted
     assertEquals(mock.tracked[0].deleted, true);
@@ -227,7 +241,12 @@ Deno.test("discord-sender: setSessionId updates session for cost tracking", asyn
   await cs.send([{
     type: "system",
     content: "",
-    metadata: { subtype: "completion", total_cost_usd: 0.01, duration_ms: 100, session_id: "new-session" },
+    metadata: {
+      subtype: "completion",
+      total_cost_usd: 0.01,
+      duration_ms: 100,
+      session_id: "new-session",
+    },
   }]);
 
   // Should finalize with cost (the status line shows it)
@@ -241,7 +260,9 @@ Deno.test("discord-sender: setSessionId updates session for cost tracking", asyn
 Deno.test("discord-sender: works without sendTracked (no status line)", async () => {
   const sent: MessageContent[] = [];
   const plainSender: DiscordSender = {
-    sendMessage: async (content: MessageContent) => { sent.push(content); },
+    sendMessage: async (content: MessageContent) => {
+      sent.push(content);
+    },
   };
   const cs = createClaudeSender(plainSender);
 

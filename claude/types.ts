@@ -17,8 +17,18 @@ export interface PermissionDenial {
 }
 
 export interface ClaudeMessage {
-  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'system' | 'other'
-    | 'permission_denied' | 'task_notification' | 'task_started' | 'tool_progress' | 'tool_summary';
+  type:
+    | "text"
+    | "tool_use"
+    | "tool_result"
+    | "thinking"
+    | "system"
+    | "other"
+    | "permission_denied"
+    | "task_notification"
+    | "task_started"
+    | "tool_progress"
+    | "tool_summary";
   content: string;
   // deno-lint-ignore no-explicit-any
   metadata?: any;
@@ -27,8 +37,8 @@ export interface ClaudeMessage {
 export interface TodoItem {
   id: string;
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  priority: 'high' | 'medium' | 'low';
+  status: "pending" | "in_progress" | "completed";
+  priority: "high" | "medium" | "low";
 }
 
 import type { MessageContent } from "../discord/types.ts";

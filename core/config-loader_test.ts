@@ -1,10 +1,10 @@
 import { assertEquals, assertThrows } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  parseArgs,
-  loadEnvConfig,
-  validateEnvConfig,
-  loadConfig,
   ConfigurationError,
+  loadConfig,
+  loadEnvConfig,
+  parseArgs,
+  validateEnvConfig,
 } from "./config-loader.ts";
 
 // --- parseArgs ---
@@ -94,12 +94,13 @@ Deno.test("validateEnvConfig: passes with all required fields", () => {
 
 Deno.test("validateEnvConfig: throws ConfigurationError when token missing", () => {
   const err = assertThrows(
-    () => validateEnvConfig({
-      discordToken: undefined,
-      applicationId: "app",
-      categoryName: undefined,
-      mentionUserId: undefined,
-    }),
+    () =>
+      validateEnvConfig({
+        discordToken: undefined,
+        applicationId: "app",
+        categoryName: undefined,
+        mentionUserId: undefined,
+      }),
     ConfigurationError,
   );
   assertEquals(err.missingKeys, ["DISCORD_TOKEN"]);
@@ -107,12 +108,13 @@ Deno.test("validateEnvConfig: throws ConfigurationError when token missing", () 
 
 Deno.test("validateEnvConfig: throws ConfigurationError when app id missing", () => {
   const err = assertThrows(
-    () => validateEnvConfig({
-      discordToken: "tok",
-      applicationId: undefined,
-      categoryName: undefined,
-      mentionUserId: undefined,
-    }),
+    () =>
+      validateEnvConfig({
+        discordToken: "tok",
+        applicationId: undefined,
+        categoryName: undefined,
+        mentionUserId: undefined,
+      }),
     ConfigurationError,
   );
   assertEquals(err.missingKeys, ["APPLICATION_ID"]);
@@ -120,12 +122,13 @@ Deno.test("validateEnvConfig: throws ConfigurationError when app id missing", ()
 
 Deno.test("validateEnvConfig: reports all missing keys together", () => {
   const err = assertThrows(
-    () => validateEnvConfig({
-      discordToken: undefined,
-      applicationId: undefined,
-      categoryName: undefined,
-      mentionUserId: undefined,
-    }),
+    () =>
+      validateEnvConfig({
+        discordToken: undefined,
+        applicationId: undefined,
+        categoryName: undefined,
+        mentionUserId: undefined,
+      }),
     ConfigurationError,
   );
   assertEquals(err.missingKeys.length, 2);
@@ -137,11 +140,12 @@ Deno.test("validateEnvConfig: reports all missing keys together", () => {
 
 Deno.test("loadConfig: combines env and CLI args", () => {
   const config = loadConfig({
-    getEnv: (key) => ({
-      DISCORD_TOKEN: "tok",
-      APPLICATION_ID: "app",
-      CATEGORY_NAME: "env-cat",
-    })[key],
+    getEnv: (key) =>
+      ({
+        DISCORD_TOKEN: "tok",
+        APPLICATION_ID: "app",
+        CATEGORY_NAME: "env-cat",
+      })[key],
     getCwd: () => "/work",
     args: [],
   });
@@ -153,11 +157,12 @@ Deno.test("loadConfig: combines env and CLI args", () => {
 
 Deno.test("loadConfig: CLI args override env for category", () => {
   const config = loadConfig({
-    getEnv: (key) => ({
-      DISCORD_TOKEN: "tok",
-      APPLICATION_ID: "app",
-      CATEGORY_NAME: "from-env",
-    })[key],
+    getEnv: (key) =>
+      ({
+        DISCORD_TOKEN: "tok",
+        APPLICATION_ID: "app",
+        CATEGORY_NAME: "from-env",
+      })[key],
     getCwd: () => "/work",
     args: ["--category", "from-cli"],
   });
@@ -166,11 +171,12 @@ Deno.test("loadConfig: CLI args override env for category", () => {
 
 Deno.test("loadConfig: CLI args override env for userId", () => {
   const config = loadConfig({
-    getEnv: (key) => ({
-      DISCORD_TOKEN: "tok",
-      APPLICATION_ID: "app",
-      DEFAULT_MENTION_USER_ID: "env-user",
-    })[key],
+    getEnv: (key) =>
+      ({
+        DISCORD_TOKEN: "tok",
+        APPLICATION_ID: "app",
+        DEFAULT_MENTION_USER_ID: "env-user",
+      })[key],
     getCwd: () => "/work",
     args: ["--user-id", "cli-user"],
   });
@@ -179,11 +185,12 @@ Deno.test("loadConfig: CLI args override env for userId", () => {
 
 Deno.test("loadConfig: throws when required env vars missing", () => {
   assertThrows(
-    () => loadConfig({
-      getEnv: () => undefined,
-      getCwd: () => "/work",
-      args: [],
-    }),
+    () =>
+      loadConfig({
+        getEnv: () => undefined,
+        getCwd: () => "/work",
+        args: [],
+      }),
     ConfigurationError,
   );
 });

@@ -11,11 +11,7 @@
  * @module discord/session-threads
  */
 
-import {
-  ChannelType,
-  type TextChannel,
-  type ThreadChannel,
-} from "npm:discord.js@14.14.1";
+import { ChannelType, type TextChannel, type ThreadChannel } from "npm:discord.js@14.14.1";
 
 import { ensureDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
 import * as path from "https://deno.land/std@0.208.0/path/mod.ts";

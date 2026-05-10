@@ -109,21 +109,24 @@ export async function runVersionCheck(): Promise<{
     return { updateAvailable: false };
   }
 
-  console.log(`[Version Check] Update available! Local: ${result.localCommit}, Latest: ${result.remoteCommit}`);
+  console.log(
+    `[Version Check] Update available! Local: ${result.localCommit}, Latest: ${result.remoteCommit}`,
+  );
 
   return {
     updateAvailable: true,
     embed: {
       color: 0xFFA500, // Orange
       title: "Update Available",
-      description: `A newer version of claude-code-discord is available on GitHub. You are running **v${BOT_VERSION}**.`,
+      description:
+        `A newer version of claude-code-discord is available on GitHub. You are running **v${BOT_VERSION}**.`,
       fields: [
         { name: "Your Commit", value: `\`${result.localCommit}\``, inline: true },
         { name: "Latest Commit", value: `\`${result.remoteCommit}\``, inline: true },
         {
           name: "How to Update",
           value: "```\ngit pull origin main && ./start.sh restart\n```",
-          inline: false
+          inline: false,
         },
       ],
     },
@@ -145,7 +148,7 @@ export function getLastCheckResult(): VersionCheckResult | null {
  */
 export function startPeriodicUpdateCheck(
   onUpdateAvailable: (result: VersionCheckResult) => void,
-  intervalMs = 12 * 60 * 60 * 1000
+  intervalMs = 12 * 60 * 60 * 1000,
 ): number {
   const check = async () => {
     try {

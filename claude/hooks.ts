@@ -1,30 +1,30 @@
 /**
  * SDK Hooks — Discord-integrated hook callbacks for Claude Code SDK.
- * 
+ *
  * Hooks provide deep integration points that fire during query execution:
  * - PreToolUse: Log/audit tool usage before execution
  * - PostToolUse: Log completed tool usage
  * - PostToolUseFailure: Log tool failures
  * - Notification: Forward Claude's notifications to Discord
  * - TaskCompleted: Notify when background tasks finish
- * 
+ *
  * All hooks are passive observers — they log to Discord but don't block execution.
  * They return `{ continue: true }` to let the SDK proceed normally.
- * 
+ *
  * @module claude/hooks
  */
 
-import type { 
-  HookCallbackMatcher, 
+import type {
   HookCallback,
-  HookInput,
-  PreToolUseHookInput,
-  PostToolUseHookInput,
-  PostToolUseFailureHookInput,
-  NotificationHookInput,
-  TaskCompletedHookInput,
+  HookCallbackMatcher,
   HookEvent,
+  HookInput,
+  NotificationHookInput,
+  PostToolUseFailureHookInput,
+  PostToolUseHookInput,
+  PreToolUseHookInput,
   SyncHookJSONOutput,
+  TaskCompletedHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
 
 /**
@@ -45,7 +45,7 @@ export interface HookConfig {
  * Discord-formatted hook event for display.
  */
 export interface HookEvent_Discord {
-  type: 'tool_start' | 'tool_complete' | 'tool_failure' | 'notification' | 'task_completed';
+  type: "tool_start" | "tool_complete" | "tool_failure" | "notification" | "task_completed";
   toolName?: string;
   // deno-lint-ignore no-explicit-any
   toolInput?: any;
@@ -72,7 +72,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     const preToolHook: HookCallback = async (input: HookInput) => {
       const preInput = input as PreToolUseHookInput;
       config.onHookEvent({
-        type: 'tool_start',
+        type: "tool_start",
         toolName: preInput.tool_name,
         toolInput: preInput.tool_input,
         timestamp: Date.now(),
@@ -89,7 +89,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     const postToolHook: HookCallback = async (input: HookInput) => {
       const postInput = input as PostToolUseHookInput;
       config.onHookEvent({
-        type: 'tool_complete',
+        type: "tool_complete",
         toolName: postInput.tool_name,
         toolInput: postInput.tool_input,
         toolResponse: postInput.tool_response,
@@ -106,7 +106,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     const failureHook: HookCallback = async (input: HookInput) => {
       const failInput = input as PostToolUseFailureHookInput;
       config.onHookEvent({
-        type: 'tool_failure',
+        type: "tool_failure",
         toolName: failInput.tool_name,
         toolInput: failInput.tool_input,
         error: failInput.error,
@@ -125,7 +125,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     const notificationHook: HookCallback = async (input: HookInput) => {
       const notifInput = input as NotificationHookInput;
       config.onHookEvent({
-        type: 'notification',
+        type: "notification",
         message: notifInput.message,
         title: notifInput.title,
         timestamp: Date.now(),
@@ -143,7 +143,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     const taskHook: HookCallback = async (input: HookInput) => {
       const taskInput = input as TaskCompletedHookInput;
       config.onHookEvent({
-        type: 'task_completed',
+        type: "task_completed",
         taskId: taskInput.task_id,
         taskSubject: taskInput.task_subject,
         message: taskInput.task_description,

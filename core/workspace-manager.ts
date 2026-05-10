@@ -33,13 +33,13 @@ export class WorkspaceManager {
   }
 
   resolve(channelId: string): string {
-    const entry = this.workspaces.find(w => w.channelId === channelId);
+    const entry = this.workspaces.find((w) => w.channelId === channelId);
     return entry?.path ?? this.defaultWorkDir;
   }
 
   add(entry: WorkspaceEntry): void {
     // Replace if name already exists
-    const idx = this.workspaces.findIndex(w => w.name === entry.name);
+    const idx = this.workspaces.findIndex((w) => w.name === entry.name);
     if (idx >= 0) {
       this.workspaces[idx] = entry;
     } else {
@@ -48,7 +48,7 @@ export class WorkspaceManager {
   }
 
   remove(name: string): WorkspaceEntry | undefined {
-    const idx = this.workspaces.findIndex(w => w.name === name);
+    const idx = this.workspaces.findIndex((w) => w.name === name);
     if (idx < 0) return undefined;
     const [removed] = this.workspaces.splice(idx, 1);
     return removed;
@@ -59,20 +59,20 @@ export class WorkspaceManager {
   }
 
   findByChannel(channelId: string): WorkspaceEntry | undefined {
-    return this.workspaces.find(w => w.channelId === channelId);
+    return this.workspaces.find((w) => w.channelId === channelId);
   }
 
   findByName(name: string): WorkspaceEntry | undefined {
-    return this.workspaces.find(w => w.name === name);
+    return this.workspaces.find((w) => w.name === name);
   }
 
   isAutoThreadChannel(channelId: string): boolean {
-    const entry = this.workspaces.find(w => w.channelId === channelId);
+    const entry = this.workspaces.find((w) => w.channelId === channelId);
     return !!entry?.autoThread;
   }
 
   setAutoThread(name: string, enabled: boolean): WorkspaceEntry | undefined {
-    const entry = this.workspaces.find(w => w.name === name);
+    const entry = this.workspaces.find((w) => w.name === name);
     if (!entry) return undefined;
     entry.autoThread = enabled;
     return entry;

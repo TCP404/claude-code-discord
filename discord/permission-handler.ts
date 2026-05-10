@@ -5,7 +5,11 @@
  * @module discord/permission-handler
  */
 
-import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCallback } from "../claude/permission-request.ts";
+import {
+  buildPermissionEmbed,
+  parsePermissionButtonId,
+  type PermissionRequestCallback,
+} from "../claude/permission-request.ts";
 
 /**
  * Create the PermissionRequest handler that uses the Discord channel.
@@ -18,20 +22,24 @@ import { buildPermissionEmbed, parsePermissionButtonId, type PermissionRequestCa
  * 5. Returns true (allow) or false (deny)
  */
 // deno-lint-ignore no-explicit-any
-export function createPermissionRequestHandler(bot: any, getTargetChannel?: () => any): PermissionRequestCallback {
+export function createPermissionRequestHandler(
+  bot: any,
+  getTargetChannel?: () => any,
+): PermissionRequestCallback {
   let nonce = 0;
 
   return async (toolName: string, toolInput: Record<string, unknown>): Promise<boolean> => {
     const channel = getTargetChannel?.() ?? bot.getChannel();
     if (!channel) {
-      console.warn('[PermissionRequest] No channel — auto-denying');
+      console.warn("[PermissionRequest] No channel — auto-denying");
       return false;
     }
 
     const reqNonce = String(++nonce);
     const embedData = buildPermissionEmbed(toolName, toolInput);
 
-    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = await import("npm:discord.js@14.14.1");
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } =
+      await import("npm:discord.js@14.14.1");
 
     const embed = new EmbedBuilder()
       .setColor(embedData.color)
@@ -47,11 +55,11 @@ export function createPermissionRequestHandler(bot: any, getTargetChannel?: () =
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`perm-req:${reqNonce}:allow`)
-        .setLabel('✅ Allow')
+        .setLabel("✅ Allow")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`perm-req:${reqNonce}:deny`)
-        .setLabel('❌ Deny')
+        .setLabel("❌ Deny")
         .setStyle(ButtonStyle.Danger),
     );
 
@@ -73,7 +81,9 @@ export function createPermissionRequestHandler(bot: any, getTargetChannel?: () =
       components: [],
     });
 
-    console.log(`[PermissionRequest] Tool "${toolName}" — ${allowed ? 'ALLOWED' : 'DENIED'} by user`);
+    console.log(
+      `[PermissionRequest] Tool "${toolName}" — ${allowed ? "ALLOWED" : "DENIED"} by user`,
+    );
     return allowed;
   };
 }

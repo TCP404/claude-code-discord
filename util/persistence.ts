@@ -37,7 +37,7 @@ export class PersistenceManager<T> {
    */
   async init(): Promise<void> {
     if (this.initialized) return;
-    
+
     try {
       await ensureDir(this.dataDir);
       this.initialized = true;
@@ -78,10 +78,8 @@ export class PersistenceManager<T> {
     await this.init();
 
     try {
-      const content = this.pretty
-        ? JSON.stringify(data, null, 2)
-        : JSON.stringify(data);
-      
+      const content = this.pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
+
       await Deno.writeTextFile(this.filePath, content);
       this.cache = data;
       console.log(`Persistence: Saved ${this.filename}`);
@@ -107,7 +105,7 @@ export class PersistenceManager<T> {
    */
   async update(
     defaultValue: T,
-    transform: (current: T) => T
+    transform: (current: T) => T,
   ): Promise<boolean> {
     const current = await this.get(defaultValue);
     const updated = transform(current);
@@ -224,7 +222,9 @@ export function getMCPServersManager(dataDir?: string): PersistenceManager<MCPSe
  */
 export function getAgentSessionsManager(dataDir?: string): PersistenceManager<AgentSessionData[]> {
   if (!agentSessionsManager) {
-    agentSessionsManager = new PersistenceManager<AgentSessionData[]>("agent-sessions", { dataDir });
+    agentSessionsManager = new PersistenceManager<AgentSessionData[]>("agent-sessions", {
+      dataDir,
+    });
   }
   return agentSessionsManager;
 }
@@ -239,7 +239,7 @@ export async function initAllPersistence(dataDir?: string): Promise<void> {
     getAgentSessionsManager(dataDir),
   ];
 
-  await Promise.all(managers.map(m => m.init()));
+  await Promise.all(managers.map((m) => m.init()));
   console.log("Persistence: All managers initialized");
 }
 

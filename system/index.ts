@@ -1,11 +1,11 @@
 /** @module system — System monitoring handlers (processes, disk, network, memory). */
 import {
   detectPlatform,
-  getPlatformCommands,
   executeSystemCommand,
+  getPlatformCommands,
   getPlatformDisplayName,
+  isCommandAvailable,
   parseProcessList,
-  isCommandAvailable
 } from "../util/platform.ts";
 
 // Re-export system commands from commands.ts
@@ -26,7 +26,7 @@ export function createSystemHandlers(deps: SystemHandlerDeps) {
       try {
         const platformName = getPlatformDisplayName();
         const systemInfoOutput = await executeSystemCommand(platformCommands.systemInfoCmd);
-        
+
         // Enhanced system info with platform detection
         const systemInfo = `Platform: ${platformName} (${platform})
 Architecture: ${Deno.build.arch}
@@ -59,18 +59,23 @@ ${systemInfoOutput}`;
         // Parse process list
         const processes = parseProcessList(output);
         const filteredProcesses = processes;
-        
+
         // Apply limit
         const limitedProcesses = filteredProcesses.slice(0, limit);
-        
-        let processInfo = `Running Processes (${limitedProcesses.length}/${filteredProcesses.length} shown):\n`;
-        processInfo += `Platform: ${getPlatformDisplayName()}\n\n`;
-        
-        processInfo += `${'PID'.padEnd(8)} ${'Name'.padEnd(20)} ${'CPU%'.padEnd(8)} ${'MEM%'.padEnd(8)} ${'Status'.padEnd(10)}\n`;
-        processInfo += '-'.repeat(60) + '\n';
 
-        limitedProcesses.forEach(proc => {
-          processInfo += `${proc.pid.toString().padEnd(8)} ${proc.name.padEnd(20)} ${(proc.cpu || 0).toFixed(1).padEnd(8)} ${(proc.memory || 0).toFixed(1).padEnd(8)} ${(proc.status || 'Unknown').padEnd(10)}\n`;
+        let processInfo =
+          `Running Processes (${limitedProcesses.length}/${filteredProcesses.length} shown):\n`;
+        processInfo += `Platform: ${getPlatformDisplayName()}\n\n`;
+
+        processInfo += `${"PID".padEnd(8)} ${"Name".padEnd(20)} ${"CPU%".padEnd(8)} ${
+          "MEM%".padEnd(8)
+        } ${"Status".padEnd(10)}\n`;
+        processInfo += "-".repeat(60) + "\n";
+
+        limitedProcesses.forEach((proc) => {
+          processInfo += `${proc.pid.toString().padEnd(8)} ${proc.name.padEnd(20)} ${
+            (proc.cpu || 0).toFixed(1).padEnd(8)
+          } ${(proc.memory || 0).toFixed(1).padEnd(8)} ${(proc.status || "Unknown").padEnd(10)}\n`;
         });
 
         return { data: processInfo };
@@ -83,18 +88,18 @@ ${systemInfoOutput}`;
     async onSystemResources(_ctx: any) {
       try {
         let resourceInfo = `System Resources - ${getPlatformDisplayName()}\n\n`;
-        
+
         const commands = [
-          ['free', '-h'],
-          ['cat', '/proc/loadavg'],
-          ['cat', '/proc/meminfo']
+          ["free", "-h"],
+          ["cat", "/proc/loadavg"],
+          ["cat", "/proc/meminfo"],
         ];
 
         for (const cmd of commands) {
           const available = await isCommandAvailable(cmd[0]);
           if (available) {
             const output = await executeSystemCommand(cmd);
-            resourceInfo += `${cmd.join(' ')}:\n${output}\n\n`;
+            resourceInfo += `${cmd.join(" ")}:\n${output}\n\n`;
           }
         }
 
@@ -108,15 +113,15 @@ ${systemInfoOutput}`;
     async onNetworkInfo(_ctx: any) {
       try {
         const networkOutput = await executeSystemCommand(platformCommands.networkInfoCmd);
-        
+
         let networkInfo = `Network Information - ${getPlatformDisplayName()}\n\n`;
-        
+
         networkInfo += `Network Interfaces:\n${networkOutput}`;
 
         // Try to get additional connection info
-        const netstatAvailable = await isCommandAvailable('netstat');
+        const netstatAvailable = await isCommandAvailable("netstat");
         if (netstatAvailable) {
-          const connectionsOutput = await executeSystemCommand(['netstat', '-tuln']);
+          const connectionsOutput = await executeSystemCommand(["netstat", "-tuln"]);
           networkInfo += `\n\nActive Connections:\n${connectionsOutput}`;
         }
 
@@ -130,7 +135,7 @@ ${systemInfoOutput}`;
     async onDiskUsage(_ctx: any) {
       try {
         const diskOutput = await executeSystemCommand(platformCommands.diskUsageCmd);
-        
+
         const diskInfo = `Disk Usage - ${getPlatformDisplayName()}\n\n${diskOutput}`;
         return { data: diskInfo };
       } catch (error) {
@@ -143,24 +148,28 @@ ${systemInfoOutput}`;
       try {
         const envVars = Deno.env.toObject();
         let envInfo = `Environment Variables - ${getPlatformDisplayName()}\n\n`;
-        
-        const filteredVars = filter 
-          ? Object.entries(envVars).filter(([key]) => 
-              key.toLowerCase().includes(filter.toLowerCase())
-            )
+
+        const filteredVars = filter
+          ? Object.entries(envVars).filter(([key]) =>
+            key.toLowerCase().includes(filter.toLowerCase())
+          )
           : Object.entries(envVars);
-        
+
         // Mask sensitive values
         const sensitivePatterns = [
-          /password/i, /token/i, /key/i, /secret/i, /auth/i
+          /password/i,
+          /token/i,
+          /key/i,
+          /secret/i,
+          /auth/i,
         ];
-        
+
         filteredVars.forEach(([key, value]) => {
-          const isSensitive = sensitivePatterns.some(pattern => pattern.test(key));
-          const displayValue = isSensitive ? '***MASKED***' : value;
+          const isSensitive = sensitivePatterns.some((pattern) => pattern.test(key));
+          const displayValue = isSensitive ? "***MASKED***" : value;
           envInfo += `${key}=${displayValue}\n`;
         });
-        
+
         envInfo += `\nTotal: ${filteredVars.length} variables`;
         if (filter) {
           envInfo += ` (filtered by: ${filter})`;
@@ -176,25 +185,25 @@ ${systemInfoOutput}`;
     async onSystemLogs(_ctx: any, lines: number = 50, service?: string) {
       try {
         let command = platformCommands.systemLogsCmd;
-        
+
         if (service) {
-          const journalAvailable = await isCommandAvailable('journalctl');
+          const journalAvailable = await isCommandAvailable("journalctl");
           if (journalAvailable) {
-            command = ['journalctl', '-u', service, '-n', lines.toString(), '--no-pager'];
+            command = ["journalctl", "-u", service, "-n", lines.toString(), "--no-pager"];
           } else {
-            command = ['dmesg', '|', 'grep', service, '|', 'tail', `-${lines}`];
+            command = ["dmesg", "|", "grep", service, "|", "tail", `-${lines}`];
           }
         } else {
-          const journalAvailable = await isCommandAvailable('journalctl');
+          const journalAvailable = await isCommandAvailable("journalctl");
           if (journalAvailable) {
-            command = ['journalctl', '-n', lines.toString(), '--no-pager'];
+            command = ["journalctl", "-n", lines.toString(), "--no-pager"];
           } else {
-            command = ['dmesg', '|', 'tail', `-${lines}`];
+            command = ["dmesg", "|", "tail", `-${lines}`];
           }
         }
-        
+
         const logOutput = await executeSystemCommand(command);
-        
+
         let logInfo = `System Logs - ${getPlatformDisplayName()}\n`;
         if (service) logInfo += `Service: ${service}\n`;
         logInfo += `Lines: ${lines}\n\n${logOutput}`;
@@ -206,13 +215,13 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onPortScan(_ctx: any, host: string = 'localhost', _ports?: string) {
+    async onPortScan(_ctx: any, host: string = "localhost", _ports?: string) {
       try {
         let portInfo = `Port Scan - ${host} (${getPlatformDisplayName()})\n\n`;
-        
+
         // Try ss first, fallback to netstat
-        const ssAvailable = await isCommandAvailable('ss');
-        const command = ssAvailable ? ['ss', '-tuln'] : ['netstat', '-tuln'];
+        const ssAvailable = await isCommandAvailable("ss");
+        const command = ssAvailable ? ["ss", "-tuln"] : ["netstat", "-tuln"];
 
         const output = await executeSystemCommand(command);
         portInfo += `Listening Ports:\n${output}`;
@@ -227,17 +236,17 @@ ${systemInfoOutput}`;
     async onServiceStatus(_ctx: any, service?: string) {
       try {
         let command = platformCommands.serviceStatusCmd;
-        
+
         if (service) {
-          if (platform === 'darwin') {
-            command = ['launchctl', 'list', '|', 'grep', service];
+          if (platform === "darwin") {
+            command = ["launchctl", "list", "|", "grep", service];
           } else {
-            command = ['systemctl', 'status', service, '--no-pager'];
+            command = ["systemctl", "status", service, "--no-pager"];
           }
         }
-        
+
         const serviceOutput = await executeSystemCommand(command);
-        
+
         let serviceInfo = `Service Status - ${getPlatformDisplayName()}\n`;
         if (service) serviceInfo += `Service: ${service}\n`;
         serviceInfo += `\n${serviceOutput}`;
@@ -263,21 +272,21 @@ ${systemInfoOutput}`;
 
     async onRefreshBedrock(_ctx: any) {
       try {
-        const cmd = new Deno.Command('aws', {
-          args: ['sso', 'login', '--profile', 'enterprise-ai'],
-          stdout: 'piped',
-          stderr: 'piped',
+        const cmd = new Deno.Command("aws", {
+          args: ["sso", "login", "--profile", "enterprise-ai"],
+          stdout: "piped",
+          stderr: "piped",
         });
         const output = await cmd.output();
         if (!output.success) {
           const stderr = new TextDecoder().decode(output.stderr);
-          throw new Error(stderr || 'AWS SSO login failed');
+          throw new Error(stderr || "AWS SSO login failed");
         }
-        return { data: 'AWS SSO login completed — Bedrock credentials refreshed successfully.' };
+        return { data: "AWS SSO login completed — Bedrock credentials refreshed successfully." };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to launch SSO login: ${message}`);
       }
-    }
+    },
   };
 }

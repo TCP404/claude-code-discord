@@ -1,18 +1,19 @@
 /** @module settings/unified-handlers — Interaction handlers for the unified /settings command. */
 import type { UnifiedBotSettings } from "./unified-settings.ts";
-import { 
-  UNIFIED_DEFAULT_SETTINGS, 
-  THINKING_MODES, 
-  OPERATION_MODES, 
+import {
+  ANTHROPIC_RATE_LIMITS,
   EFFORT_LEVELS,
-  ANTHROPIC_RATE_LIMITS 
+  OPERATION_MODES,
+  THINKING_MODES,
+  UNIFIED_DEFAULT_SETTINGS,
 } from "./unified-settings.ts";
 import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
-import { 
-  getTodosManager, 
-  type TodoItem as PersistenceTodoItem
-} from "../util/persistence.ts";
-import { toggleMcpServerActive, reconnectMcpServerActive, getMcpServerStatus } from "../claude/query-manager.ts";
+import { getTodosManager, type TodoItem as PersistenceTodoItem } from "../util/persistence.ts";
+import {
+  getMcpServerStatus,
+  reconnectMcpServerActive,
+  toggleMcpServerActive,
+} from "../claude/query-manager.ts";
 import * as path from "https://deno.land/std@0.208.0/path/mod.ts";
 
 // .claude/mcp.json file format types (Claude Code standard format)
@@ -38,7 +39,7 @@ export interface UnifiedSettingsHandlerDeps {
 export interface TodoItem {
   id: string;
   content: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  priority: "low" | "medium" | "high" | "critical";
   completed: boolean;
   createdAt: Date;
   completedAt?: Date;
@@ -56,11 +57,11 @@ let persistenceInitialized = false;
 // Initialize persistence and load data
 async function ensurePersistence(): Promise<void> {
   if (persistenceInitialized) return;
-  
+
   try {
     // Load todos
     const savedTodos = await todosManager.load([]);
-    todos = savedTodos.map(t => ({
+    todos = savedTodos.map((t) => ({
       id: t.id,
       content: t.text,
       priority: t.priority,
@@ -68,28 +69,28 @@ async function ensurePersistence(): Promise<void> {
       createdAt: new Date(t.createdAt),
       completedAt: t.completedAt ? new Date(t.completedAt) : undefined,
       estimatedTokens: 0,
-      rateLimitTier: undefined
+      rateLimitTier: undefined,
     }));
-    
+
     // NOTE: MCP servers are now read from .claude/mcp.json on-demand, not loaded here
-    
+
     persistenceInitialized = true;
     console.log(`Persistence: Loaded ${todos.length} todos`);
   } catch (error) {
-    console.error('Persistence: Failed to initialize:', error);
+    console.error("Persistence: Failed to initialize:", error);
     persistenceInitialized = true; // Don't retry on error
   }
 }
 
 // Save todos to persistence
 async function saveTodos(): Promise<void> {
-  const persistenceTodos: PersistenceTodoItem[] = todos.map(t => ({
+  const persistenceTodos: PersistenceTodoItem[] = todos.map((t) => ({
     id: t.id,
     text: t.content,
     priority: t.priority,
     completed: t.completed,
     createdAt: t.createdAt.toISOString(),
-    completedAt: t.completedAt?.toISOString()
+    completedAt: t.completedAt?.toISOString(),
   }));
   await todosManager.save(persistenceTodos);
 }
@@ -120,7 +121,11 @@ async function writeMCPJsonConfig(workDir: string, config: MCPJsonConfig): Promi
     await Deno.mkdir(path.join(workDir, MCP_JSON_DIR), { recursive: true });
     const content = JSON.stringify(config, null, 2);
     await Deno.writeTextFile(filePath, content);
-    console.log(`MCP: Saved ${Object.keys(config.mcpServers).length} server(s) to ${MCP_JSON_DIR}/${MCP_JSON_FILENAME}`);
+    console.log(
+      `MCP: Saved ${
+        Object.keys(config.mcpServers).length
+      } server(s) to ${MCP_JSON_DIR}/${MCP_JSON_FILENAME}`,
+    );
     return true;
   } catch (error) {
     console.error(`Failed to write ${MCP_JSON_DIR}/${MCP_JSON_FILENAME}:`, error);
@@ -137,122 +142,130 @@ export function createUnifiedSettingsHandlers(deps: UnifiedSettingsHandlerDeps) 
         await ctx.deferReply();
 
         switch (category) {
-          case 'show':
+          case "show":
             await showAllSettings(ctx, settings);
             break;
-            
-          case 'bot':
+
+          case "bot":
             await handleBotSettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'claude':
+
+          case "claude":
             await handleClaudeSettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'modes':
+
+          case "modes":
             await handleModeSettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'output':
+
+          case "output":
             await handleOutputSettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'proxy':
+
+          case "proxy":
             await handleProxySettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'developer':
+
+          case "developer":
             await handleDeveloperSettings(ctx, settings, updateSettings, action, value);
             break;
-            
-          case 'reset':
+
+          case "reset":
             await handleResetSettings(ctx, settings, updateSettings, action);
             break;
-            
+
           default:
             await ctx.editReply({
               embeds: [{
                 color: 0xff0000,
-                title: '❌ Invalid Category',
+                title: "❌ Invalid Category",
                 description: `Unknown settings category: ${category}`,
-                timestamp: true
-              }]
+                timestamp: true,
+              }],
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('settings', error instanceof Error ? error : new Error(String(error)), 'unified-settings');
+        await crashHandler.reportCrash(
+          "settings",
+          error instanceof Error ? error : new Error(String(error)),
+          "unified-settings",
+        );
         throw error;
       }
     },
 
     async onTodos(
-      ctx: any, 
-      action: string, 
-      content?: string, 
-      priority?: string, 
-      rateTier?: string
+      ctx: any,
+      action: string,
+      content?: string,
+      priority?: string,
+      rateTier?: string,
     ) {
       try {
         await ctx.deferReply();
 
         switch (action) {
-          case 'list':
+          case "list":
             await listTodos(ctx);
             break;
-            
-          case 'add':
+
+          case "add":
             if (!content) {
               await ctx.editReply({
-                content: 'Content is required for adding todos.',
-                ephemeral: true
+                content: "Content is required for adding todos.",
+                ephemeral: true,
               });
               return;
             }
             await addTodo(ctx, content, priority as any, rateTier);
             break;
-            
-          case 'complete':
+
+          case "complete":
             if (!content) {
               await ctx.editReply({
-                content: 'Todo ID is required for completion.',
-                ephemeral: true
+                content: "Todo ID is required for completion.",
+                ephemeral: true,
               });
               return;
             }
             await completeTodo(ctx, content);
             break;
-            
-          case 'generate':
+
+          case "generate":
             if (!content) {
               await ctx.editReply({
-                content: 'File path is required for todo generation.',
-                ephemeral: true
+                content: "File path is required for todo generation.",
+                ephemeral: true,
               });
               return;
             }
             await generateTodosFromCode(ctx, content, rateTier);
             break;
-            
-          case 'prioritize':
+
+          case "prioritize":
             await prioritizeTodos(ctx, rateTier);
             break;
-            
-          case 'rate-status':
+
+          case "rate-status":
             await showRateStatus(ctx, rateTier);
             break;
-            
+
           default:
             await ctx.editReply({
               embeds: [{
                 color: 0xff0000,
-                title: '❌ Invalid Action',
+                title: "❌ Invalid Action",
                 description: `Unknown todo action: ${action}`,
-                timestamp: true
-              }]
+                timestamp: true,
+              }],
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('todos', error instanceof Error ? error : new Error(String(error)), 'todos-command');
+        await crashHandler.reportCrash(
+          "todos",
+          error instanceof Error ? error : new Error(String(error)),
+          "todos-command",
+        );
         throw error;
       }
     },
@@ -263,90 +276,95 @@ export function createUnifiedSettingsHandlers(deps: UnifiedSettingsHandlerDeps) 
       serverName?: string,
       command?: string,
       description?: string,
-      value?: string
+      value?: string,
     ) {
       try {
         await ctx.deferReply();
 
         switch (action) {
-          case 'list':
+          case "list":
             await listMCPServers(ctx, workDir);
             break;
-            
-          case 'add':
+
+          case "add":
             if (!serverName || !command) {
               await ctx.editReply({
-                content: 'Server name and command are required for adding MCP servers.',
-                ephemeral: true
+                content: "Server name and command are required for adding MCP servers.",
+                ephemeral: true,
               });
               return;
             }
             await addMCPServer(ctx, workDir, serverName, command, description);
             break;
-            
-          case 'remove':
+
+          case "remove":
             if (!serverName) {
               await ctx.editReply({
-                content: 'Server name is required for removal.',
-                ephemeral: true
+                content: "Server name is required for removal.",
+                ephemeral: true,
               });
               return;
             }
             await removeMCPServer(ctx, workDir, serverName);
             break;
-          
-          case 'toggle':
+
+          case "toggle":
             if (!serverName) {
               await ctx.editReply({
-                content: 'Server name is required for toggling. Use `/mcp action:toggle server_name:[name] value:[on/off]`',
-                ephemeral: true
+                content:
+                  "Server name is required for toggling. Use `/mcp action:toggle server_name:[name] value:[on/off]`",
+                ephemeral: true,
               });
               return;
             }
             await handleMcpToggle(ctx, serverName, value);
             break;
-          
-          case 'reconnect':
+
+          case "reconnect":
             if (!serverName) {
               await ctx.editReply({
-                content: 'Server name is required for reconnecting.',
-                ephemeral: true
+                content: "Server name is required for reconnecting.",
+                ephemeral: true,
               });
               return;
             }
             await handleMcpReconnect(ctx, serverName);
             break;
-            
-          case 'test':
+
+          case "test":
             if (!serverName) {
               await ctx.editReply({
-                content: 'Server name is required for testing.',
-                ephemeral: true
+                content: "Server name is required for testing.",
+                ephemeral: true,
               });
               return;
             }
             await testMCPConnection(ctx, workDir, serverName);
             break;
-            
-          case 'status':
+
+          case "status":
             await showMCPStatus(ctx, workDir);
             break;
-            
+
           default:
             await ctx.editReply({
               embeds: [{
                 color: 0xff0000,
-                title: '❌ Invalid Action',
+                title: "❌ Invalid Action",
                 description: `Unknown MCP action: ${action}`,
-                timestamp: true
-              }]
+                timestamp: true,
+              }],
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('mcp', error instanceof Error ? error : new Error(String(error)), 'mcp-command');
+        await crashHandler.reportCrash(
+          "mcp",
+          error instanceof Error ? error : new Error(String(error)),
+          "mcp-command",
+        );
         throw error;
       }
-    }
+    },
   };
 }
 
@@ -354,84 +372,118 @@ export function createUnifiedSettingsHandlers(deps: UnifiedSettingsHandlerDeps) 
 async function showAllSettings(ctx: any, settings: UnifiedBotSettings) {
   const fields = [
     {
-      name: '🤖 Bot Settings',
-      value: `Mentions: ${settings.mentionEnabled ? `Enabled (<@${settings.mentionUserId}>)` : 'Disabled'}`,
-      inline: true
+      name: "🤖 Bot Settings",
+      value: `Mentions: ${
+        settings.mentionEnabled ? `Enabled (<@${settings.mentionUserId}>)` : "Disabled"
+      }`,
+      inline: true,
     },
     {
-      name: '🧠 Claude Settings',
-      value: `Model: ${settings.defaultModel}\nAuto Git Context: ${settings.autoIncludeGitContext ? 'On' : 'Off'}\nAuto System Info: ${settings.autoIncludeSystemInfo ? 'On' : 'Off'}`,
-      inline: true
+      name: "🧠 Claude Settings",
+      value: `Model: ${settings.defaultModel}\nAuto Git Context: ${
+        settings.autoIncludeGitContext ? "On" : "Off"
+      }\nAuto System Info: ${settings.autoIncludeSystemInfo ? "On" : "Off"}`,
+      inline: true,
     },
     {
-      name: '⚙️ Mode Settings',
-      value: `Thinking: ${THINKING_MODES[settings.thinkingMode].name}\nOperation: ${OPERATION_MODES[settings.operationMode].name}\nEffort: ${EFFORT_LEVELS[settings.effortLevel].name}\nBudget: ${settings.maxBudgetUsd != null ? '$' + settings.maxBudgetUsd : 'No limit'}`,
-      inline: true
+      name: "⚙️ Mode Settings",
+      value: `Thinking: ${THINKING_MODES[settings.thinkingMode].name}\nOperation: ${
+        OPERATION_MODES[settings.operationMode].name
+      }\nEffort: ${EFFORT_LEVELS[settings.effortLevel].name}\nBudget: ${
+        settings.maxBudgetUsd != null ? "$" + settings.maxBudgetUsd : "No limit"
+      }`,
+      inline: true,
     },
     {
-      name: '🎨 Output Settings',
-      value: `Code Highlighting: ${settings.codeHighlighting ? 'On' : 'Off'}\nMax Length: ${settings.maxOutputLength}\nTimestamp: ${settings.timestampFormat}`,
-      inline: true
+      name: "🎨 Output Settings",
+      value: `Code Highlighting: ${
+        settings.codeHighlighting ? "On" : "Off"
+      }\nMax Length: ${settings.maxOutputLength}\nTimestamp: ${settings.timestampFormat}`,
+      inline: true,
     },
     {
-      name: '🌐 Proxy Settings',
-      value: `Proxy: ${settings.proxyEnabled ? 'Enabled' : 'Disabled'}\nNo-Proxy Domains: ${settings.noProxyDomains.length}`,
-      inline: true
+      name: "🌐 Proxy Settings",
+      value: `Proxy: ${
+        settings.proxyEnabled ? "Enabled" : "Disabled"
+      }\nNo-Proxy Domains: ${settings.noProxyDomains.length}`,
+      inline: true,
     },
     {
-      name: '🔧 Developer Settings',
-      value: `Debug: ${settings.enableDebugMode ? 'On' : 'Off'}\nVerbose Errors: ${settings.verboseErrorReporting ? 'On' : 'Off'}\nMetrics: ${settings.enablePerformanceMetrics ? 'On' : 'Off'}`,
-      inline: true
+      name: "🔧 Developer Settings",
+      value: `Debug: ${settings.enableDebugMode ? "On" : "Off"}\nVerbose Errors: ${
+        settings.verboseErrorReporting ? "On" : "Off"
+      }\nMetrics: ${settings.enablePerformanceMetrics ? "On" : "Off"}`,
+      inline: true,
     },
     {
-      name: '🔌 SDK Features',
-      value: `Agent Teams: ${settings.enableAgentTeams ? '✅' : '❌'}\nSandbox: ${settings.sandboxConfig ? '✅ Custom' : settings.enableSandbox ? '✅ Basic' : '❌'}\nAdditional Dirs: ${settings.additionalDirectories.length > 0 ? settings.additionalDirectories.join(', ') : 'None'}\n1M Context: ${settings.enable1MContext ? '✅' : '❌'}\nCheckpointing: ${settings.enableFileCheckpointing ? '✅' : '❌'}`,
-      inline: true
+      name: "🔌 SDK Features",
+      value: `Agent Teams: ${settings.enableAgentTeams ? "✅" : "❌"}\nSandbox: ${
+        settings.sandboxConfig ? "✅ Custom" : settings.enableSandbox ? "✅ Basic" : "❌"
+      }\nAdditional Dirs: ${
+        settings.additionalDirectories.length > 0
+          ? settings.additionalDirectories.join(", ")
+          : "None"
+      }\n1M Context: ${settings.enable1MContext ? "✅" : "❌"}\nCheckpointing: ${
+        settings.enableFileCheckpointing ? "✅" : "❌"
+      }`,
+      inline: true,
     },
     {
-      name: '🪝 Hooks',
-      value: `Tool Use: ${settings.hooksLogToolUse ? '✅' : '❌'}\nNotifications: ${settings.hooksLogNotifications ? '✅' : '❌'}\nTask Completions: ${settings.hooksLogTaskCompletions ? '✅' : '❌'}`,
-      inline: true
-    }
+      name: "🪝 Hooks",
+      value: `Tool Use: ${settings.hooksLogToolUse ? "✅" : "❌"}\nNotifications: ${
+        settings.hooksLogNotifications ? "✅" : "❌"
+      }\nTask Completions: ${settings.hooksLogTaskCompletions ? "✅" : "❌"}`,
+      inline: true,
+    },
   ];
 
   await ctx.editReply({
     embeds: [{
       color: 0x0099ff,
-      title: '⚙️ All Bot Settings',
-      description: 'Use `/settings category:[category] action:[action] value:[value]` to modify settings',
+      title: "⚙️ All Bot Settings",
+      description:
+        "Use `/settings category:[category] action:[action] value:[value]` to modify settings",
       fields,
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
-async function handleBotSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleBotSettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  value?: string,
+) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '🤖 Bot Settings',
-        description: 'Available actions: `mention-on`, `mention-off`',
+        title: "🤖 Bot Settings",
+        description: "Available actions: `mention-on`, `mention-off`",
         fields: [
           {
-            name: 'Current Settings',
-            value: `Mentions: ${settings.mentionEnabled ? `Enabled (<@${settings.mentionUserId}>)` : 'Disabled'}`,
-            inline: false
-          }
+            name: "Current Settings",
+            value: `Mentions: ${
+              settings.mentionEnabled ? `Enabled (<@${settings.mentionUserId}>)` : "Disabled"
+            }`,
+            inline: false,
+          },
         ],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'mention-on':
+    case "mention-on":
       if (!value) {
         await ctx.editReply({
-          content: 'User ID is required for mention-on. Usage: `/settings category:bot action:mention-on value:[user_id]`',
-          ephemeral: true
+          content:
+            "User ID is required for mention-on. Usage: `/settings category:bot action:mention-on value:[user_id]`",
+          ephemeral: true,
         });
         return;
       }
@@ -439,92 +491,111 @@ async function handleBotSettings(ctx: any, settings: UnifiedBotSettings, updateS
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Mentions Enabled',
+          title: "✅ Mentions Enabled",
           description: `Mentions enabled for <@${value}>`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'mention-off':
+
+    case "mention-off":
       updateSettings({ mentionEnabled: false, mentionUserId: null });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Mentions Disabled',
-          description: 'Mentions have been disabled',
-          timestamp: true
-        }]
+          title: "✅ Mentions Disabled",
+          description: "Mentions have been disabled",
+          timestamp: true,
+        }],
       });
       break;
-      
+
     default:
       await ctx.editReply({
         content: `Unknown bot action: ${action}. Available: mention-on, mention-off`,
-        ephemeral: true
+        ephemeral: true,
       });
   }
 }
 
-async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleModeSettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  value?: string,
+) {
   if (!action) {
-    const thinkingOptions = Object.entries(THINKING_MODES).map(([key, mode]) => 
+    const thinkingOptions = Object.entries(THINKING_MODES).map(([key, mode]) =>
       `• **${key}**: ${mode.name} - ${mode.description}`
-    ).join('\n');
-    
-    const operationOptions = Object.entries(OPERATION_MODES).map(([key, mode]) => 
+    ).join("\n");
+
+    const operationOptions = Object.entries(OPERATION_MODES).map(([key, mode]) =>
       `• **${key}**: ${mode.name} - ${mode.description} (${mode.riskLevel} risk)`
-    ).join('\n');
+    ).join("\n");
 
     const effortOptions = Object.entries(EFFORT_LEVELS).map(([key, level]) =>
       `• **${key}**: ${level.name} - ${level.description}`
-    ).join('\n');
+    ).join("\n");
 
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '⚙️ Mode Settings',
-        description: 'Available actions: `set-thinking`, `set-operation`, `set-effort`, `set-budget`, `toggle-1m`, `toggle-checkpoint`, `toggle-sandbox`, `toggle-structured-output`, `set-output-schema`',
+        title: "⚙️ Mode Settings",
+        description:
+          "Available actions: `set-thinking`, `set-operation`, `set-effort`, `set-budget`, `toggle-1m`, `toggle-checkpoint`, `toggle-sandbox`, `toggle-structured-output`, `set-output-schema`",
         fields: [
           {
-            name: 'Current Settings',
-            value: `Thinking Mode: **${settings.thinkingMode}** (${THINKING_MODES[settings.thinkingMode].name})\nOperation Mode: **${settings.operationMode}** (${OPERATION_MODES[settings.operationMode].name})\nEffort Level: **${settings.effortLevel}** (${EFFORT_LEVELS[settings.effortLevel].name})\nBudget Cap: ${settings.maxBudgetUsd != null ? `$${settings.maxBudgetUsd}` : 'No limit'}\nStructured Output: ${settings.outputJsonSchema ? '**Enabled**' : 'Disabled'}`,
-            inline: false
+            name: "Current Settings",
+            value: `Thinking Mode: **${settings.thinkingMode}** (${
+              THINKING_MODES[settings.thinkingMode].name
+            })\nOperation Mode: **${settings.operationMode}** (${
+              OPERATION_MODES[settings.operationMode].name
+            })\nEffort Level: **${settings.effortLevel}** (${
+              EFFORT_LEVELS[settings.effortLevel].name
+            })\nBudget Cap: ${
+              settings.maxBudgetUsd != null ? `$${settings.maxBudgetUsd}` : "No limit"
+            }\nStructured Output: ${settings.outputJsonSchema ? "**Enabled**" : "Disabled"}`,
+            inline: false,
           },
           {
-            name: 'Advanced Features',
-            value: `1M Context Beta: ${settings.enable1MContext ? '✅ Enabled' : '❌ Disabled'}\nFile Checkpointing: ${settings.enableFileCheckpointing ? '✅ Enabled' : '❌ Disabled'}\nSandbox Mode: ${settings.enableSandbox ? '✅ Enabled' : '❌ Disabled'}`,
-            inline: false
+            name: "Advanced Features",
+            value: `1M Context Beta: ${
+              settings.enable1MContext ? "✅ Enabled" : "❌ Disabled"
+            }\nFile Checkpointing: ${
+              settings.enableFileCheckpointing ? "✅ Enabled" : "❌ Disabled"
+            }\nSandbox Mode: ${settings.enableSandbox ? "✅ Enabled" : "❌ Disabled"}`,
+            inline: false,
           },
           {
-            name: 'Thinking Mode Options',
+            name: "Thinking Mode Options",
             value: thinkingOptions,
-            inline: false
+            inline: false,
           },
           {
-            name: 'Operation Mode Options',
+            name: "Operation Mode Options",
             value: operationOptions,
-            inline: false
+            inline: false,
           },
           {
-            name: 'Effort Level Options',
+            name: "Effort Level Options",
             value: effortOptions,
-            inline: false
-          }
+            inline: false,
+          },
         ],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'set-thinking':
+    case "set-thinking":
       if (!value || !(value in THINKING_MODES)) {
-        const options = Object.keys(THINKING_MODES).join(', ');
+        const options = Object.keys(THINKING_MODES).join(", ");
         await ctx.editReply({
           content: `Invalid thinking mode. Available options: ${options}`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
@@ -532,60 +603,66 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Thinking Mode Updated',
-          description: `Thinking mode set to: **${THINKING_MODES[value as keyof typeof THINKING_MODES].name}**`,
+          title: "✅ Thinking Mode Updated",
+          description: `Thinking mode set to: **${
+            THINKING_MODES[value as keyof typeof THINKING_MODES].name
+          }**`,
           fields: [{
-            name: 'Description',
+            name: "Description",
             value: THINKING_MODES[value as keyof typeof THINKING_MODES].description,
-            inline: false
+            inline: false,
           }],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'set-operation':
+
+    case "set-operation":
       if (!value || !(value in OPERATION_MODES)) {
-        const options = Object.keys(OPERATION_MODES).join(', ');
+        const options = Object.keys(OPERATION_MODES).join(", ");
         await ctx.editReply({
           content: `Invalid operation mode. Available options: ${options}`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
-      
+
       const mode = OPERATION_MODES[value as keyof typeof OPERATION_MODES];
-      const warningColor = mode.riskLevel === 'high' ? 0xff6600 : mode.riskLevel === 'medium' ? 0xffaa00 : 0x00ff00;
-      
+      const warningColor = mode.riskLevel === "high"
+        ? 0xff6600
+        : mode.riskLevel === "medium"
+        ? 0xffaa00
+        : 0x00ff00;
+
       updateSettings({ operationMode: value as keyof typeof OPERATION_MODES });
       await ctx.editReply({
         embeds: [{
           color: warningColor,
-          title: '✅ Operation Mode Updated',
+          title: "✅ Operation Mode Updated",
           description: `Operation mode set to: **${mode.name}**`,
           fields: [
             {
-              name: 'Description',
+              name: "Description",
               value: mode.description,
-              inline: false
+              inline: false,
             },
             {
-              name: 'Risk Level',
-              value: `${mode.riskLevel.toUpperCase()}${mode.riskLevel === 'high' ? ' ⚠️' : ''}`,
-              inline: true
-            }
+              name: "Risk Level",
+              value: `${mode.riskLevel.toUpperCase()}${mode.riskLevel === "high" ? " ⚠️" : ""}`,
+              inline: true,
+            },
           ],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'set-effort':
+
+    case "set-effort":
       if (!value || !(value in EFFORT_LEVELS)) {
-        const options = Object.keys(EFFORT_LEVELS).join(', ');
+        const options = Object.keys(EFFORT_LEVELS).join(", ");
         await ctx.editReply({
           content: `Invalid effort level. Available options: ${options}`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
@@ -593,42 +670,44 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Effort Level Updated',
-          description: `Effort level set to: **${EFFORT_LEVELS[value as keyof typeof EFFORT_LEVELS].name}**`,
+          title: "✅ Effort Level Updated",
+          description: `Effort level set to: **${
+            EFFORT_LEVELS[value as keyof typeof EFFORT_LEVELS].name
+          }**`,
           fields: [{
-            name: 'Description',
+            name: "Description",
             value: EFFORT_LEVELS[value as keyof typeof EFFORT_LEVELS].description,
-            inline: false
+            inline: false,
           }],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'set-budget':
+    case "set-budget":
       if (!value) {
         await ctx.editReply({
           content: `Provide a budget in USD (e.g. \`0.50\`) or \`none\` to remove the limit.`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
-      if (value === 'none' || value === 'null' || value === '0') {
+      if (value === "none" || value === "null" || value === "0") {
         updateSettings({ maxBudgetUsd: null });
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '✅ Budget Limit Removed',
-            description: 'No budget limit is set. Queries will run until completion.',
-            timestamp: true
-          }]
+            title: "✅ Budget Limit Removed",
+            description: "No budget limit is set. Queries will run until completion.",
+            timestamp: true,
+          }],
         });
       } else {
         const budget = parseFloat(value);
         if (isNaN(budget) || budget <= 0) {
           await ctx.editReply({
             content: `Invalid budget. Provide a positive number (e.g. \`0.50\`) or \`none\`.`,
-            ephemeral: true
+            ephemeral: true,
           });
           return;
         }
@@ -636,107 +715,113 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '✅ Budget Limit Set',
+            title: "✅ Budget Limit Set",
             description: `Maximum budget per query: **$${budget.toFixed(2)}**`,
             fields: [{
-              name: 'Note',
-              value: 'Queries will stop if this budget is exceeded.',
-              inline: false
+              name: "Note",
+              value: "Queries will stop if this budget is exceeded.",
+              inline: false,
             }],
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
       }
       break;
 
-    case 'toggle-1m': {
+    case "toggle-1m": {
       const newVal = !settings.enable1MContext;
       updateSettings({ enable1MContext: newVal });
       await ctx.editReply({
         embeds: [{
           color: newVal ? 0x00ff00 : 0xff6600,
-          title: newVal ? '✅ 1M Context Beta Enabled' : '⚠️ 1M Context Beta Disabled',
+          title: newVal ? "✅ 1M Context Beta Enabled" : "⚠️ 1M Context Beta Disabled",
           description: newVal
-            ? 'Extended context window (up to 1M tokens) is now active. This uses the `context-1m-2025-08-07` beta.'
-            : '1M context beta has been disabled. Standard context window will be used.',
-          timestamp: true
-        }]
+            ? "Extended context window (up to 1M tokens) is now active. This uses the `context-1m-2025-08-07` beta."
+            : "1M context beta has been disabled. Standard context window will be used.",
+          timestamp: true,
+        }],
       });
       break;
     }
 
-    case 'toggle-checkpoint': {
+    case "toggle-checkpoint": {
       const newVal = !settings.enableFileCheckpointing;
       updateSettings({ enableFileCheckpointing: newVal });
       await ctx.editReply({
         embeds: [{
           color: newVal ? 0x00ff00 : 0xff6600,
-          title: newVal ? '✅ File Checkpointing Enabled' : '⚠️ File Checkpointing Disabled',
+          title: newVal ? "✅ File Checkpointing Enabled" : "⚠️ File Checkpointing Disabled",
           description: newVal
-            ? 'File checkpointing is now active. Claude will create restore points for file changes, allowing rollback via `rewindFiles()`.'
-            : 'File checkpointing has been disabled.',
-          timestamp: true
-        }]
+            ? "File checkpointing is now active. Claude will create restore points for file changes, allowing rollback via `rewindFiles()`."
+            : "File checkpointing has been disabled.",
+          timestamp: true,
+        }],
       });
       break;
     }
 
-    case 'toggle-sandbox': {
+    case "toggle-sandbox": {
       const newVal = !settings.enableSandbox;
       updateSettings({ enableSandbox: newVal });
       await ctx.editReply({
         embeds: [{
           color: newVal ? 0x00ff00 : 0xff6600,
-          title: newVal ? '✅ Sandbox Mode Enabled' : '⚠️ Sandbox Mode Disabled',
+          title: newVal ? "✅ Sandbox Mode Enabled" : "⚠️ Sandbox Mode Disabled",
           description: newVal
-            ? 'Sandbox mode is now active. Commands will run in an isolated environment with restricted filesystem and network access.'
-            : 'Sandbox mode has been disabled. Commands will run with normal system access.',
-          timestamp: true
-        }]
+            ? "Sandbox mode is now active. Commands will run in an isolated environment with restricted filesystem and network access."
+            : "Sandbox mode has been disabled. Commands will run with normal system access.",
+          timestamp: true,
+        }],
       });
       break;
     }
 
-    case 'toggle-structured-output': {
+    case "toggle-structured-output": {
       const isEnabled = settings.outputJsonSchema !== null;
       if (isEnabled) {
         updateSettings({ outputJsonSchema: null });
         await ctx.editReply({
           embeds: [{
             color: 0xff6600,
-            title: '📝 Structured Output Disabled',
-            description: 'Claude will respond with normal unstructured text.',
-            timestamp: true
-          }]
+            title: "📝 Structured Output Disabled",
+            description: "Claude will respond with normal unstructured text.",
+            timestamp: true,
+          }],
         });
       } else {
         const defaultSchema: Record<string, unknown> = {
-          type: 'object',
+          type: "object",
           properties: {
-            response: { type: 'string', description: 'The main response text' },
-            confidence: { type: 'number', description: 'Confidence level 0-1' },
-            sources: { type: 'array', items: { type: 'string' }, description: 'Referenced sources' }
+            response: { type: "string", description: "The main response text" },
+            confidence: { type: "number", description: "Confidence level 0-1" },
+            sources: {
+              type: "array",
+              items: { type: "string" },
+              description: "Referenced sources",
+            },
           },
-          required: ['response']
+          required: ["response"],
         };
         updateSettings({ outputJsonSchema: defaultSchema });
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '📊 Structured Output Enabled',
-            description: 'Claude will respond with JSON matching the configured schema.\n\nDefault schema has `response`, `confidence`, and `sources` fields.\nUse `set-output-schema` to customize.',
-            timestamp: true
-          }]
+            title: "📊 Structured Output Enabled",
+            description:
+              "Claude will respond with JSON matching the configured schema.\n\nDefault schema has `response`, `confidence`, and `sources` fields.\nUse `set-output-schema` to customize.",
+            timestamp: true,
+          }],
         });
       }
       break;
     }
 
-    case 'set-output-schema': {
+    case "set-output-schema": {
       if (!value) {
         await ctx.editReply({
-          content: 'Provide a JSON schema string. Example: `set-output-schema {"type":"object","properties":{"answer":{"type":"string"}}}`',
-          ephemeral: true
+          content:
+            'Provide a JSON schema string. Example: `set-output-schema {"type":"object","properties":{"answer":{"type":"string"}}}`',
+          ephemeral: true,
         });
         break;
       }
@@ -746,15 +831,15 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '📊 Output Schema Updated',
+            title: "📊 Output Schema Updated",
             description: `\`\`\`json\n${JSON.stringify(schema, null, 2).slice(0, 1000)}\n\`\`\``,
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
       } catch {
         await ctx.editReply({
-          content: 'Invalid JSON schema. Please provide valid JSON.',
-          ephemeral: true
+          content: "Invalid JSON schema. Please provide valid JSON.",
+          ephemeral: true,
         });
       }
       break;
@@ -762,8 +847,9 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
 
     default:
       await ctx.editReply({
-        content: `Unknown mode action: ${action}. Available: set-thinking, set-operation, set-effort, set-budget, toggle-1m, toggle-checkpoint, toggle-sandbox, toggle-structured-output, set-output-schema`,
-        ephemeral: true
+        content:
+          `Unknown mode action: ${action}. Available: set-thinking, set-operation, set-effort, set-budget, toggle-1m, toggle-checkpoint, toggle-sandbox, toggle-structured-output, set-output-schema`,
+        ephemeral: true,
       });
   }
 }
@@ -771,7 +857,13 @@ async function handleModeSettings(ctx: any, settings: UnifiedBotSettings, update
 // Additional handler functions would continue here...
 // For brevity, I'll implement the key functions and the rest can follow the same pattern
 
-async function handleClaudeSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleClaudeSettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  value?: string,
+) {
   // Implementation for Claude settings management
   // NOTE: Only model, system prompt, and context options are supported by Claude Code CLI
   // Temperature and maxTokens are NOT supported
@@ -779,112 +871,129 @@ async function handleClaudeSettings(ctx: any, settings: UnifiedBotSettings, upda
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '🧠 Claude Settings',
-        description: 'Available actions: `set-model`, `toggle-git-context`, `toggle-system-info`, `set-system-prompt`\n\n*Note: Only model and context options are supported by Claude Code CLI*',
+        title: "🧠 Claude Settings",
+        description:
+          "Available actions: `set-model`, `toggle-git-context`, `toggle-system-info`, `set-system-prompt`\n\n*Note: Only model and context options are supported by Claude Code CLI*",
         fields: [{
-          name: 'Current Settings',
-          value: `Model: ${settings.defaultModel}\nAuto Git Context: ${settings.autoIncludeGitContext ? 'On' : 'Off'}\nAuto System Info: ${settings.autoIncludeSystemInfo ? 'On' : 'Off'}\nSystem Prompt: ${settings.defaultSystemPrompt ? 'Set' : 'Not set'}`,
-          inline: false
+          name: "Current Settings",
+          value: `Model: ${settings.defaultModel}\nAuto Git Context: ${
+            settings.autoIncludeGitContext ? "On" : "Off"
+          }\nAuto System Info: ${settings.autoIncludeSystemInfo ? "On" : "Off"}\nSystem Prompt: ${
+            settings.defaultSystemPrompt ? "Set" : "Not set"
+          }`,
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'set-model':
+    case "set-model":
       if (!value) {
-        const availableModels = Object.entries(CLAUDE_MODELS).map(([key, model]) => 
+        const availableModels = Object.entries(CLAUDE_MODELS).map(([key, model]) =>
           `• **${key}**: ${model.name}`
-        ).join('\n');
+        ).join("\n");
         await ctx.editReply({
           embeds: [{
             color: 0xff6600,
-            title: '❌ Invalid Model',
-            description: 'Please specify a valid Claude model.',
+            title: "❌ Invalid Model",
+            description: "Please specify a valid Claude model.",
             fields: [{
-              name: 'Available Models',
+              name: "Available Models",
               value: availableModels,
-              inline: false
+              inline: false,
             }],
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
         return;
       }
-      
+
       updateSettings({ defaultModel: value });
-      const modelInfo = CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS] || { name: value, description: 'Custom model', contextWindow: 200000, supportsThinking: false, recommended: false, tier: 'balanced' as const };
+      const modelInfo = CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS] ||
+        {
+          name: value,
+          description: "Custom model",
+          contextWindow: 200000,
+          supportsThinking: false,
+          recommended: false,
+          tier: "balanced" as const,
+        };
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Model Updated',
+          title: "✅ Model Updated",
           description: `Default Claude model set to: **${modelInfo.name}**`,
           fields: [{
-            name: 'Model Details',
-            value: `${modelInfo.description}\nContext Window: ${modelInfo.contextWindow.toLocaleString()} tokens`,
-            inline: false
+            name: "Model Details",
+            value:
+              `${modelInfo.description}\nContext Window: ${modelInfo.contextWindow.toLocaleString()} tokens`,
+            inline: false,
           }],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'toggle-git-context':
+
+    case "toggle-git-context":
       const newGitContext = !settings.autoIncludeGitContext;
       updateSettings({ autoIncludeGitContext: newGitContext });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Git Context Updated',
-          description: `Auto-include Git context: **${newGitContext ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ Git Context Updated",
+          description: `Auto-include Git context: **${newGitContext ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'toggle-system-info':
+
+    case "toggle-system-info":
       const newSystemInfo = !settings.autoIncludeSystemInfo;
       updateSettings({ autoIncludeSystemInfo: newSystemInfo });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ System Info Updated',
-          description: `Auto-include System Info: **${newSystemInfo ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ System Info Updated",
+          description: `Auto-include System Info: **${newSystemInfo ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
-      
-    case 'set-system-prompt':
+
+    case "set-system-prompt":
       if (!value) {
         updateSettings({ defaultSystemPrompt: null });
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '✅ System Prompt Cleared',
-            description: 'Default system prompt has been removed',
-            timestamp: true
-          }]
+            title: "✅ System Prompt Cleared",
+            description: "Default system prompt has been removed",
+            timestamp: true,
+          }],
         });
       } else {
         updateSettings({ defaultSystemPrompt: value });
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '✅ System Prompt Set',
-            description: `System prompt updated:\n\`${value.substring(0, 200)}${value.length > 200 ? '...' : ''}\``,
-            timestamp: true
-          }]
+            title: "✅ System Prompt Set",
+            description: `System prompt updated:\n\`${value.substring(0, 200)}${
+              value.length > 200 ? "..." : ""
+            }\``,
+            timestamp: true,
+          }],
         });
       }
       break;
-      
+
     default:
       await ctx.editReply({
-        content: `Unknown Claude action: ${action}. Available: set-model, toggle-git-context, toggle-system-info, set-system-prompt`,
-        ephemeral: true
+        content:
+          `Unknown Claude action: ${action}. Available: set-model, toggle-git-context, toggle-system-info, set-system-prompt`,
+        ephemeral: true,
       });
   }
 }
@@ -892,61 +1001,71 @@ async function handleClaudeSettings(ctx: any, settings: UnifiedBotSettings, upda
 // Todo management functions
 async function listTodos(ctx: any) {
   await ensurePersistence();
-  
+
   if (todos.length === 0) {
     await ctx.editReply({
       embeds: [{
         color: 0xffaa00,
-        title: '📝 No Todos Found',
-        description: 'No todos found. Use `/todos action:add content:[todo]` to create your first todo.',
-        timestamp: true
-      }]
+        title: "📝 No Todos Found",
+        description:
+          "No todos found. Use `/todos action:add content:[todo]` to create your first todo.",
+        timestamp: true,
+      }],
     });
     return;
   }
 
-  const activeTodos = todos.filter(t => !t.completed);
-  const completedTodos = todos.filter(t => t.completed);
-  
-  const activeList = activeTodos.length > 0 ? 
-    activeTodos.slice(0, 10).map(todo => 
-      `• **${todo.priority.toUpperCase()}**: ${todo.content.substring(0, 100)}${todo.content.length > 100 ? '...' : ''} (\`${todo.id.substring(0, 8)}\`)`
-    ).join('\n') : 'No active todos';
-    
+  const activeTodos = todos.filter((t) => !t.completed);
+  const completedTodos = todos.filter((t) => t.completed);
+
+  const activeList = activeTodos.length > 0
+    ? activeTodos.slice(0, 10).map((todo) =>
+      `• **${todo.priority.toUpperCase()}**: ${todo.content.substring(0, 100)}${
+        todo.content.length > 100 ? "..." : ""
+      } (\`${todo.id.substring(0, 8)}\`)`
+    ).join("\n")
+    : "No active todos";
+
   const fields = [{
     name: `📋 Active Todos (${activeTodos.length})`,
     value: activeList,
-    inline: false
+    inline: false,
   }];
-  
+
   if (completedTodos.length > 0) {
-    const recentCompleted = completedTodos.slice(-5).map(todo => 
+    const recentCompleted = completedTodos.slice(-5).map((todo) =>
       `• ~~${todo.content.substring(0, 80)}~~`
-    ).join('\n');
-    
+    ).join("\n");
+
     fields.push({
       name: `✅ Recently Completed (${completedTodos.length} total)`,
       value: recentCompleted,
-      inline: false
+      inline: false,
     });
   }
 
   await ctx.editReply({
     embeds: [{
       color: 0x0099ff,
-      title: '📝 Development Todos',
+      title: "📝 Development Todos",
       fields,
       footer: {
-        text: '💾 Persisted to disk | Use /todos action:complete content:[todo_id] to mark as complete'
+        text:
+          "💾 Persisted to disk | Use /todos action:complete content:[todo_id] to mark as complete",
       },
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
-async function addTodo(ctx: any, content: string, priority: 'low' | 'medium' | 'high' | 'critical' = 'medium', rateTier?: string) {
+async function addTodo(
+  ctx: any,
+  content: string,
+  priority: "low" | "medium" | "high" | "critical" = "medium",
+  rateTier?: string,
+) {
   await ensurePersistence();
-  
+
   const todo: TodoItem = {
     id: generateTodoId(),
     content,
@@ -954,118 +1073,126 @@ async function addTodo(ctx: any, content: string, priority: 'low' | 'medium' | '
     completed: false,
     createdAt: new Date(),
     estimatedTokens: estimateTokens(content),
-    rateLimitTier: rateTier
+    rateLimitTier: rateTier,
   };
-  
+
   todos.push(todo);
   await saveTodos(); // Persist changes
-  
+
   const priorityColors = {
     low: 0x808080,
     medium: 0x0099ff,
     high: 0xff9900,
-    critical: 0xff0000
+    critical: 0xff0000,
   };
 
   await ctx.editReply({
     embeds: [{
       color: priorityColors[priority],
-      title: '✅ Todo Added',
+      title: "✅ Todo Added",
       fields: [
-        { name: 'Content', value: content, inline: false },
-        { name: 'Priority', value: priority.toUpperCase(), inline: true },
-        { name: 'ID', value: `\`${todo.id.substring(0, 8)}\``, inline: true },
-        { name: 'Estimated Tokens', value: todo.estimatedTokens.toString(), inline: true }
+        { name: "Content", value: content, inline: false },
+        { name: "Priority", value: priority.toUpperCase(), inline: true },
+        { name: "ID", value: `\`${todo.id.substring(0, 8)}\``, inline: true },
+        { name: "Estimated Tokens", value: todo.estimatedTokens.toString(), inline: true },
       ],
-      footer: { text: '💾 Saved to disk' },
-      timestamp: true
-    }]
+      footer: { text: "💾 Saved to disk" },
+      timestamp: true,
+    }],
   });
 }
 
 async function completeTodo(ctx: any, todoId: string) {
   await ensurePersistence();
-  
-  const todo = todos.find(t => t.id.startsWith(todoId) && !t.completed);
-  
+
+  const todo = todos.find((t) => t.id.startsWith(todoId) && !t.completed);
+
   if (!todo) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Todo Not Found',
+        title: "❌ Todo Not Found",
         description: `No active todo found with ID starting with: ${todoId}`,
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
-  
+
   todo.completed = true;
   todo.completedAt = new Date();
   await saveTodos(); // Persist changes
-  
+
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '✅ Todo Completed',
+      title: "✅ Todo Completed",
       fields: [
-        { name: 'Completed Todo', value: todo.content, inline: false },
-        { name: 'Priority', value: todo.priority.toUpperCase(), inline: true },
-        { name: 'Duration', value: formatDuration(Date.now() - todo.createdAt.getTime()), inline: true }
+        { name: "Completed Todo", value: todo.content, inline: false },
+        { name: "Priority", value: todo.priority.toUpperCase(), inline: true },
+        {
+          name: "Duration",
+          value: formatDuration(Date.now() - todo.createdAt.getTime()),
+          inline: true,
+        },
       ],
-      footer: { text: '💾 Saved to disk' },
-      timestamp: true
-    }]
+      footer: { text: "💾 Saved to disk" },
+      timestamp: true,
+    }],
   });
 }
 
 async function showRateStatus(ctx: any, rateTier?: string) {
-  const tier = rateTier || 'basic';
+  const tier = rateTier || "basic";
   const limits = ANTHROPIC_RATE_LIMITS[tier];
-  
+
   if (!limits) {
     await ctx.editReply({
-      content: 'Invalid rate tier specified.',
-      ephemeral: true
+      content: "Invalid rate tier specified.",
+      ephemeral: true,
     });
     return;
   }
-  
+
   // Get real usage data from tracker
   const { getUsageSummary, getTodayUsage } = await import("../util/usage-tracker.ts");
   const summary = await getUsageSummary();
   const todayUsage = await getTodayUsage();
-  
+
   // Calculate usage from real data
   const totalCost = todayUsage.statistics.totalCost;
   const totalRequests = todayUsage.statistics.totalRequests;
-  
+
   // Estimate token usage from cost (rough estimate: $0.003 per 1K input, $0.015 per 1K output)
   // Average ~$0.01 per 1K tokens combined
   const estimatedTokens = Math.round(totalCost * 100000);
   const usagePercentage = Math.min((estimatedTokens / limits.tokensPerDay) * 100, 100);
-  
+
   const statusColor = usagePercentage > 80 ? 0xff0000 : usagePercentage > 60 ? 0xff9900 : 0x00ff00;
-  
+
   await ctx.editReply({
     embeds: [{
       color: statusColor,
-      title: '📊 API Rate Limit Status',
+      title: "📊 API Rate Limit Status",
       fields: [
-        { name: 'Current Tier', value: limits.name, inline: true },
+        { name: "Current Tier", value: limits.name, inline: true },
         { name: "Today's Cost", value: summary.today.cost, inline: true },
         { name: "Today's Requests", value: totalRequests.toString(), inline: true },
-        { name: 'Estimated Tokens', value: `${estimatedTokens.toLocaleString()} / ${limits.tokensPerDay.toLocaleString()}`, inline: true },
-        { name: 'Usage %', value: `${usagePercentage.toFixed(1)}%`, inline: true },
-        { name: 'Avg Response Time', value: summary.today.avgDuration, inline: true },
-        { name: 'All-Time Cost', value: summary.allTime.cost, inline: true },
-        { name: 'All-Time Requests', value: summary.allTime.requests.toString(), inline: true },
-        { name: 'Top Model', value: summary.allTime.topModel, inline: true },
-        { name: 'Tier Description', value: limits.description, inline: false }
+        {
+          name: "Estimated Tokens",
+          value: `${estimatedTokens.toLocaleString()} / ${limits.tokensPerDay.toLocaleString()}`,
+          inline: true,
+        },
+        { name: "Usage %", value: `${usagePercentage.toFixed(1)}%`, inline: true },
+        { name: "Avg Response Time", value: summary.today.avgDuration, inline: true },
+        { name: "All-Time Cost", value: summary.allTime.cost, inline: true },
+        { name: "All-Time Requests", value: summary.allTime.requests.toString(), inline: true },
+        { name: "Top Model", value: summary.allTime.topModel, inline: true },
+        { name: "Tier Description", value: limits.description, inline: false },
       ],
-      footer: { text: '💾 Real usage data from API tracker' },
-      timestamp: true
-    }]
+      footer: { text: "💾 Real usage data from API tracker" },
+      timestamp: true,
+    }],
   });
 }
 
@@ -1073,119 +1200,126 @@ async function showRateStatus(ctx: any, rateTier?: string) {
 async function listMCPServers(ctx: any, workDir: string) {
   const config = await readMCPJsonConfig(workDir);
   const serverNames = Object.keys(config.mcpServers);
-  
+
   if (serverNames.length === 0) {
     await ctx.editReply({
       embeds: [{
         color: 0xffaa00,
-        title: '🔌 No MCP Servers',
-        description: `No MCP servers configured in \`.claude/mcp.json\`.\n\nUse \`/mcp action:add\` to add your first server.`,
+        title: "🔌 No MCP Servers",
+        description:
+          `No MCP servers configured in \`.claude/mcp.json\`.\n\nUse \`/mcp action:add\` to add your first server.`,
         footer: { text: `📁 ${path.join(workDir, MCP_JSON_FILENAME)}` },
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
-  
+
   // Build server list with nice formatting
-  const fields = serverNames.map(name => {
+  const fields = serverNames.map((name) => {
     const server = config.mcpServers[name];
-    const command = server.args?.length 
-      ? `\`${server.command} ${server.args.join(' ')}\``
+    const command = server.args?.length
+      ? `\`${server.command} ${server.args.join(" ")}\``
       : `\`${server.command}\``;
-    
+
     let details = command;
     if (server.description) {
       details = `${server.description}\n${command}`;
     }
     if (server.env && Object.keys(server.env).length > 0) {
-      const envVars = Object.keys(server.env).join(', ');
+      const envVars = Object.keys(server.env).join(", ");
       details += `\n🔑 Env: \`${envVars}\``;
     }
-    
+
     return {
       name: `🔌 ${name}`,
       value: details,
-      inline: false
+      inline: false,
     };
   });
-  
+
   await ctx.editReply({
     embeds: [{
       color: 0x0099ff,
-      title: '🔌 MCP Servers',
+      title: "🔌 MCP Servers",
       description: `Found **${serverNames.length}** server(s) configured in \`.claude/mcp.json\``,
       fields: fields.slice(0, 25), // Discord limit
       footer: {
-        text: `📁 ${path.join(workDir, MCP_JSON_FILENAME)}`
+        text: `📁 ${path.join(workDir, MCP_JSON_FILENAME)}`,
       },
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
-async function addMCPServer(ctx: any, workDir: string, name: string, commandOrUrl: string, description?: string) {
+async function addMCPServer(
+  ctx: any,
+  workDir: string,
+  name: string,
+  commandOrUrl: string,
+  description?: string,
+) {
   const config = await readMCPJsonConfig(workDir);
-  
+
   // Check if server name already exists
   if (config.mcpServers[name]) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Server Exists',
+        title: "❌ Server Exists",
         description: `MCP server with name "${name}" already exists in \`.claude/mcp.json\`.`,
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
-  
+
   // Parse command - support "npx -y @package" format
   const parts = commandOrUrl.trim().split(/\s+/);
   const command = parts[0];
   const args = parts.slice(1);
-  
+
   // Create the new server entry
   const serverEntry: MCPJsonServerEntry = {
     command,
     ...(args.length > 0 && { args }),
-    ...(description && { description })
+    ...(description && { description }),
   };
-  
+
   // Add to config
   config.mcpServers[name] = serverEntry;
-  
+
   // Save to .claude/mcp.json
   const saved = await writeMCPJsonConfig(workDir, config);
-  
+
   if (!saved) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Save Failed',
+        title: "❌ Save Failed",
         description: `Failed to save server to \`.claude/mcp.json\`. Check file permissions.`,
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
-  
-  const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-  
+
+  const fullCommand = args.length > 0 ? `${command} ${args.join(" ")}` : command;
+
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '✅ MCP Server Added',
+      title: "✅ MCP Server Added",
       fields: [
-        { name: 'Server Name', value: name, inline: true },
-        { name: 'Command', value: `\`${fullCommand}\``, inline: false },
-        ...(description ? [{ name: 'Description', value: description, inline: false }] : [])
+        { name: "Server Name", value: name, inline: true },
+        { name: "Command", value: `\`${fullCommand}\``, inline: false },
+        ...(description ? [{ name: "Description", value: description, inline: false }] : []),
       ],
       footer: {
-        text: `📁 Saved to ${MCP_JSON_FILENAME}`
+        text: `📁 Saved to ${MCP_JSON_FILENAME}`,
       },
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
@@ -1212,64 +1346,75 @@ function formatDuration(ms: number): string {
 }
 
 // Output settings management
-async function handleOutputSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleOutputSettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  value?: string,
+) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '🎨 Output Settings',
-        description: 'Available actions: `toggle-highlighting`, `set-max-length`, `set-timestamp`',
+        title: "🎨 Output Settings",
+        description: "Available actions: `toggle-highlighting`, `set-max-length`, `set-timestamp`",
         fields: [{
-          name: 'Current Settings',
-          value: `Code Highlighting: ${settings.codeHighlighting ? 'On' : 'Off'}\nAuto-Page Long Output: ${settings.autoPageLongOutput ? 'On' : 'Off'}\nMax Output Length: ${settings.maxOutputLength} chars\nTimestamp Format: ${settings.timestampFormat}`,
-          inline: false
+          name: "Current Settings",
+          value: `Code Highlighting: ${
+            settings.codeHighlighting ? "On" : "Off"
+          }\nAuto-Page Long Output: ${
+            settings.autoPageLongOutput ? "On" : "Off"
+          }\nMax Output Length: ${settings.maxOutputLength} chars\nTimestamp Format: ${settings.timestampFormat}`,
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'toggle-highlighting':
+    case "toggle-highlighting":
       const newHighlighting = !settings.codeHighlighting;
       updateSettings({ codeHighlighting: newHighlighting });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Code Highlighting Updated',
-          description: `Code highlighting: **${newHighlighting ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ Code Highlighting Updated",
+          description: `Code highlighting: **${newHighlighting ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'toggle-paging':
+    case "toggle-paging":
       const newPaging = !settings.autoPageLongOutput;
       updateSettings({ autoPageLongOutput: newPaging });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Auto-Paging Updated',
-          description: `Auto-page long output: **${newPaging ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ Auto-Paging Updated",
+          description: `Auto-page long output: **${newPaging ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'set-max-length':
+    case "set-max-length":
       if (!value) {
         await ctx.editReply({
-          content: 'Please specify max length (500-10000). Usage: `/settings category:output action:set-max-length value:[number]`',
-          ephemeral: true
+          content:
+            "Please specify max length (500-10000). Usage: `/settings category:output action:set-max-length value:[number]`",
+          ephemeral: true,
         });
         return;
       }
       const maxLen = parseInt(value, 10);
       if (isNaN(maxLen) || maxLen < 500 || maxLen > 10000) {
         await ctx.editReply({
-          content: 'Max length must be between 500 and 10000 characters.',
-          ephemeral: true
+          content: "Max length must be between 500 and 10000 characters.",
+          ephemeral: true,
         });
         return;
       }
@@ -1277,65 +1422,78 @@ async function handleOutputSettings(ctx: any, settings: UnifiedBotSettings, upda
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Max Output Length Updated',
+          title: "✅ Max Output Length Updated",
           description: `Max output length set to: **${maxLen}** characters`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'set-timestamp':
-      if (!value || !['relative', 'absolute', 'both'].includes(value)) {
+    case "set-timestamp":
+      if (!value || !["relative", "absolute", "both"].includes(value)) {
         await ctx.editReply({
-          content: 'Please specify timestamp format: `relative`, `absolute`, or `both`',
-          ephemeral: true
+          content: "Please specify timestamp format: `relative`, `absolute`, or `both`",
+          ephemeral: true,
         });
         return;
       }
-      updateSettings({ timestampFormat: value as 'relative' | 'absolute' | 'both' });
+      updateSettings({ timestampFormat: value as "relative" | "absolute" | "both" });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Timestamp Format Updated',
+          title: "✅ Timestamp Format Updated",
           description: `Timestamp format set to: **${value}**`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
     default:
       await ctx.editReply({
-        content: `Unknown output action: ${action}. Available: toggle-highlighting, toggle-paging, set-max-length, set-timestamp`,
-        ephemeral: true
+        content:
+          `Unknown output action: ${action}. Available: toggle-highlighting, toggle-paging, set-max-length, set-timestamp`,
+        ephemeral: true,
       });
   }
 }
 
 // Proxy settings management
-async function handleProxySettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, value?: string) {
+async function handleProxySettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  value?: string,
+) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '🌐 Proxy Settings',
-        description: 'Available actions: `enable`, `disable`, `set-url`, `add-bypass`, `remove-bypass`, `list-bypass`',
+        title: "🌐 Proxy Settings",
+        description:
+          "Available actions: `enable`, `disable`, `set-url`, `add-bypass`, `remove-bypass`, `list-bypass`",
         fields: [{
-          name: 'Current Settings',
-          value: `Proxy: ${settings.proxyEnabled ? 'Enabled' : 'Disabled'}\nProxy URL: ${settings.proxyUrl || 'Not set'}\nBypass Domains: ${settings.noProxyDomains.length > 0 ? settings.noProxyDomains.join(', ') : 'None'}`,
-          inline: false
+          name: "Current Settings",
+          value: `Proxy: ${settings.proxyEnabled ? "Enabled" : "Disabled"}\nProxy URL: ${
+            settings.proxyUrl || "Not set"
+          }\nBypass Domains: ${
+            settings.noProxyDomains.length > 0 ? settings.noProxyDomains.join(", ") : "None"
+          }`,
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'enable':
+    case "enable":
       if (!settings.proxyUrl) {
         await ctx.editReply({
-          content: 'Please set a proxy URL first with `/settings category:proxy action:set-url value:[url]`',
-          ephemeral: true
+          content:
+            "Please set a proxy URL first with `/settings category:proxy action:set-url value:[url]`",
+          ephemeral: true,
         });
         return;
       }
@@ -1343,30 +1501,30 @@ async function handleProxySettings(ctx: any, settings: UnifiedBotSettings, updat
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Proxy Enabled',
+          title: "✅ Proxy Enabled",
           description: `Proxy enabled using: ${settings.proxyUrl}`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'disable':
+    case "disable":
       updateSettings({ proxyEnabled: false });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Proxy Disabled',
-          description: 'Proxy has been disabled',
-          timestamp: true
-        }]
+          title: "✅ Proxy Disabled",
+          description: "Proxy has been disabled",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'set-url':
+    case "set-url":
       if (!value) {
         await ctx.editReply({
-          content: 'Please provide a proxy URL. Example: `http://proxy.example.com:8080`',
-          ephemeral: true
+          content: "Please provide a proxy URL. Example: `http://proxy.example.com:8080`",
+          ephemeral: true,
         });
         return;
       }
@@ -1376,31 +1534,31 @@ async function handleProxySettings(ctx: any, settings: UnifiedBotSettings, updat
         await ctx.editReply({
           embeds: [{
             color: 0x00ff00,
-            title: '✅ Proxy URL Set',
+            title: "✅ Proxy URL Set",
             description: `Proxy URL set to: ${value}`,
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
       } catch {
         await ctx.editReply({
-          content: 'Invalid URL format. Please provide a valid proxy URL.',
-          ephemeral: true
+          content: "Invalid URL format. Please provide a valid proxy URL.",
+          ephemeral: true,
         });
       }
       break;
 
-    case 'add-bypass':
+    case "add-bypass":
       if (!value) {
         await ctx.editReply({
-          content: 'Please provide a domain to bypass. Example: `localhost` or `*.internal.com`',
-          ephemeral: true
+          content: "Please provide a domain to bypass. Example: `localhost` or `*.internal.com`",
+          ephemeral: true,
         });
         return;
       }
       if (settings.noProxyDomains.includes(value)) {
         await ctx.editReply({
           content: `Domain "${value}" is already in the bypass list.`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
@@ -1408,122 +1566,132 @@ async function handleProxySettings(ctx: any, settings: UnifiedBotSettings, updat
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Bypass Domain Added',
+          title: "✅ Bypass Domain Added",
           description: `Added "${value}" to proxy bypass list`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'remove-bypass':
+    case "remove-bypass":
       if (!value) {
         await ctx.editReply({
-          content: 'Please specify which domain to remove from bypass list.',
-          ephemeral: true
+          content: "Please specify which domain to remove from bypass list.",
+          ephemeral: true,
         });
         return;
       }
       if (!settings.noProxyDomains.includes(value)) {
         await ctx.editReply({
           content: `Domain "${value}" is not in the bypass list.`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
-      updateSettings({ noProxyDomains: settings.noProxyDomains.filter(d => d !== value) });
+      updateSettings({ noProxyDomains: settings.noProxyDomains.filter((d) => d !== value) });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Bypass Domain Removed',
+          title: "✅ Bypass Domain Removed",
           description: `Removed "${value}" from proxy bypass list`,
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'list-bypass':
+    case "list-bypass":
       await ctx.editReply({
         embeds: [{
           color: 0x0099ff,
-          title: '🌐 Proxy Bypass Domains',
-          description: settings.noProxyDomains.length > 0 
-            ? settings.noProxyDomains.map(d => `• ${d}`).join('\n')
-            : 'No bypass domains configured',
-          timestamp: true
-        }]
+          title: "🌐 Proxy Bypass Domains",
+          description: settings.noProxyDomains.length > 0
+            ? settings.noProxyDomains.map((d) => `• ${d}`).join("\n")
+            : "No bypass domains configured",
+          timestamp: true,
+        }],
       });
       break;
 
     default:
       await ctx.editReply({
-        content: `Unknown proxy action: ${action}. Available: enable, disable, set-url, add-bypass, remove-bypass, list-bypass`,
-        ephemeral: true
+        content:
+          `Unknown proxy action: ${action}. Available: enable, disable, set-url, add-bypass, remove-bypass, list-bypass`,
+        ephemeral: true,
       });
   }
 }
 
 // Developer settings management
-async function handleDeveloperSettings(ctx: any, settings: UnifiedBotSettings, updateSettings: any, action?: string, _value?: string) {
+async function handleDeveloperSettings(
+  ctx: any,
+  settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+  _value?: string,
+) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
         color: 0x0099ff,
-        title: '🔧 Developer Settings',
-        description: 'Available actions: `toggle-debug`, `toggle-verbose`, `toggle-metrics`, `show-debug`',
+        title: "🔧 Developer Settings",
+        description:
+          "Available actions: `toggle-debug`, `toggle-verbose`, `toggle-metrics`, `show-debug`",
         fields: [{
-          name: 'Current Settings',
-          value: `Debug Mode: ${settings.enableDebugMode ? 'On' : 'Off'}\nVerbose Errors: ${settings.verboseErrorReporting ? 'On' : 'Off'}\nPerformance Metrics: ${settings.enablePerformanceMetrics ? 'On' : 'Off'}`,
-          inline: false
+          name: "Current Settings",
+          value: `Debug Mode: ${settings.enableDebugMode ? "On" : "Off"}\nVerbose Errors: ${
+            settings.verboseErrorReporting ? "On" : "Off"
+          }\nPerformance Metrics: ${settings.enablePerformanceMetrics ? "On" : "Off"}`,
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   switch (action) {
-    case 'toggle-debug':
+    case "toggle-debug":
       const newDebug = !settings.enableDebugMode;
       updateSettings({ enableDebugMode: newDebug });
       await ctx.editReply({
         embeds: [{
           color: newDebug ? 0xff9900 : 0x00ff00,
-          title: newDebug ? '🔧 Debug Mode Enabled' : '✅ Debug Mode Disabled',
-          description: newDebug 
-            ? '⚠️ Debug mode is now **enabled**. Additional logging will be shown.'
-            : 'Debug mode has been disabled.',
-          timestamp: true
-        }]
+          title: newDebug ? "🔧 Debug Mode Enabled" : "✅ Debug Mode Disabled",
+          description: newDebug
+            ? "⚠️ Debug mode is now **enabled**. Additional logging will be shown."
+            : "Debug mode has been disabled.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'toggle-verbose':
+    case "toggle-verbose":
       const newVerbose = !settings.verboseErrorReporting;
       updateSettings({ verboseErrorReporting: newVerbose });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Verbose Error Reporting Updated',
-          description: `Verbose error reporting: **${newVerbose ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ Verbose Error Reporting Updated",
+          description: `Verbose error reporting: **${newVerbose ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'toggle-metrics':
+    case "toggle-metrics":
       const newMetrics = !settings.enablePerformanceMetrics;
       updateSettings({ enablePerformanceMetrics: newMetrics });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Performance Metrics Updated',
-          description: `Performance metrics: **${newMetrics ? 'Enabled' : 'Disabled'}**`,
-          timestamp: true
-        }]
+          title: "✅ Performance Metrics Updated",
+          description: `Performance metrics: **${newMetrics ? "Enabled" : "Disabled"}**`,
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'show-debug':
+    case "show-debug":
       const debugInfo = {
         denoVersion: Deno.version.deno,
         v8Version: Deno.version.v8,
@@ -1532,49 +1700,63 @@ async function handleDeveloperSettings(ctx: any, settings: UnifiedBotSettings, u
         arch: Deno.build.arch,
         memory: Deno.memoryUsage(),
         pid: Deno.pid,
-        uptime: Math.floor(performance.now() / 1000)
+        uptime: Math.floor(performance.now() / 1000),
       };
       await ctx.editReply({
         embeds: [{
           color: 0x0099ff,
-          title: '🔧 Debug Information',
+          title: "🔧 Debug Information",
           fields: [
-            { name: 'Deno Version', value: debugInfo.denoVersion, inline: true },
-            { name: 'V8 Version', value: debugInfo.v8Version, inline: true },
-            { name: 'TypeScript', value: debugInfo.typescriptVersion, inline: true },
-            { name: 'Platform', value: `${debugInfo.platform} (${debugInfo.arch})`, inline: true },
-            { name: 'PID', value: debugInfo.pid.toString(), inline: true },
-            { name: 'Uptime', value: `${debugInfo.uptime}s`, inline: true },
-            { name: 'Memory Usage', value: `RSS: ${(debugInfo.memory.rss / 1024 / 1024).toFixed(2)} MB\nHeap: ${(debugInfo.memory.heapUsed / 1024 / 1024).toFixed(2)} / ${(debugInfo.memory.heapTotal / 1024 / 1024).toFixed(2)} MB`, inline: false }
+            { name: "Deno Version", value: debugInfo.denoVersion, inline: true },
+            { name: "V8 Version", value: debugInfo.v8Version, inline: true },
+            { name: "TypeScript", value: debugInfo.typescriptVersion, inline: true },
+            { name: "Platform", value: `${debugInfo.platform} (${debugInfo.arch})`, inline: true },
+            { name: "PID", value: debugInfo.pid.toString(), inline: true },
+            { name: "Uptime", value: `${debugInfo.uptime}s`, inline: true },
+            {
+              name: "Memory Usage",
+              value: `RSS: ${(debugInfo.memory.rss / 1024 / 1024).toFixed(2)} MB\nHeap: ${
+                (debugInfo.memory.heapUsed / 1024 / 1024).toFixed(2)
+              } / ${(debugInfo.memory.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+              inline: false,
+            },
           ],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       break;
 
     default:
       await ctx.editReply({
-        content: `Unknown developer action: ${action}. Available: toggle-debug, toggle-verbose, toggle-metrics, show-debug`,
-        ephemeral: true
+        content:
+          `Unknown developer action: ${action}. Available: toggle-debug, toggle-verbose, toggle-metrics, show-debug`,
+        ephemeral: true,
       });
   }
 }
 
 // Reset settings to defaults
-async function handleResetSettings(ctx: any, _settings: UnifiedBotSettings, updateSettings: any, action?: string) {
+async function handleResetSettings(
+  ctx: any,
+  _settings: UnifiedBotSettings,
+  updateSettings: any,
+  action?: string,
+) {
   if (!action) {
     await ctx.editReply({
       embeds: [{
         color: 0xff6600,
-        title: '⚠️ Reset Settings',
-        description: 'Available actions: `all`, `bot`, `claude`, `modes`, `output`, `proxy`, `developer`\n\n**Warning:** This will reset settings to their default values.',
+        title: "⚠️ Reset Settings",
+        description:
+          "Available actions: `all`, `bot`, `claude`, `modes`, `output`, `proxy`, `developer`\n\n**Warning:** This will reset settings to their default values.",
         fields: [{
-          name: 'Usage',
-          value: '`/settings category:reset action:[category]`\n\nExample: `/settings category:reset action:all` to reset everything',
-          inline: false
+          name: "Usage",
+          value:
+            "`/settings category:reset action:[category]`\n\nExample: `/settings category:reset action:all` to reset everything",
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
@@ -1582,51 +1764,51 @@ async function handleResetSettings(ctx: any, _settings: UnifiedBotSettings, upda
   const defaultSettings = { ...UNIFIED_DEFAULT_SETTINGS };
 
   switch (action) {
-    case 'all':
+    case "all":
       updateSettings(defaultSettings);
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ All Settings Reset',
-          description: 'All settings have been reset to their default values.',
-          timestamp: true
-        }]
+          title: "✅ All Settings Reset",
+          description: "All settings have been reset to their default values.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'bot':
+    case "bot":
       updateSettings({
         mentionEnabled: defaultSettings.mentionEnabled,
-        mentionUserId: defaultSettings.mentionUserId
+        mentionUserId: defaultSettings.mentionUserId,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Bot Settings Reset',
-          description: 'Bot settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Bot Settings Reset",
+          description: "Bot settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'claude':
+    case "claude":
       updateSettings({
         defaultModel: defaultSettings.defaultModel,
         defaultSystemPrompt: defaultSettings.defaultSystemPrompt,
         autoIncludeSystemInfo: defaultSettings.autoIncludeSystemInfo,
-        autoIncludeGitContext: defaultSettings.autoIncludeGitContext
+        autoIncludeGitContext: defaultSettings.autoIncludeGitContext,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Claude Settings Reset',
-          description: 'Claude settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Claude Settings Reset",
+          description: "Claude settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'modes':
+    case "modes":
       updateSettings({
         thinkingMode: defaultSettings.thinkingMode,
         operationMode: defaultSettings.operationMode,
@@ -1634,71 +1816,72 @@ async function handleResetSettings(ctx: any, _settings: UnifiedBotSettings, upda
         maxBudgetUsd: defaultSettings.maxBudgetUsd,
         enable1MContext: defaultSettings.enable1MContext,
         enableFileCheckpointing: defaultSettings.enableFileCheckpointing,
-        enableSandbox: defaultSettings.enableSandbox
+        enableSandbox: defaultSettings.enableSandbox,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Mode Settings Reset',
-          description: 'Mode settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Mode Settings Reset",
+          description: "Mode settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'output':
+    case "output":
       updateSettings({
         codeHighlighting: defaultSettings.codeHighlighting,
         autoPageLongOutput: defaultSettings.autoPageLongOutput,
         maxOutputLength: defaultSettings.maxOutputLength,
-        timestampFormat: defaultSettings.timestampFormat
+        timestampFormat: defaultSettings.timestampFormat,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Output Settings Reset',
-          description: 'Output settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Output Settings Reset",
+          description: "Output settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'proxy':
+    case "proxy":
       updateSettings({
         proxyEnabled: defaultSettings.proxyEnabled,
         proxyUrl: defaultSettings.proxyUrl,
-        noProxyDomains: defaultSettings.noProxyDomains
+        noProxyDomains: defaultSettings.noProxyDomains,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Proxy Settings Reset',
-          description: 'Proxy settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Proxy Settings Reset",
+          description: "Proxy settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
-    case 'developer':
+    case "developer":
       updateSettings({
         enableDebugMode: defaultSettings.enableDebugMode,
         verboseErrorReporting: defaultSettings.verboseErrorReporting,
-        enablePerformanceMetrics: defaultSettings.enablePerformanceMetrics
+        enablePerformanceMetrics: defaultSettings.enablePerformanceMetrics,
       });
       await ctx.editReply({
         embeds: [{
           color: 0x00ff00,
-          title: '✅ Developer Settings Reset',
-          description: 'Developer settings have been reset to defaults.',
-          timestamp: true
-        }]
+          title: "✅ Developer Settings Reset",
+          description: "Developer settings have been reset to defaults.",
+          timestamp: true,
+        }],
       });
       break;
 
     default:
       await ctx.editReply({
-        content: `Unknown reset target: ${action}. Available: all, bot, claude, modes, output, proxy, developer`,
-        ephemeral: true
+        content:
+          `Unknown reset target: ${action}. Available: all, bot, claude, modes, output, proxy, developer`,
+        ephemeral: true,
       });
   }
 }
@@ -1706,17 +1889,17 @@ async function handleResetSettings(ctx: any, _settings: UnifiedBotSettings, upda
 // Generate todos from code comments (TODO, FIXME, etc.)
 async function generateTodosFromCode(ctx: any, filePath: string, _rateTier?: string) {
   await ensurePersistence();
-  
+
   try {
     // Read the file content
     const content = await Deno.readTextFile(filePath);
-    const lines = content.split('\n');
-    
+    const lines = content.split("\n");
+
     // Regex patterns for common todo markers
     const todoPatterns = [
       /\/\/\s*(TODO|FIXME|HACK|XXX|BUG|NOTE):\s*(.+)/i,
       /\/\*\s*(TODO|FIXME|HACK|XXX|BUG|NOTE):\s*(.+)\*\//i,
-      /#\s*(TODO|FIXME|HACK|XXX|BUG|NOTE):\s*(.+)/i
+      /#\s*(TODO|FIXME|HACK|XXX|BUG|NOTE):\s*(.+)/i,
     ];
 
     const foundTodos: { type: string; content: string; line: number }[] = [];
@@ -1728,7 +1911,7 @@ async function generateTodosFromCode(ctx: any, filePath: string, _rateTier?: str
           foundTodos.push({
             type: match[1].toUpperCase(),
             content: match[2].trim(),
-            line: index + 1
+            line: index + 1,
           });
           break;
         }
@@ -1739,27 +1922,27 @@ async function generateTodosFromCode(ctx: any, filePath: string, _rateTier?: str
       await ctx.editReply({
         embeds: [{
           color: 0xffaa00,
-          title: '📝 No Todos Found',
+          title: "📝 No Todos Found",
           description: `No TODO, FIXME, HACK, XXX, BUG, or NOTE comments found in the file.`,
           fields: [{
-            name: 'File Scanned',
+            name: "File Scanned",
             value: filePath,
-            inline: false
+            inline: false,
           }],
-          timestamp: true
-        }]
+          timestamp: true,
+        }],
       });
       return;
     }
 
     // Create todo items from found comments
-    const priorityMap: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
-      'NOTE': 'low',
-      'TODO': 'medium',
-      'HACK': 'medium',
-      'XXX': 'high',
-      'FIXME': 'high',
-      'BUG': 'critical'
+    const priorityMap: Record<string, "low" | "medium" | "high" | "critical"> = {
+      "NOTE": "low",
+      "TODO": "medium",
+      "HACK": "medium",
+      "XXX": "high",
+      "FIXME": "high",
+      "BUG": "critical",
     };
 
     let addedCount = 0;
@@ -1768,42 +1951,44 @@ async function generateTodosFromCode(ctx: any, filePath: string, _rateTier?: str
       const newTodo: TodoItem = {
         id: todoId,
         content: `[${found.type}] Line ${found.line}: ${found.content}`,
-        priority: priorityMap[found.type] || 'medium',
+        priority: priorityMap[found.type] || "medium",
         completed: false,
         createdAt: new Date(),
-        estimatedTokens: Math.ceil(found.content.length / 4) // Rough estimate
+        estimatedTokens: Math.ceil(found.content.length / 4), // Rough estimate
       };
       todos.push(newTodo);
       addedCount++;
     }
-    
+
     await saveTodos(); // Persist changes
 
-    const summary = foundTodos.slice(0, 5).map(t => 
-      `• **${t.type}** (L${t.line}): ${t.content.substring(0, 60)}${t.content.length > 60 ? '...' : ''}`
-    ).join('\n');
+    const summary = foundTodos.slice(0, 5).map((t) =>
+      `• **${t.type}** (L${t.line}): ${t.content.substring(0, 60)}${
+        t.content.length > 60 ? "..." : ""
+      }`
+    ).join("\n");
 
     await ctx.editReply({
       embeds: [{
         color: 0x00ff00,
-        title: '✅ Todos Generated',
+        title: "✅ Todos Generated",
         description: `Found and added **${addedCount}** todos from code comments.`,
         fields: [
-          { name: 'File Scanned', value: filePath, inline: false },
-          { name: 'Preview (First 5)', value: summary || 'None', inline: false }
+          { name: "File Scanned", value: filePath, inline: false },
+          { name: "Preview (First 5)", value: summary || "None", inline: false },
         ],
-        footer: { text: '💾 Saved to disk' },
-        timestamp: true
-      }]
+        footer: { text: "💾 Saved to disk" },
+        timestamp: true,
+      }],
     });
   } catch (error) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Error Reading File',
-        description: error instanceof Error ? error.message : 'Failed to read file',
-        timestamp: true
-      }]
+        title: "❌ Error Reading File",
+        description: error instanceof Error ? error.message : "Failed to read file",
+        timestamp: true,
+      }],
     });
   }
 }
@@ -1814,23 +1999,23 @@ async function prioritizeTodos(ctx: any, _rateTier?: string) {
     await ctx.editReply({
       embeds: [{
         color: 0xffaa00,
-        title: '📝 No Todos to Prioritize',
-        description: 'No todos found. Add some todos first.',
-        timestamp: true
-      }]
+        title: "📝 No Todos to Prioritize",
+        description: "No todos found. Add some todos first.",
+        timestamp: true,
+      }],
     });
     return;
   }
 
   // Sort by priority (critical > high > medium > low) then by creation date
   const priorityOrder: Record<string, number> = {
-    'critical': 0,
-    'high': 1,
-    'medium': 2,
-    'low': 3
+    "critical": 0,
+    "high": 1,
+    "medium": 2,
+    "low": 3,
   };
 
-  const activeTodos = todos.filter(t => !t.completed);
+  const activeTodos = todos.filter((t) => !t.completed);
   activeTodos.sort((a, b) => {
     const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
     if (priorityDiff !== 0) return priorityDiff;
@@ -1838,26 +2023,28 @@ async function prioritizeTodos(ctx: any, _rateTier?: string) {
   });
 
   // Update the todos array with sorted order
-  const completedTodos = todos.filter(t => t.completed);
+  const completedTodos = todos.filter((t) => t.completed);
   todos.length = 0;
   todos.push(...activeTodos, ...completedTodos);
 
-  const preview = activeTodos.slice(0, 10).map((t, i) => 
-    `${i + 1}. **${t.priority.toUpperCase()}**: ${t.content.substring(0, 50)}${t.content.length > 50 ? '...' : ''}`
-  ).join('\n');
+  const preview = activeTodos.slice(0, 10).map((t, i) =>
+    `${i + 1}. **${t.priority.toUpperCase()}**: ${t.content.substring(0, 50)}${
+      t.content.length > 50 ? "..." : ""
+    }`
+  ).join("\n");
 
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '✅ Todos Prioritized',
+      title: "✅ Todos Prioritized",
       description: `Sorted **${activeTodos.length}** active todos by priority and age.`,
       fields: [{
-        name: 'Top 10 Priorities',
-        value: preview || 'None',
-        inline: false
+        name: "Top 10 Priorities",
+        value: preview || "None",
+        inline: false,
       }],
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
@@ -1865,62 +2052,64 @@ async function prioritizeTodos(ctx: any, _rateTier?: string) {
 async function removeMCPServer(ctx: any, workDir: string, serverName: string) {
   const config = await readMCPJsonConfig(workDir);
   const serverNames = Object.keys(config.mcpServers);
-  
+
   // Case-insensitive search for the server
-  const matchingName = serverNames.find(n => n.toLowerCase() === serverName.toLowerCase());
-  
+  const matchingName = serverNames.find((n) => n.toLowerCase() === serverName.toLowerCase());
+
   if (!matchingName) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Server Not Found',
+        title: "❌ Server Not Found",
         description: `No MCP server found with name: "${serverName}"`,
         fields: [{
-          name: 'Available Servers',
-          value: serverNames.length > 0 
-            ? serverNames.map(s => `• ${s}`).join('\n')
-            : 'No servers configured',
-          inline: false
+          name: "Available Servers",
+          value: serverNames.length > 0
+            ? serverNames.map((s) => `• ${s}`).join("\n")
+            : "No servers configured",
+          inline: false,
         }],
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   const removedServer = config.mcpServers[matchingName];
   delete config.mcpServers[matchingName];
-  
+
   const saved = await writeMCPJsonConfig(workDir, config);
-  
+
   if (!saved) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Save Failed',
+        title: "❌ Save Failed",
         description: `Failed to save changes to \`.claude/mcp.json\`.`,
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
-  const fullCommand = removedServer.args?.length 
-    ? `${removedServer.command} ${removedServer.args.join(' ')}`
+  const fullCommand = removedServer.args?.length
+    ? `${removedServer.command} ${removedServer.args.join(" ")}`
     : removedServer.command;
 
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '✅ MCP Server Removed',
+      title: "✅ MCP Server Removed",
       description: `Successfully removed MCP server: **${matchingName}**`,
       fields: [
-        { name: 'Command', value: `\`${fullCommand}\``, inline: false },
-        ...(removedServer.description ? [{ name: 'Description', value: removedServer.description, inline: false }] : [])
+        { name: "Command", value: `\`${fullCommand}\``, inline: false },
+        ...(removedServer.description
+          ? [{ name: "Description", value: removedServer.description, inline: false }]
+          : []),
       ],
       footer: { text: `📁 Changes saved to ${MCP_JSON_FILENAME}` },
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
@@ -1928,48 +2117,48 @@ async function removeMCPServer(ctx: any, workDir: string, serverName: string) {
 async function testMCPConnection(ctx: any, workDir: string, serverName: string) {
   const config = await readMCPJsonConfig(workDir);
   const serverNames = Object.keys(config.mcpServers);
-  
+
   // Case-insensitive search for the server
-  const matchingName = serverNames.find(n => n.toLowerCase() === serverName.toLowerCase());
-  
+  const matchingName = serverNames.find((n) => n.toLowerCase() === serverName.toLowerCase());
+
   if (!matchingName) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Server Not Found',
+        title: "❌ Server Not Found",
         description: `No MCP server found with name: "${serverName}"`,
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   const server = config.mcpServers[matchingName];
   let testSuccess = false;
-  let testMessage = '';
+  let testMessage = "";
 
   try {
     // For MCP servers, we test by checking if the command exists
     // Most MCP servers use npx which should be available
-    if (server.command === 'npx' || server.command === 'npm' || server.command === 'node') {
+    if (server.command === "npx" || server.command === "npm" || server.command === "node") {
       // Check if npx/npm/node is available
       const cmd = new Deno.Command(server.command, {
-        args: ['--version'],
-        stdout: 'piped',
-        stderr: 'piped'
+        args: ["--version"],
+        stdout: "piped",
+        stderr: "piped",
       });
       const { code } = await cmd.output();
       testSuccess = code === 0;
-      testMessage = testSuccess 
+      testMessage = testSuccess
         ? `\`${server.command}\` is available and can run MCP servers`
         : `\`${server.command}\` command failed`;
     } else {
       // For other commands, check if they exist in PATH
-      const whichCmd = 'which';
+      const whichCmd = "which";
       const cmd = new Deno.Command(whichCmd, {
         args: [server.command],
-        stdout: 'piped',
-        stderr: 'piped'
+        stdout: "piped",
+        stderr: "piped",
       });
       const { code } = await cmd.output();
       testSuccess = code === 0;
@@ -1978,27 +2167,37 @@ async function testMCPConnection(ctx: any, workDir: string, serverName: string) 
         : `Command \`${server.command}\` not found in PATH`;
     }
   } catch (err) {
-    testMessage = err instanceof Error ? err.message : 'Test failed';
+    testMessage = err instanceof Error ? err.message : "Test failed";
   }
 
-  const fullCommand = server.args?.length 
-    ? `${server.command} ${server.args.join(' ')}`
+  const fullCommand = server.args?.length
+    ? `${server.command} ${server.args.join(" ")}`
     : server.command;
 
   await ctx.editReply({
     embeds: [{
       color: testSuccess ? 0x00ff00 : 0xff0000,
-      title: testSuccess ? '✅ Command Available' : '❌ Command Not Found',
+      title: testSuccess ? "✅ Command Available" : "❌ Command Not Found",
       description: testMessage,
       fields: [
-        { name: 'Server', value: matchingName, inline: true },
-        { name: 'Command', value: `\`${fullCommand}\``, inline: false },
-        ...(server.description ? [{ name: 'Description', value: server.description, inline: false }] : []),
-        ...(server.env ? [{ name: 'Environment', value: Object.keys(server.env).map(k => `\`${k}\``).join(', '), inline: false }] : [])
+        { name: "Server", value: matchingName, inline: true },
+        { name: "Command", value: `\`${fullCommand}\``, inline: false },
+        ...(server.description
+          ? [{ name: "Description", value: server.description, inline: false }]
+          : []),
+        ...(server.env
+          ? [{
+            name: "Environment",
+            value: Object.keys(server.env).map((k) => `\`${k}\``).join(", "),
+            inline: false,
+          }]
+          : []),
       ],
-      footer: { text: 'Note: This only tests if the command is available, not the MCP server itself' },
-      timestamp: true
-    }]
+      footer: {
+        text: "Note: This only tests if the command is available, not the MCP server itself",
+      },
+      timestamp: true,
+    }],
   });
 }
 
@@ -2006,45 +2205,46 @@ async function testMCPConnection(ctx: any, workDir: string, serverName: string) 
 async function showMCPStatus(ctx: any, workDir: string) {
   const config = await readMCPJsonConfig(workDir);
   const serverNames = Object.keys(config.mcpServers);
-  
+
   if (serverNames.length === 0) {
     await ctx.editReply({
       embeds: [{
         color: 0xffaa00,
-        title: '📊 MCP Status',
-        description: `No MCP servers configured in \`.claude/mcp.json\`.\n\nUse \`/mcp action:add server_name:[name] command:[command]\` to add a server.`,
+        title: "📊 MCP Status",
+        description:
+          `No MCP servers configured in \`.claude/mcp.json\`.\n\nUse \`/mcp action:add server_name:[name] command:[command]\` to add a server.`,
         footer: { text: `📁 ${path.join(workDir, MCP_JSON_FILENAME)}` },
-        timestamp: true
-      }]
+        timestamp: true,
+      }],
     });
     return;
   }
 
   // Build detailed status view
-  const fields = serverNames.map(name => {
+  const fields = serverNames.map((name) => {
     const server = config.mcpServers[name];
-    const fullCommand = server.args?.length 
-      ? `${server.command} ${server.args.join(' ')}`
+    const fullCommand = server.args?.length
+      ? `${server.command} ${server.args.join(" ")}`
       : server.command;
-    
+
     let info = `💻 \`${fullCommand}\``;
     if (server.description) {
       info = `${server.description}\n${info}`;
     }
     if (server.env && Object.keys(server.env).length > 0) {
       const envKeys = Object.keys(server.env);
-      info += `\n🔑 ${envKeys.length} env var(s): \`${envKeys.join('\`, \`')}\``;
+      info += `\n🔑 ${envKeys.length} env var(s): \`${envKeys.join("\`, \`")}\``;
     }
-    
+
     return {
       name: `🔌 ${name}`,
       value: info,
-      inline: false
+      inline: false,
     };
   });
 
   // Count servers with env vars
-  const withEnvCount = serverNames.filter(name => {
+  const withEnvCount = serverNames.filter((name) => {
     const server = config.mcpServers[name];
     return server.env && Object.keys(server.env).length > 0;
   }).length;
@@ -2052,15 +2252,19 @@ async function showMCPStatus(ctx: any, workDir: string) {
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '📊 MCP Server Status',
+      title: "📊 MCP Server Status",
       description: `**${serverNames.length}** MCP server(s) configured`,
       fields: [
         ...fields.slice(0, 20), // Discord field limit
-        { name: '📊 Summary', value: `Total: ${serverNames.length} | With Env Vars: ${withEnvCount}`, inline: false }
+        {
+          name: "📊 Summary",
+          value: `Total: ${serverNames.length} | With Env Vars: ${withEnvCount}`,
+          inline: false,
+        },
       ],
       footer: { text: `📁 ${path.join(workDir, MCP_JSON_FILENAME)}` },
-      timestamp: true
-    }]
+      timestamp: true,
+    }],
   });
 }
 
@@ -2076,9 +2280,9 @@ async function showMCPStatus(ctx: any, workDir: string) {
 async function handleMcpToggle(ctx: any, serverName: string, value?: string): Promise<void> {
   // Determine desired state: "on"/"off" or auto-detect from current status
   let enabled: boolean;
-  if (value === 'on') {
+  if (value === "on") {
     enabled = true;
-  } else if (value === 'off') {
+  } else if (value === "off") {
     enabled = false;
   } else {
     // Default to toggling — check current status first
@@ -2087,25 +2291,29 @@ async function handleMcpToggle(ctx: any, serverName: string, value?: string): Pr
       await ctx.editReply({
         embeds: [{
           color: 0xff0000,
-          title: '❌ No Active Session',
-          description: 'MCP toggle requires an active Claude session. Start a query first with `/claude`.',
-        }]
+          title: "❌ No Active Session",
+          description:
+            "MCP toggle requires an active Claude session. Start a query first with `/claude`.",
+        }],
       });
       return;
     }
-    const server = statuses.find(s => s.name === serverName);
+    const server = statuses.find((s) => s.name === serverName);
     if (!server) {
       await ctx.editReply({
         embeds: [{
           color: 0xff0000,
-          title: '❌ Server Not Found',
-          description: `No MCP server named **${serverName}** found in the active session.\n\nAvailable: ${statuses.map(s => `\`${s.name}\``).join(', ') || 'none'}`,
-        }]
+          title: "❌ Server Not Found",
+          description:
+            `No MCP server named **${serverName}** found in the active session.\n\nAvailable: ${
+              statuses.map((s) => `\`${s.name}\``).join(", ") || "none"
+            }`,
+        }],
       });
       return;
     }
     // Toggle: if currently connected/pending → disable, if disabled/failed → enable
-    enabled = server.status === 'disabled' || server.status === 'failed';
+    enabled = server.status === "disabled" || server.status === "failed";
   }
 
   const success = await toggleMcpServerActive(serverName, enabled);
@@ -2113,17 +2321,18 @@ async function handleMcpToggle(ctx: any, serverName: string, value?: string): Pr
     await ctx.editReply({
       embeds: [{
         color: enabled ? 0x00ff00 : 0xffaa00,
-        title: enabled ? '✅ MCP Server Enabled' : '⏸️ MCP Server Disabled',
-        description: `**${serverName}** has been ${enabled ? 'enabled' : 'disabled'} mid-session.`,
-      }]
+        title: enabled ? "✅ MCP Server Enabled" : "⏸️ MCP Server Disabled",
+        description: `**${serverName}** has been ${enabled ? "enabled" : "disabled"} mid-session.`,
+      }],
     });
   } else {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Toggle Failed',
-        description: `Could not toggle **${serverName}**. Ensure an active Claude session exists and the server name is correct.`,
-      }]
+        title: "❌ Toggle Failed",
+        description:
+          `Could not toggle **${serverName}**. Ensure an active Claude session exists and the server name is correct.`,
+      }],
     });
   }
 }
@@ -2139,17 +2348,18 @@ async function handleMcpReconnect(ctx: any, serverName: string): Promise<void> {
     await ctx.editReply({
       embeds: [{
         color: 0x00ff00,
-        title: '🔄 MCP Server Reconnected',
+        title: "🔄 MCP Server Reconnected",
         description: `**${serverName}** has been reconnected successfully.`,
-      }]
+      }],
     });
   } else {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: '❌ Reconnect Failed',
-        description: `Could not reconnect **${serverName}**. Ensure an active Claude session exists and the server name is correct.`,
-      }]
+        title: "❌ Reconnect Failed",
+        description:
+          `Could not reconnect **${serverName}**. Ensure an active Claude session exists and the server name is correct.`,
+      }],
     });
   }
 }

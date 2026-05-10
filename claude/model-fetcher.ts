@@ -1,10 +1,10 @@
 /**
  * Dynamic Model Fetcher
- * 
+ *
  * Discovers available Claude models using two strategies:
  * 1. Primary: Anthropic REST API (requires ANTHROPIC_API_KEY)
  * 2. Fallback: Parse model IDs from the installed Claude CLI binary
- * 
+ *
  * Both strategies auto-refresh periodically and fall back to
  * hardcoded defaults when neither source is available.
  */
@@ -35,13 +35,13 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null;
 /**
  * Classify a model ID into a tier based on naming conventions.
  */
-function classifyTier(id: string): ModelInfo['tier'] {
-  if (id.includes('opus')) return 'flagship';
-  if (id.includes('haiku')) return 'fast';
-  if (id.includes('sonnet')) return 'balanced';
+function classifyTier(id: string): ModelInfo["tier"] {
+  if (id.includes("opus")) return "flagship";
+  if (id.includes("haiku")) return "fast";
+  if (id.includes("sonnet")) return "balanced";
   // Legacy / Claude 3 models
-  if (id.startsWith('claude-3-') && !id.startsWith('claude-3-5-')) return 'legacy';
-  return 'balanced';
+  if (id.startsWith("claude-3-") && !id.startsWith("claude-3-5-")) return "legacy";
+  return "balanced";
 }
 
 /**
@@ -49,8 +49,8 @@ function classifyTier(id: string): ModelInfo['tier'] {
  */
 function inferSupportsThinking(id: string): boolean {
   // Opus and Sonnet 4+ support thinking; Haiku and legacy do not
-  if (id.includes('opus')) return true;
-  if (id.includes('sonnet')) {
+  if (id.includes("opus")) return true;
+  if (id.includes("sonnet")) {
     // Sonnet 4+ supports thinking
     const versionMatch = id.match(/sonnet-(\d+)/);
     if (versionMatch && parseInt(versionMatch[1]) >= 4) return true;
@@ -63,9 +63,9 @@ function inferSupportsThinking(id: string): boolean {
  */
 function inferDeprecated(id: string): boolean {
   // Claude 3.x (non-3.5) are deprecated
-  if (id.startsWith('claude-3-') && !id.startsWith('claude-3-5-')) return true;
+  if (id.startsWith("claude-3-") && !id.startsWith("claude-3-5-")) return true;
   // Claude 3.5 models are older generation
-  if (id.startsWith('claude-3-5-')) return true;
+  if (id.startsWith("claude-3-5-")) return true;
   return false;
 }
 
@@ -98,21 +98,23 @@ function toModelInfo(entry: AnthropicModelEntry): ModelInfo {
  * Families: opus, sonnet, haiku.
  */
 function buildAliases(models: Record<string, ModelInfo>, apiModels: AnthropicModelEntry[]): void {
-  const families = ['opus', 'sonnet', 'haiku'] as const;
-  
+  const families = ["opus", "sonnet", "haiku"] as const;
+
   for (const family of families) {
     // Find all API models in this family, sorted by created_at descending
     const familyModels = apiModels
-      .filter(m => m.id.includes(family) && m.type === 'model')
+      .filter((m) => m.id.includes(family) && m.type === "model")
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
+
     if (familyModels.length > 0) {
       const latest = familyModels[0];
       const tier = classifyTier(latest.id);
-      
+
       models[family] = {
         name: `Claude ${family.charAt(0).toUpperCase() + family.slice(1)} (Latest)`,
-        description: `Auto-resolves to latest ${family.charAt(0).toUpperCase() + family.slice(1)} via CLI alias`,
+        description: `Auto-resolves to latest ${
+          family.charAt(0).toUpperCase() + family.slice(1)
+        } via CLI alias`,
         contextWindow: inferContextWindow(latest.id),
         recommended: true,
         supportsThinking: inferSupportsThinking(latest.id),
@@ -179,7 +181,10 @@ async function fetchFromAPI(): Promise<AnthropicModelEntry[] | null> {
 
     return allModels;
   } catch (error) {
-    console.error("Failed to fetch models from Anthropic API:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Failed to fetch models from Anthropic API:",
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
@@ -191,7 +196,7 @@ function buildModelsFromAPI(apiModels: AnthropicModelEntry[]): Record<string, Mo
   const models: Record<string, ModelInfo> = {};
 
   // Filter to only Claude models (skip any non-Claude entries)
-  const claudeModels = apiModels.filter(m => m.id.startsWith("claude-"));
+  const claudeModels = apiModels.filter((m) => m.id.startsWith("claude-"));
 
   // Add each model
   for (const entry of claudeModels) {
@@ -214,11 +219,11 @@ async function parseModelsFromCLI(): Promise<string[] | null> {
   try {
     // Common install paths for Claude CLI (both old and new package names)
     const packageNames = [
-      '@anthropic-ai/claude-code',
-      '@anthropic-ai/claude-agent-sdk',
+      "@anthropic-ai/claude-code",
+      "@anthropic-ai/claude-agent-sdk",
     ];
     const possiblePaths: string[] = [];
-    
+
     for (const pkg of packageNames) {
       // npm global
       possiblePaths.push(`/usr/local/lib/node_modules/${pkg}/cli.js`);
@@ -244,24 +249,24 @@ async function parseModelsFromCLI(): Promise<string[] | null> {
     // Also try locating via `which claude` / `where claude`
     if (!cliContent) {
       try {
-        const whichCmd = 'which';
+        const whichCmd = "which";
         const cmd = new Deno.Command(whichCmd, {
-          args: ['claude'],
-          stdout: 'piped',
-          stderr: 'piped',
+          args: ["claude"],
+          stdout: "piped",
+          stderr: "piped",
         });
         const { stdout } = await cmd.output();
-        const claudePath = new TextDecoder().decode(stdout).trim().split('\n')[0].trim();
-        
+        const claudePath = new TextDecoder().decode(stdout).trim().split("\n")[0].trim();
+
         if (claudePath) {
           // Claude is a JS script — the actual CLI is in the same package
           // Resolve to the package's cli.js (check both old and new package names)
-          const basePath = claudePath.replace(/\/claude$/i, '');
+          const basePath = claudePath.replace(/\/claude$/i, "");
           const possibleCliJsPaths = [
             `${basePath}/node_modules/@anthropic-ai/claude-code/cli.js`,
             `${basePath}/node_modules/@anthropic-ai/claude-agent-sdk/cli.js`,
           ];
-          
+
           for (const possibleCliJs of possibleCliJsPaths) {
             try {
               cliContent = await Deno.readTextFile(possibleCliJs);
@@ -270,7 +275,7 @@ async function parseModelsFromCLI(): Promise<string[] | null> {
               // Try next path
             }
           }
-          
+
           if (!cliContent) {
             // The claude binary might itself contain model references
             try {
@@ -293,11 +298,12 @@ async function parseModelsFromCLI(): Promise<string[] | null> {
     // Extract model IDs matching the pattern: claude-<family>-<version>-YYYYMMDD
     const modelPattern = /claude-[a-z0-9-]+-\d{8}/g;
     const matches = cliContent.match(modelPattern) || [];
-    
+
     // Deduplicate and filter out non-model patterns
-    const uniqueModels = [...new Set(matches)].filter(id => {
+    const uniqueModels = [...new Set(matches)].filter((id) => {
       // Must be a plausible model ID (contains a known family name)
-      return id.includes('opus') || id.includes('sonnet') || id.includes('haiku') || id.includes('code');
+      return id.includes("opus") || id.includes("sonnet") || id.includes("haiku") ||
+        id.includes("code");
     });
 
     if (uniqueModels.length === 0) {
@@ -308,7 +314,10 @@ async function parseModelsFromCLI(): Promise<string[] | null> {
     console.log(`Model fetcher: Discovered ${uniqueModels.length} models from CLI binary`);
     return uniqueModels;
   } catch (error) {
-    console.error("Failed to parse models from CLI:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Failed to parse models from CLI:",
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
@@ -322,13 +331,19 @@ function buildModelsFromCLI(modelIds: string[]): Record<string, ModelInfo> {
 
   for (const id of modelIds) {
     const tier = classifyTier(id);
-    const familyName = id.includes('opus') ? 'Opus' : id.includes('sonnet') ? 'Sonnet' : id.includes('haiku') ? 'Haiku' : 'Claude';
-    
+    const familyName = id.includes("opus")
+      ? "Opus"
+      : id.includes("sonnet")
+      ? "Sonnet"
+      : id.includes("haiku")
+      ? "Haiku"
+      : "Claude";
+
     // Extract version info from ID
     const versionMatch = id.match(/(\d+)(?:-(\d+))?-(\d{8})$/);
-    const majorVersion = versionMatch ? versionMatch[1] : '';
-    const minorVersion = versionMatch?.[2] ? `.${versionMatch[2]}` : '';
-    
+    const majorVersion = versionMatch ? versionMatch[1] : "";
+    const minorVersion = versionMatch?.[2] ? `.${versionMatch[2]}` : "";
+
     models[id] = {
       name: `Claude ${familyName} ${majorVersion}${minorVersion}`,
       description: `Claude ${familyName} ${majorVersion}${minorVersion} (discovered from CLI)`,
@@ -341,11 +356,11 @@ function buildModelsFromCLI(modelIds: string[]): Record<string, ModelInfo> {
   }
 
   // Build aliases from CLI-discovered models
-  const apiLikeEntries: AnthropicModelEntry[] = modelIds.map(id => ({
+  const apiLikeEntries: AnthropicModelEntry[] = modelIds.map((id) => ({
     id,
     display_name: models[id]?.name || id,
     created_at: extractDateFromId(id),
-    type: 'model',
+    type: "model",
   }));
 
   buildAliases(models, apiLikeEntries);
@@ -361,7 +376,7 @@ function extractDateFromId(id: string): string {
   if (match) {
     return `${match[1]}-${match[2]}-${match[3]}T00:00:00Z`;
   }
-  return '2024-01-01T00:00:00Z';
+  return "2024-01-01T00:00:00Z";
 }
 
 /**
@@ -381,7 +396,9 @@ export async function fetchModels(): Promise<Record<string, ModelInfo> | null> {
   if (apiModels && apiModels.length > 0) {
     cachedModels = buildModelsFromAPI(apiModels);
     lastFetchTime = now;
-    console.log(`Model fetcher: Loaded ${Object.keys(cachedModels).length} models from Anthropic API`);
+    console.log(
+      `Model fetcher: Loaded ${Object.keys(cachedModels).length} models from Anthropic API`,
+    );
     return cachedModels;
   }
 
@@ -403,14 +420,14 @@ export async function fetchModels(): Promise<Record<string, ModelInfo> | null> {
  * Start periodic model refresh (call once at startup).
  */
 export function startModelRefresh(
-  updateCallback: (models: Record<string, ModelInfo>) => void
+  updateCallback: (models: Record<string, ModelInfo>) => void,
 ): void {
   // Initial fetch
-  fetchModels().then(models => {
+  fetchModels().then((models) => {
     if (models) {
       updateCallback(models);
     }
-  }).catch(err => {
+  }).catch((err) => {
     console.error("Initial model fetch failed:", err);
   });
 

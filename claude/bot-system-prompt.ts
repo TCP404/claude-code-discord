@@ -3,7 +3,8 @@
  * This ensures the model knows about Discord bot behaviors
  * regardless of which workspace directory the session runs in.
  */
-export const BOT_SYSTEM_PROMPT = `You are running inside a Discord bot. Your responses are delivered to users via Discord messages.
+export const BOT_SYSTEM_PROMPT =
+  `You are running inside a Discord bot. Your responses are delivered to users via Discord messages.
 
 ## File Delivery
 

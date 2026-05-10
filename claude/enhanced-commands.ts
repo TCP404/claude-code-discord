@@ -4,89 +4,101 @@ import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
 
 export const enhancedClaudeCommands = [
   new SlashCommandBuilder()
-    .setName('claude-enhanced')
-    .setDescription('Send message to Claude Code with advanced options')
-    .addStringOption(option =>
-      option.setName('prompt')
-        .setDescription('Prompt for Claude Code')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('model')
-        .setDescription('Claude model to use')
+    .setName("claude-enhanced")
+    .setDescription("Send message to Claude Code with advanced options")
+    .addStringOption((option) =>
+      option.setName("prompt")
+        .setDescription("Prompt for Claude Code")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option.setName("model")
+        .setDescription("Claude model to use")
         .setRequired(false)
         .addChoices(
           ...Object.entries(CLAUDE_MODELS).map(([value, model]) => ({
             name: model.name,
-            value: value
-          }))
-        ))
-    .addStringOption(option =>
-      option.setName('template')
-        .setDescription('Use a predefined template')
+            value: value,
+          })),
+        )
+    )
+    .addStringOption((option) =>
+      option.setName("template")
+        .setDescription("Use a predefined template")
         .setRequired(false)
         .addChoices(
           ...Object.entries(CLAUDE_TEMPLATES).map(([key, _value]) => ({
             name: key.charAt(0).toUpperCase() + key.slice(1),
-            value: key
-          }))
-        ))
-    .addBooleanOption(option =>
-      option.setName('include_system_info')
-        .setDescription('Include system information in context')
-        .setRequired(false))
-    .addBooleanOption(option =>
-      option.setName('include_git_context')
-        .setDescription('Include git repository context')
-        .setRequired(false))
-    .addStringOption(option =>
-      option.setName('context_files')
-        .setDescription('Comma-separated list of files to include in context')
-        .setRequired(false))
-    .addStringOption(option =>
-      option.setName('session_id')
-        .setDescription('Session ID to continue (optional)')
-        .setRequired(false)),
+            value: key,
+          })),
+        )
+    )
+    .addBooleanOption((option) =>
+      option.setName("include_system_info")
+        .setDescription("Include system information in context")
+        .setRequired(false)
+    )
+    .addBooleanOption((option) =>
+      option.setName("include_git_context")
+        .setDescription("Include git repository context")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option.setName("context_files")
+        .setDescription("Comma-separated list of files to include in context")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option.setName("session_id")
+        .setDescription("Session ID to continue (optional)")
+        .setRequired(false)
+    ),
 
   new SlashCommandBuilder()
-    .setName('claude-models')
-    .setDescription('List available Claude models and their capabilities'),
+    .setName("claude-models")
+    .setDescription("List available Claude models and their capabilities"),
 
   new SlashCommandBuilder()
-    .setName('claude-sessions')
-    .setDescription('Manage Claude Code sessions')
-    .addStringOption(option =>
-      option.setName('action')
-        .setDescription('Action to perform')
+    .setName("claude-sessions")
+    .setDescription("Manage Claude Code sessions")
+    .addStringOption((option) =>
+      option.setName("action")
+        .setDescription("Action to perform")
         .setRequired(true)
         .addChoices(
-          { name: 'list', value: 'list' },
-          { name: 'info', value: 'info' },
-          { name: 'delete', value: 'delete' },
-          { name: 'cleanup', value: 'cleanup' }
-        ))
-    .addStringOption(option =>
-      option.setName('session_id')
-        .setDescription('Session ID (required for info/delete actions)')
-        .setRequired(false)),
+          { name: "list", value: "list" },
+          { name: "info", value: "info" },
+          { name: "delete", value: "delete" },
+          { name: "cleanup", value: "cleanup" },
+        )
+    )
+    .addStringOption((option) =>
+      option.setName("session_id")
+        .setDescription("Session ID (required for info/delete actions)")
+        .setRequired(false)
+    ),
 
   // NOTE: claude-templates command removed as requested
   // Template functionality is now handled through enhanced prompting
 
   new SlashCommandBuilder()
-    .setName('claude-context')
-    .setDescription('Show context information that would be sent to Claude')
-    .addBooleanOption(option =>
-      option.setName('include_system_info')
-        .setDescription('Include system information')
-        .setRequired(false))
-    .addBooleanOption(option =>
-      option.setName('include_git_context')
-        .setDescription('Include git context')
-        .setRequired(false))
-    .addStringOption(option =>
-      option.setName('context_files')
-        .setDescription('Comma-separated list of files to preview')
-        .setRequired(false))
+    .setName("claude-context")
+    .setDescription("Show context information that would be sent to Claude")
+    .addBooleanOption((option) =>
+      option.setName("include_system_info")
+        .setDescription("Include system information")
+        .setRequired(false)
+    )
+    .addBooleanOption((option) =>
+      option.setName("include_git_context")
+        .setDescription("Include git context")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option.setName("context_files")
+        .setDescription("Comma-separated list of files to preview")
+        .setRequired(false)
+    ),
 ];
 
 export interface EnhancedClaudeHandlerDeps {
@@ -103,7 +115,7 @@ export interface EnhancedClaudeHandlerDeps {
 
 export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
   const { workDir, sessionManager, crashHandler, sendClaudeMessages } = deps;
-  
+
   return {
     async onClaudeEnhanced(
       ctx: any,
@@ -113,7 +125,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
       includeSystemInfo?: boolean,
       includeGitContext?: boolean,
       contextFiles?: string,
-      sessionId?: string
+      sessionId?: string,
     ) {
       try {
         // Cancel any existing session
@@ -135,25 +147,35 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
         }
 
         // Parse context files
-        const contextFilesList = contextFiles ? 
-          contextFiles.split(',').map(f => f.trim()).filter(f => f.length > 0) : 
-          undefined;
+        const contextFilesList = contextFiles
+          ? contextFiles.split(",").map((f) => f.trim()).filter((f) => f.length > 0)
+          : undefined;
 
         await ctx.editReply({
           embeds: [{
             color: 0xffff00,
-            title: '🤖 Enhanced Claude Code Running...',
-            description: 'Processing with advanced options...',
+            title: "🤖 Enhanced Claude Code Running...",
+            description: "Processing with advanced options...",
             fields: [
-              { name: 'Model', value: model || 'Default', inline: true },
-              { name: 'Template', value: template || 'None', inline: true },
-              { name: 'System Info', value: includeSystemInfo ? 'Yes' : 'No', inline: true },
-              { name: 'Git Context', value: includeGitContext ? 'Yes' : 'No', inline: true },
-              { name: 'Context Files', value: contextFilesList?.length ? `${contextFilesList.length} files` : 'None', inline: true },
-              { name: 'Prompt Preview', value: `\`${enhancedPrompt.substring(0, 200)}${enhancedPrompt.length > 200 ? '...' : ''}\``, inline: false }
+              { name: "Model", value: model || "Default", inline: true },
+              { name: "Template", value: template || "None", inline: true },
+              { name: "System Info", value: includeSystemInfo ? "Yes" : "No", inline: true },
+              { name: "Git Context", value: includeGitContext ? "Yes" : "No", inline: true },
+              {
+                name: "Context Files",
+                value: contextFilesList?.length ? `${contextFilesList.length} files` : "None",
+                inline: true,
+              },
+              {
+                name: "Prompt Preview",
+                value: `\`${enhancedPrompt.substring(0, 200)}${
+                  enhancedPrompt.length > 200 ? "..." : ""
+                }\``,
+                inline: false,
+              },
             ],
-            timestamp: true
-          }]
+            timestamp: true,
+          }],
         });
 
         const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
@@ -185,7 +207,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
               sendClaudeMessages(claudeMessages).catch(() => {});
             }
           },
-          false
+          false,
         );
 
         deps.setClaudeSessionId(result.sessionId);
@@ -200,59 +222,76 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
 
         return result;
       } catch (error) {
-        await crashHandler.reportCrash('claude', error instanceof Error ? error : new Error(String(error)), 'enhanced', 'Enhanced Claude query');
+        await crashHandler.reportCrash(
+          "claude",
+          error instanceof Error ? error : new Error(String(error)),
+          "enhanced",
+          "Enhanced Claude query",
+        );
         throw error;
       }
     },
 
     async onClaudeModels(ctx: any) {
       // Group models by tier
-      const tiers = { flagship: '🏆 Flagship', balanced: '⚡ Balanced', fast: '🚀 Fast', legacy: '📦 Legacy' };
-      const grouped: Record<string, string[]> = { flagship: [], balanced: [], fast: [], legacy: [] };
-      
+      const tiers = {
+        flagship: "🏆 Flagship",
+        balanced: "⚡ Balanced",
+        fast: "🚀 Fast",
+        legacy: "📦 Legacy",
+      };
+      const grouped: Record<string, string[]> = {
+        flagship: [],
+        balanced: [],
+        fast: [],
+        legacy: [],
+      };
+
       for (const [key, model] of Object.entries(CLAUDE_MODELS)) {
-        const recommended = model.recommended ? ' ⭐' : '';
-        const alias = model.aliasFor ? ` → \`${model.aliasFor}\`` : '';
-        const deprecated = model.deprecated ? ' *(deprecated)*' : '';
-        const entry = `**${model.name}${recommended}${deprecated}**\n${model.description}${alias}\nContext: ${model.contextWindow.toLocaleString()} tokens\nID: \`${key}\``;
+        const recommended = model.recommended ? " ⭐" : "";
+        const alias = model.aliasFor ? ` → \`${model.aliasFor}\`` : "";
+        const deprecated = model.deprecated ? " *(deprecated)*" : "";
+        const entry =
+          `**${model.name}${recommended}${deprecated}**\n${model.description}${alias}\nContext: ${model.contextWindow.toLocaleString()} tokens\nID: \`${key}\``;
         grouped[model.tier].push(entry);
       }
-      
+
       const fields = Object.entries(tiers)
         .filter(([tier]) => grouped[tier].length > 0)
         .map(([tier, label]) => ({
           name: label,
-          value: grouped[tier].join('\n\n'),
-          inline: false
+          value: grouped[tier].join("\n\n"),
+          inline: false,
         }));
 
       await ctx.reply({
         embeds: [{
           color: 0x0099ff,
-          title: '🤖 Available Claude Models',
-          description: '⭐ = Recommended • Aliases (opus, sonnet, haiku) always resolve to the latest version',
+          title: "🤖 Available Claude Models",
+          description:
+            "⭐ = Recommended • Aliases (opus, sonnet, haiku) always resolve to the latest version",
           fields,
-          footer: { text: 'Use any model ID or alias with /claude-enhanced or /settings' },
-          timestamp: true
+          footer: { text: "Use any model ID or alias with /claude-enhanced or /settings" },
+          timestamp: true,
         }],
-        ephemeral: true
+        ephemeral: true,
       });
     },
 
     async onClaudeSessions(ctx: any, action: string, sessionId?: string) {
       try {
         switch (action) {
-          case 'list':
+          case "list":
             const sessions = sessionManager.getAllSessions();
             if (sessions.length === 0) {
               await ctx.reply({
                 embeds: [{
                   color: 0xffaa00,
-                  title: '📋 Claude Sessions',
-                  description: 'No active sessions found.',
-                  timestamp: true
+                  title: "📋 Claude Sessions",
+                  description: "No active sessions found.",
+                  timestamp: true,
                 }],
-                ephemeral: true
+                ephemeral: true,
               });
               return;
             }
@@ -260,26 +299,30 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             const sessionsList = sessions.map((session: any) => {
               const uptime = Date.now() - session.startTime.getTime();
               const uptimeStr = formatDuration(uptime);
-              return `**${session.id.substring(0, 12)}...**\nMessages: ${session.messageCount} | Cost: $${session.totalCost.toFixed(4)} | Uptime: ${uptimeStr}\nModel: ${session.model}`;
-            }).join('\n\n');
+              return `**${
+                session.id.substring(0, 12)
+              }...**\nMessages: ${session.messageCount} | Cost: $${
+                session.totalCost.toFixed(4)
+              } | Uptime: ${uptimeStr}\nModel: ${session.model}`;
+            }).join("\n\n");
 
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '📋 Active Claude Sessions',
+                title: "📋 Active Claude Sessions",
                 description: sessionsList,
                 footer: { text: `Total: ${sessions.length} sessions` },
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'info':
+          case "info":
             if (!sessionId) {
               await ctx.reply({
-                content: 'Session ID is required for info action.',
-                ephemeral: true
+                content: "Session ID is required for info action.",
+                ephemeral: true,
               });
               return;
             }
@@ -287,8 +330,8 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             const session = sessionManager.getSession(sessionId);
             if (!session) {
               await ctx.reply({
-                content: 'Session not found.',
-                ephemeral: true
+                content: "Session not found.",
+                ephemeral: true,
               });
               return;
             }
@@ -299,28 +342,32 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             await ctx.reply({
               embeds: [{
                 color: 0x0099ff,
-                title: '📊 Session Details',
+                title: "📊 Session Details",
                 fields: [
-                  { name: 'Session ID', value: `\`${session.id}\``, inline: false },
-                  { name: 'Model', value: session.model, inline: true },
-                  { name: 'Messages', value: session.messageCount.toString(), inline: true },
-                  { name: 'Total Cost', value: `$${session.totalCost.toFixed(4)}`, inline: true },
-                  { name: 'Started', value: session.startTime.toLocaleString(), inline: true },
-                  { name: 'Last Activity', value: `${formatDuration(lastActivity)} ago`, inline: true },
-                  { name: 'Uptime', value: formatDuration(sessionUptime), inline: true },
-                  { name: 'Working Directory', value: `\`${session.workDir}\``, inline: false }
+                  { name: "Session ID", value: `\`${session.id}\``, inline: false },
+                  { name: "Model", value: session.model, inline: true },
+                  { name: "Messages", value: session.messageCount.toString(), inline: true },
+                  { name: "Total Cost", value: `$${session.totalCost.toFixed(4)}`, inline: true },
+                  { name: "Started", value: session.startTime.toLocaleString(), inline: true },
+                  {
+                    name: "Last Activity",
+                    value: `${formatDuration(lastActivity)} ago`,
+                    inline: true,
+                  },
+                  { name: "Uptime", value: formatDuration(sessionUptime), inline: true },
+                  { name: "Working Directory", value: `\`${session.workDir}\``, inline: false },
                 ],
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'delete':
+          case "delete":
             if (!sessionId) {
               await ctx.reply({
-                content: 'Session ID is required for delete action.',
-                ephemeral: true
+                content: "Session ID is required for delete action.",
+                ephemeral: true,
               });
               return;
             }
@@ -329,29 +376,36 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             await ctx.reply({
               embeds: [{
                 color: deleted ? 0x00ff00 : 0xff0000,
-                title: deleted ? '✅ Session Deleted' : '❌ Session Not Found',
-                description: deleted ? `Session ${sessionId.substring(0, 12)}... has been deleted.` : 'The specified session was not found.',
-                timestamp: true
+                title: deleted ? "✅ Session Deleted" : "❌ Session Not Found",
+                description: deleted
+                  ? `Session ${sessionId.substring(0, 12)}... has been deleted.`
+                  : "The specified session was not found.",
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'cleanup':
+          case "cleanup":
             const cleanedCount = sessionManager.cleanup();
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '🧹 Sessions Cleaned Up',
+                title: "🧹 Sessions Cleaned Up",
                 description: `Removed ${cleanedCount} old sessions (older than 24 hours).`,
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
         }
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'claude-sessions', `Action: ${action}`);
+        await crashHandler.reportCrash(
+          "main",
+          error instanceof Error ? error : new Error(String(error)),
+          "claude-sessions",
+          `Action: ${action}`,
+        );
         throw error;
       }
     },
@@ -363,7 +417,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
       ctx: any,
       includeSystemInfo?: boolean,
       includeGitContext?: boolean,
-      contextFiles?: string
+      contextFiles?: string,
     ) {
       try {
         await ctx.deferReply({ ephemeral: true });
@@ -372,10 +426,15 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
 
         if (includeSystemInfo) {
           try {
-            const systemInfo = `System: ${Deno.build.os} ${Deno.build.arch}\nDeno: ${Deno.version.deno}\nWorking Directory: ${workDir}`;
+            const systemInfo =
+              `System: ${Deno.build.os} ${Deno.build.arch}\nDeno: ${Deno.version.deno}\nWorking Directory: ${workDir}`;
             contextParts.push(`**System Information:**\n\`\`\`\n${systemInfo}\n\`\`\``);
           } catch (error) {
-            contextParts.push(`**System Information:** Error - ${error instanceof Error ? error.message : 'Unknown error'}`);
+            contextParts.push(
+              `**System Information:** Error - ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            );
           }
         }
 
@@ -384,24 +443,28 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             const { executeGitCommand } = await import("../git/handler.ts");
             const [branch, status] = await Promise.all([
               executeGitCommand(workDir, "git branch --show-current"),
-              executeGitCommand(workDir, "git status --porcelain")
+              executeGitCommand(workDir, "git status --porcelain"),
             ]);
-            
-            const gitInfo = `Branch: ${branch.trim()}\nStatus: ${status || 'Clean'}`;
+
+            const gitInfo = `Branch: ${branch.trim()}\nStatus: ${status || "Clean"}`;
             contextParts.push(`**Git Context:**\n\`\`\`\n${gitInfo}\n\`\`\``);
           } catch (error) {
-            contextParts.push(`**Git Context:** Error - ${error instanceof Error ? error.message : 'Unknown error'}`);
+            contextParts.push(
+              `**Git Context:** Error - ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            );
           }
         }
 
         if (contextFiles) {
-          const fileList = contextFiles.split(',').map(f => f.trim()).filter(f => f.length > 0);
+          const fileList = contextFiles.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
           const fileContents: string[] = [];
 
           for (const filePath of fileList.slice(0, 5)) { // Limit to 5 files
             try {
               const content = await Deno.readTextFile(filePath);
-              const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+              const preview = content.length > 200 ? content.substring(0, 200) + "..." : content;
               fileContents.push(`**${filePath}:**\n\`\`\`\n${preview}\n\`\`\``);
             } catch (_error) {
               fileContents.push(`**${filePath}:** Error reading file`);
@@ -412,25 +475,31 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             fileContents.push(`**... and ${fileList.length - 5} more files**`);
           }
 
-          contextParts.push(fileContents.join('\n\n'));
+          contextParts.push(fileContents.join("\n\n"));
         }
 
-        const fullContext = contextParts.join('\n\n');
+        const fullContext = contextParts.join("\n\n");
 
         await ctx.editReply({
           embeds: [{
             color: 0x0099ff,
-            title: '📋 Claude Context Preview',
-            description: fullContext || 'No context selected. Enable options to see what would be included.',
-            footer: { text: 'This is what would be sent to Claude as additional context' },
-            timestamp: true
-          }]
+            title: "📋 Claude Context Preview",
+            description: fullContext ||
+              "No context selected. Enable options to see what would be included.",
+            footer: { text: "This is what would be sent to Claude as additional context" },
+            timestamp: true,
+          }],
         });
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'claude-context', 'Context preview');
+        await crashHandler.reportCrash(
+          "main",
+          error instanceof Error ? error : new Error(String(error)),
+          "claude-context",
+          "Context preview",
+        );
         throw error;
       }
-    }
+    },
   };
 }
 

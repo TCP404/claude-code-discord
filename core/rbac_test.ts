@@ -1,9 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import {
-  isRestrictedCommand,
-  checkCommandPermission,
-  getRestrictedCommands,
-} from "./rbac.ts";
+import { checkCommandPermission, getRestrictedCommands, isRestrictedCommand } from "./rbac.ts";
 import type { InteractionContext } from "../discord/types.ts";
 
 function mockContext(opts: {
@@ -14,8 +10,12 @@ function mockContext(opts: {
   return {
     getUserId: () => opts.userId ?? "user-1",
     getMemberRoleIds: () => new Set(opts.roleIds ?? []),
-    reply: async () => { replied = true; },
-    get _replied() { return replied; },
+    reply: async () => {
+      replied = true;
+    },
+    get _replied() {
+      return replied;
+    },
     // Unused methods for this test
     deferReply: async () => {},
     editReply: async () => {},
@@ -26,7 +26,6 @@ function mockContext(opts: {
     getBoolean: () => null,
   } as unknown as InteractionContext & { _replied: boolean };
 }
-
 
 // --- isRestrictedCommand ---
 
@@ -105,7 +104,9 @@ Deno.test({
   fn: async () => {
     // This test runs in a subprocess to avoid polluting the cached config
     const cmd = new Deno.Command("deno", {
-      args: ["eval", `
+      args: [
+        "eval",
+        `
         import { hasPermission, checkCommandPermission, loadRBACConfig } from "./core/rbac.ts";
 
         // Set env before loading config
@@ -149,13 +150,18 @@ Deno.test({
         if (r2) throw new Error("random user should fail restricted command check");
 
         console.log("ALL_PASSED");
-      `],
+      `,
+      ],
       stdout: "piped",
       stderr: "piped",
     });
     const output = await cmd.output();
     const stdout = new TextDecoder().decode(output.stdout);
-    assertEquals(stdout.includes("ALL_PASSED"), true, `RBAC subprocess failed: ${new TextDecoder().decode(output.stderr)}`);
+    assertEquals(
+      stdout.includes("ALL_PASSED"),
+      true,
+      `RBAC subprocess failed: ${new TextDecoder().decode(output.stderr)}`,
+    );
   },
 });
 
@@ -163,7 +169,9 @@ Deno.test({
   name: "RBAC: disabled when no env vars set",
   fn: async () => {
     const cmd = new Deno.Command("deno", {
-      args: ["eval", `
+      args: [
+        "eval",
+        `
         import { hasPermission, loadRBACConfig } from "./core/rbac.ts";
 
         // Ensure vars are unset
@@ -189,13 +197,18 @@ Deno.test({
         if (!hasPermission(ctx)) throw new Error("should allow all when disabled");
 
         console.log("ALL_PASSED");
-      `],
+      `,
+      ],
       stdout: "piped",
       stderr: "piped",
       env: { "PATH": Deno.env.get("PATH") ?? "" },
     });
     const output = await cmd.output();
     const stdout = new TextDecoder().decode(output.stdout);
-    assertEquals(stdout.includes("ALL_PASSED"), true, `Subprocess failed: ${new TextDecoder().decode(output.stderr)}`);
+    assertEquals(
+      stdout.includes("ALL_PASSED"),
+      true,
+      `Subprocess failed: ${new TextDecoder().decode(output.stderr)}`,
+    );
   },
 });

@@ -2,61 +2,61 @@
 
 ## Thinking Modes
 
-| Mode | Description |
-|------|-------------|
-| Disabled | Standard responses without extended thinking |
-| Concise | Brief, efficient analysis |
-| Verbose | Detailed, thorough reasoning |
-| Comprehensive | Maximum depth analysis |
+| Mode          | Description                                  |
+| ------------- | -------------------------------------------- |
+| Disabled      | Standard responses without extended thinking |
+| Concise       | Brief, efficient analysis                    |
+| Verbose       | Detailed, thorough reasoning                 |
+| Comprehensive | Maximum depth analysis                       |
 
 Set via `/settings` > `claude` > `set-thinking`.
 
 ## Operation Modes
 
-| Mode | Permissions | Description |
-|------|-------------|-------------|
-| Normal | `acceptEdits` | Can edit files, shows Allow/Deny buttons for other tools (e.g. Bash) |
-| Trusted | `bypassPermissions` | Full auto-approval of all operations |
-| Safe | `plan` | Analyze only, no modifications |
-| Don't Ask | `dontAsk` | Auto-denies any tool that isn't pre-approved |
-| Delegate | `delegate` | Restricts to Teammate + Task tools only (agent teams) |
+| Mode      | Permissions         | Description                                                          |
+| --------- | ------------------- | -------------------------------------------------------------------- |
+| Normal    | `acceptEdits`       | Can edit files, shows Allow/Deny buttons for other tools (e.g. Bash) |
+| Trusted   | `bypassPermissions` | Full auto-approval of all operations                                 |
+| Safe      | `plan`              | Analyze only, no modifications                                       |
+| Don't Ask | `dontAsk`           | Auto-denies any tool that isn't pre-approved                         |
+| Delegate  | `delegate`          | Restricts to Teammate + Task tools only (agent teams)                |
 
 Set via `/settings` > `permissions` > `set-mode`.
 
 ## Effort Levels
 
-| Level | Description |
-|-------|-------------|
-| `min` | Quick responses, minimal processing |
-| `low` | Simple analysis and code completion |
-| `medium` | Standard effort with good accuracy |
-| `high` | Thorough analysis and robust output |
-| `max` | Maximum depth, best quality |
+| Level    | Description                         |
+| -------- | ----------------------------------- |
+| `min`    | Quick responses, minimal processing |
+| `low`    | Simple analysis and code completion |
+| `medium` | Standard effort with good accuracy  |
+| `high`   | Thorough analysis and robust output |
+| `max`    | Maximum depth, best quality         |
 
 Set via `/settings` > `claude` > `set-effort`.
 
 ## Advanced SDK Features
 
-| Feature | Description |
-|---------|-------------|
-| Fast Mode | Toggle Opus 4.6 speed-optimized API (2.5x faster, same quality) via `/fast` |
-| 1M Token Context | Beta: increases context window to 1M tokens |
-| Sandbox Mode | Granular sandbox with network rules, filesystem ACLs, excluded commands |
-| File Checkpointing | Enables file change tracking for rewind support |
-| Agent Teams | Experimental multi-agent collaboration (delegate mode) |
-| Hooks System | Passive SDK callbacks for tool use, notification, and task observability |
-| Additional Directories | Multi-repo access — let Claude read/write across multiple directories |
-| Fork Session | Branch a conversation into a new independent session |
-| AskUserQuestion | Claude can ask clarifying questions mid-session via Discord buttons |
+| Feature                         | Description                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| Fast Mode                       | Toggle Opus 4.6 speed-optimized API (2.5x faster, same quality) via `/fast`            |
+| 1M Token Context                | Beta: increases context window to 1M tokens                                            |
+| Sandbox Mode                    | Granular sandbox with network rules, filesystem ACLs, excluded commands                |
+| File Checkpointing              | Enables file change tracking for rewind support                                        |
+| Agent Teams                     | Experimental multi-agent collaboration (delegate mode)                                 |
+| Hooks System                    | Passive SDK callbacks for tool use, notification, and task observability               |
+| Additional Directories          | Multi-repo access — let Claude read/write across multiple directories                  |
+| Fork Session                    | Branch a conversation into a new independent session                                   |
+| AskUserQuestion                 | Claude can ask clarifying questions mid-session via Discord buttons                    |
 | Interactive Permission Requests | Allow/Deny buttons when Claude wants to use unapproved tools (replaces CLI TUI prompt) |
-| Channel Monitoring | Auto-detect bot/webhook messages and trigger Claude investigation in a thread |
-| Thread-per-Session | Dedicated Discord thread for each `/claude-thread` conversation with custom names |
-| Session Persistence | Sessions survive bot restarts — threads restored with full context |
-| Thread Auto-Resume | Post plain text in a session thread to automatically resume Claude |
-| Live Status Indicator | Compact, auto-updating status line for hidden tool/system activity |
-| Message Filtering | Toggle visibility of system, tool, and thinking messages via `/show-*` commands |
-| Auto-Allow MCP Tools | All `mcp__*` tools auto-approved without interactive prompts |
-| AWS Bedrock Support | `/refresh-bedrock` for enterprise AWS SSO credential refresh |
+| Channel Monitoring              | Auto-detect bot/webhook messages and trigger Claude investigation in a thread          |
+| Thread-per-Session              | Dedicated Discord thread for each `/claude-thread` conversation with custom names      |
+| Session Persistence             | Sessions survive bot restarts — threads restored with full context                     |
+| Thread Auto-Resume              | Post plain text in a session thread to automatically resume Claude                     |
+| Live Status Indicator           | Compact, auto-updating status line for hidden tool/system activity                     |
+| Message Filtering               | Toggle visibility of system, tool, and thinking messages via `/show-*` commands        |
+| Auto-Allow MCP Tools            | All `mcp__*` tools auto-approved without interactive prompts                           |
+| AWS Bedrock Support             | `/refresh-bedrock` for enterprise AWS SSO credential refresh                           |
 
 Toggles available via `/settings` > `claude`.
 
@@ -64,15 +64,15 @@ Toggles available via `/settings` > `claude`.
 
 7 built-in agents optimized for specific tasks:
 
-| Agent | Specialization |
-|-------|---------------|
+| Agent         | Specialization                                 |
+| ------------- | ---------------------------------------------- |
 | `code-review` | Deep code analysis, security, and style checks |
-| `debug` | Error diagnosis and root cause analysis |
-| `architect` | System design and architecture planning |
-| `refactor` | Code restructuring and improvement |
-| `test-writer` | Test generation and coverage analysis |
-| `docs` | Documentation generation |
-| `security` | Security vulnerability scanning |
+| `debug`       | Error diagnosis and root cause analysis        |
+| `architect`   | System design and architecture planning        |
+| `refactor`    | Code restructuring and improvement             |
+| `test-writer` | Test generation and coverage analysis          |
+| `docs`        | Documentation generation                       |
+| `security`    | Security vulnerability scanning                |
 
 ### Usage
 
@@ -172,6 +172,7 @@ Sessions are persisted to `.bot-data/session-threads.json` and survive bot resta
 By default, tool use details, system messages, and other verbose output are hidden. Instead, a compact **live status line** shows progress (tool name, elapsed time) and auto-updates as Claude works.
 
 Toggle visibility with:
+
 - `/show-system` — System init/completion messages
 - `/show-tool-details` — Tool use, results, progress, summaries
 - `/show-thinking` — Claude's internal reasoning
@@ -219,12 +220,12 @@ Restrict dangerous commands to authorized users and roles:
 
 ### Restricted Command Categories
 
-| Category | Commands |
-| -------- | -------- |
-| Shell | `/shell`, `/exec`, `/run`, `/terminal` |
-| Git | `/git`, `/commit`, `/push`, `/pull`, `/branch` |
-| System | `/shutdown`, `/restart`, `/config` |
-| Admin | `/admin` |
+| Category | Commands                                       |
+| -------- | ---------------------------------------------- |
+| Shell    | `/shell`, `/exec`, `/run`, `/terminal`         |
+| Git      | `/git`, `/commit`, `/push`, `/pull`, `/branch` |
+| System   | `/shutdown`, `/restart`, `/config`             |
+| Admin    | `/admin`                                       |
 
 ### Configuration
 

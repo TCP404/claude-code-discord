@@ -141,18 +141,18 @@ Discord slash command / thread message
 
 ### Key SDK Features Used
 
-| Feature | Implementation |
-|---------|---------------|
-| Streaming | `Query` async generator yields `SDKMessage` objects |
-| Models | `query.supportedModels()` for runtime discovery |
-| Agents | `AgentDefinition` with system prompts passed via `agents` option |
-| Permissions | `query.setPermissionMode()` for mid-session changes |
-| Model Swap | `query.setModel()` for mid-session model changes |
-| Rewind | `query.rewindFiles(messageId)` for file change rollback |
-| Info | `query.accountInfo()`, `query.initializationResult()` |
-| MCP | `query.mcpServerStatus()`, `query.setMcpServers()` |
-| Interrupts | `query.interrupt()` for cancellation |
-| Sessions | `persistSession: true` for conversation continuity |
+| Feature     | Implementation                                                   |
+| ----------- | ---------------------------------------------------------------- |
+| Streaming   | `Query` async generator yields `SDKMessage` objects              |
+| Models      | `query.supportedModels()` for runtime discovery                  |
+| Agents      | `AgentDefinition` with system prompts passed via `agents` option |
+| Permissions | `query.setPermissionMode()` for mid-session changes              |
+| Model Swap  | `query.setModel()` for mid-session model changes                 |
+| Rewind      | `query.rewindFiles(messageId)` for file change rollback          |
+| Info        | `query.accountInfo()`, `query.initializationResult()`            |
+| MCP         | `query.mcpServerStatus()`, `query.setMcpServers()`               |
+| Interrupts  | `query.interrupt()` for cancellation                             |
+| Sessions    | `persistSession: true` for conversation continuity               |
 
 ### Settings Pipeline
 

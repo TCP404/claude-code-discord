@@ -18,6 +18,7 @@ Discord slash command
 ```
 
 Key directories:
+
 - `claude/` — SDK integration: query execution, streaming, model registry, permissions, MCP loading
   - `client.ts` — low-level SDK wrapper (builds options, streams)
   - `enhanced-client.ts` — session manager, model registry, templates
@@ -53,6 +54,7 @@ Key directories:
 ## Config Injection
 
 At session start, the SDK query loads:
+
 - `.claude/mcp.json` — MCP servers (auto-injected, all `mcp__*` tools auto-approved)
 - `CLAUDE.md` — project instructions (this file)
 - `settings.local.json` — local settings
@@ -82,6 +84,7 @@ npx deno fmt            # format
 Before committing any code change, you MUST run `npx deno task test` and confirm all tests pass. Do not commit if any test fails — fix the failure first.
 
 **Test maintenance rules:**
+
 1. If you modify a function that has existing tests in a colocated `*_test.ts` file, update or add test cases to cover the new behavior.
 2. If you add a new exported function that is pure (no Discord/SDK side effects), you MUST add tests for it in the colocated `*_test.ts` file (create it if it doesn't exist).
 3. If you change a function's signature or return type, verify all its existing tests still pass and update assertions as needed.

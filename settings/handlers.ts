@@ -16,145 +16,193 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
     async onClaudeSettings(ctx: any, action: string, value?: string) {
       try {
         switch (action) {
-          case 'show':
+          case "show":
             await ctx.reply({
               embeds: [{
                 color: 0x0099ff,
-                title: '🤖 Claude Code Settings',
-                description: 'Note: Only model and context options are supported by Claude Code CLI',
+                title: "🤖 Claude Code Settings",
+                description:
+                  "Note: Only model and context options are supported by Claude Code CLI",
                 fields: [
-                  { name: 'Default Model', value: `\`${settings.defaultModel}\`\n${CLAUDE_MODELS[settings.defaultModel as keyof typeof CLAUDE_MODELS]?.name || 'Unknown'}`, inline: true },
-                  { name: 'Auto System Info', value: settings.autoIncludeSystemInfo ? 'Enabled' : 'Disabled', inline: true },
-                  { name: 'Auto Git Context', value: settings.autoIncludeGitContext ? 'Enabled' : 'Disabled', inline: true },
-                  { name: 'System Prompt', value: settings.defaultSystemPrompt || 'Not set', inline: false }
+                  {
+                    name: "Default Model",
+                    value: `\`${settings.defaultModel}\`\n${
+                      CLAUDE_MODELS[settings.defaultModel as keyof typeof CLAUDE_MODELS]?.name ||
+                      "Unknown"
+                    }`,
+                    inline: true,
+                  },
+                  {
+                    name: "Auto System Info",
+                    value: settings.autoIncludeSystemInfo ? "Enabled" : "Disabled",
+                    inline: true,
+                  },
+                  {
+                    name: "Auto Git Context",
+                    value: settings.autoIncludeGitContext ? "Enabled" : "Disabled",
+                    inline: true,
+                  },
+                  {
+                    name: "System Prompt",
+                    value: settings.defaultSystemPrompt || "Not set",
+                    inline: false,
+                  },
                 ],
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'set-model':
+          case "set-model":
             if (!value) {
-              const modelList = Object.entries(CLAUDE_MODELS).map(([key, model]) => 
+              const modelList = Object.entries(CLAUDE_MODELS).map(([key, model]) =>
                 `• \`${key}\` - ${model.name}`
-              ).join('\n');
-              
+              ).join("\n");
+
               await ctx.reply({
                 embeds: [{
                   color: 0xff6600,
-                  title: '❌ Invalid Model',
-                  description: 'Please specify a valid Claude model.',
-                  fields: [{ name: 'Available Models', value: modelList, inline: false }],
-                  timestamp: true
+                  title: "❌ Invalid Model",
+                  description: "Please specify a valid Claude model.",
+                  fields: [{ name: "Available Models", value: modelList, inline: false }],
+                  timestamp: true,
                 }],
-                ephemeral: true
+                ephemeral: true,
               });
               return;
             }
-            
+
             updateSettings({ defaultModel: value });
-            const selectedModel = CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS] || { name: value, description: 'Custom model', contextWindow: 200000, supportsThinking: false, recommended: false, tier: 'balanced' as const };
-            
+            const selectedModel = CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS] ||
+              {
+                name: value,
+                description: "Custom model",
+                contextWindow: 200000,
+                supportsThinking: false,
+                recommended: false,
+                tier: "balanced" as const,
+              };
+
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '✅ Model Updated',
+                title: "✅ Model Updated",
                 description: `Default Claude model set to **${selectedModel.name}**`,
                 fields: [
-                  { name: 'Description', value: selectedModel.description, inline: false },
-                  { name: 'Context Window', value: selectedModel.contextWindow.toLocaleString() + ' tokens', inline: true },
-                  { name: 'Supports Thinking', value: selectedModel.supportsThinking ? 'Yes' : 'No', inline: true }
+                  { name: "Description", value: selectedModel.description, inline: false },
+                  {
+                    name: "Context Window",
+                    value: selectedModel.contextWindow.toLocaleString() + " tokens",
+                    inline: true,
+                  },
+                  {
+                    name: "Supports Thinking",
+                    value: selectedModel.supportsThinking ? "Yes" : "No",
+                    inline: true,
+                  },
                 ],
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
           // NOTE: set-temperature and set-max-tokens removed - NOT supported by Claude Code CLI
 
-          case 'set-system-prompt':
+          case "set-system-prompt":
             if (!value) {
               updateSettings({ defaultSystemPrompt: null });
               await ctx.reply({
                 embeds: [{
                   color: 0x00ff00,
-                  title: '✅ System Prompt Cleared',
-                  description: 'Default system prompt has been removed',
-                  timestamp: true
+                  title: "✅ System Prompt Cleared",
+                  description: "Default system prompt has been removed",
+                  timestamp: true,
                 }],
-                ephemeral: true
+                ephemeral: true,
               });
             } else {
               updateSettings({ defaultSystemPrompt: value });
               await ctx.reply({
                 embeds: [{
                   color: 0x00ff00,
-                  title: '✅ System Prompt Set',
-                  description: `System prompt updated: ${value.substring(0, 200)}${value.length > 200 ? '...' : ''}`,
-                  timestamp: true
+                  title: "✅ System Prompt Set",
+                  description: `System prompt updated: ${value.substring(0, 200)}${
+                    value.length > 200 ? "..." : ""
+                  }`,
+                  timestamp: true,
                 }],
-                ephemeral: true
+                ephemeral: true,
               });
             }
             break;
 
-          case 'toggle-auto-system-info':
+          case "toggle-auto-system-info":
             const newSystemInfo = !settings.autoIncludeSystemInfo;
             updateSettings({ autoIncludeSystemInfo: newSystemInfo });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: `✅ Auto System Info ${newSystemInfo ? 'Enabled' : 'Disabled'}`,
-                description: `System information will ${newSystemInfo ? '' : 'not '}be automatically included in Claude requests`,
-                timestamp: true
+                title: `✅ Auto System Info ${newSystemInfo ? "Enabled" : "Disabled"}`,
+                description: `System information will ${
+                  newSystemInfo ? "" : "not "
+                }be automatically included in Claude requests`,
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'toggle-auto-git-context':
+          case "toggle-auto-git-context":
             const newGitContext = !settings.autoIncludeGitContext;
             updateSettings({ autoIncludeGitContext: newGitContext });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: `✅ Auto Git Context ${newGitContext ? 'Enabled' : 'Disabled'}`,
-                description: `Git context will ${newGitContext ? '' : 'not '}be automatically included in Claude requests`,
-                timestamp: true
+                title: `✅ Auto Git Context ${newGitContext ? "Enabled" : "Disabled"}`,
+                description: `Git context will ${
+                  newGitContext ? "" : "not "
+                }be automatically included in Claude requests`,
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'reset-defaults':
+          case "reset-defaults":
             const { DEFAULT_SETTINGS } = await import("./advanced-settings.ts");
             updateSettings({
               defaultModel: DEFAULT_SETTINGS.defaultModel,
               defaultSystemPrompt: DEFAULT_SETTINGS.defaultSystemPrompt,
               autoIncludeSystemInfo: DEFAULT_SETTINGS.autoIncludeSystemInfo,
-              autoIncludeGitContext: DEFAULT_SETTINGS.autoIncludeGitContext
+              autoIncludeGitContext: DEFAULT_SETTINGS.autoIncludeGitContext,
             });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '✅ Settings Reset',
-                description: 'Claude Code settings have been reset to defaults',
-                timestamp: true
+                title: "✅ Settings Reset",
+                description: "Claude Code settings have been reset to defaults",
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
           default:
             await ctx.reply({
-              content: 'Unknown action. Use `/claude-settings action: show` to see current settings.',
-              ephemeral: true
+              content:
+                "Unknown action. Use `/claude-settings action: show` to see current settings.",
+              ephemeral: true,
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'claude-settings', `Action: ${action}`);
+        await crashHandler.reportCrash(
+          "main",
+          error instanceof Error ? error : new Error(String(error)),
+          "claude-settings",
+          `Action: ${action}`,
+        );
         throw error;
       }
     },
@@ -163,110 +211,132 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
     async onOutputSettings(ctx: any, action: string, value?: string) {
       try {
         switch (action) {
-          case 'show':
+          case "show":
             await ctx.reply({
               embeds: [{
                 color: 0x9932cc,
-                title: '🎨 Output Display Settings',
+                title: "🎨 Output Display Settings",
                 fields: [
-                  { name: 'Code Highlighting', value: settings.codeHighlighting ? 'Enabled' : 'Disabled', inline: true },
-                  { name: 'Auto Pagination', value: settings.autoPageLongOutput ? 'Enabled' : 'Disabled', inline: true },
-                  { name: 'Max Output Length', value: settings.maxOutputLength.toString(), inline: true },
-                  { name: 'Timestamp Format', value: settings.timestampFormat, inline: true }
+                  {
+                    name: "Code Highlighting",
+                    value: settings.codeHighlighting ? "Enabled" : "Disabled",
+                    inline: true,
+                  },
+                  {
+                    name: "Auto Pagination",
+                    value: settings.autoPageLongOutput ? "Enabled" : "Disabled",
+                    inline: true,
+                  },
+                  {
+                    name: "Max Output Length",
+                    value: settings.maxOutputLength.toString(),
+                    inline: true,
+                  },
+                  { name: "Timestamp Format", value: settings.timestampFormat, inline: true },
                 ],
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'toggle-code-highlighting':
+          case "toggle-code-highlighting":
             const newHighlighting = !settings.codeHighlighting;
             updateSettings({ codeHighlighting: newHighlighting });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: `✅ Code Highlighting ${newHighlighting ? 'Enabled' : 'Disabled'}`,
-                description: `Syntax highlighting ${newHighlighting ? 'will be applied' : 'has been disabled'} for code blocks`,
-                timestamp: true
+                title: `✅ Code Highlighting ${newHighlighting ? "Enabled" : "Disabled"}`,
+                description: `Syntax highlighting ${
+                  newHighlighting ? "will be applied" : "has been disabled"
+                } for code blocks`,
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'toggle-auto-pagination':
+          case "toggle-auto-pagination":
             const newPagination = !settings.autoPageLongOutput;
             updateSettings({ autoPageLongOutput: newPagination });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: `✅ Auto Pagination ${newPagination ? 'Enabled' : 'Disabled'}`,
-                description: `Long outputs ${newPagination ? 'will be paginated' : 'will be truncated'} automatically`,
-                timestamp: true
+                title: `✅ Auto Pagination ${newPagination ? "Enabled" : "Disabled"}`,
+                description: `Long outputs ${
+                  newPagination ? "will be paginated" : "will be truncated"
+                } automatically`,
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'set-max-length':
+          case "set-max-length":
             if (!value) {
               await ctx.reply({
-                content: 'Please provide a max length value between 1000 and 8000',
-                ephemeral: true
+                content: "Please provide a max length value between 1000 and 8000",
+                ephemeral: true,
               });
               return;
             }
-            
+
             const maxLength = parseInt(value);
             if (isNaN(maxLength) || maxLength < 1000 || maxLength > 8000) {
               await ctx.reply({
-                content: 'Max length must be between 1000 and 8000 characters',
-                ephemeral: true
+                content: "Max length must be between 1000 and 8000 characters",
+                ephemeral: true,
               });
               return;
             }
-            
+
             updateSettings({ maxOutputLength: maxLength });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '✅ Max Length Updated',
+                title: "✅ Max Length Updated",
                 description: `Output max length set to ${maxLength} characters`,
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
-          case 'set-timestamp-format':
-            if (!value || !['relative', 'absolute', 'both'].includes(value)) {
+          case "set-timestamp-format":
+            if (!value || !["relative", "absolute", "both"].includes(value)) {
               await ctx.reply({
-                content: 'Please specify: relative, absolute, or both',
-                ephemeral: true
+                content: "Please specify: relative, absolute, or both",
+                ephemeral: true,
               });
               return;
             }
-            
-            updateSettings({ timestampFormat: value as 'relative' | 'absolute' | 'both' });
+
+            updateSettings({ timestampFormat: value as "relative" | "absolute" | "both" });
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '✅ Timestamp Format Updated',
+                title: "✅ Timestamp Format Updated",
                 description: `Timestamp format set to ${value}`,
-                timestamp: true
+                timestamp: true,
               }],
-              ephemeral: true
+              ephemeral: true,
             });
             break;
 
           default:
             await ctx.reply({
-              content: 'Unknown action. Use `/output-settings action: show` to see current settings.',
-              ephemeral: true
+              content:
+                "Unknown action. Use `/output-settings action: show` to see current settings.",
+              ephemeral: true,
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'output-settings', `Action: ${action}`);
+        await crashHandler.reportCrash(
+          "main",
+          error instanceof Error ? error : new Error(String(error)),
+          "output-settings",
+          `Action: ${action}`,
+        );
         throw error;
       }
     },
@@ -277,18 +347,22 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
         const selectedModel = CLAUDE_MODELS[model as keyof typeof CLAUDE_MODELS];
         if (!selectedModel) {
           const modelList = Object.entries(CLAUDE_MODELS)
-            .map(([key, m]) => `\`${key}\` — ${m.name}${m.recommended ? ' ⭐' : ''}`)
-            .join('\n');
+            .map(([key, m]) => `\`${key}\` — ${m.name}${m.recommended ? " ⭐" : ""}`)
+            .join("\n");
           await ctx.reply({
             embeds: [{
               color: 0xff6600,
-              title: '❌ Invalid Model',
+              title: "❌ Invalid Model",
               description: `\`${model}\` is not a recognized model.`,
-              fields: [{ name: 'Available Models', value: modelList || 'No models loaded', inline: false }],
-              footer: { text: 'Use /claude-models to refresh the model list' },
-              timestamp: true
+              fields: [{
+                name: "Available Models",
+                value: modelList || "No models loaded",
+                inline: false,
+              }],
+              footer: { text: "Use /claude-models to refresh the model list" },
+              timestamp: true,
             }],
-            ephemeral: true
+            ephemeral: true,
           });
           return;
         }
@@ -298,22 +372,35 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
         await ctx.reply({
           embeds: [{
             color: 0x00ff00,
-            title: '🚀 Model Switched',
+            title: "🚀 Model Switched",
             description: `Now using **${selectedModel.name}** for Claude conversations`,
             fields: [
-              { name: 'Model ID', value: `\`${model}\``, inline: true },
-              { name: 'Context Window', value: selectedModel.contextWindow.toLocaleString() + ' tokens', inline: true },
-              { name: 'Thinking Mode', value: selectedModel.supportsThinking ? 'Enabled' : 'Disabled', inline: true }
+              { name: "Model ID", value: `\`${model}\``, inline: true },
+              {
+                name: "Context Window",
+                value: selectedModel.contextWindow.toLocaleString() + " tokens",
+                inline: true,
+              },
+              {
+                name: "Thinking Mode",
+                value: selectedModel.supportsThinking ? "Enabled" : "Disabled",
+                inline: true,
+              },
             ],
-            footer: { text: 'This applies to all new conversations' },
-            timestamp: true
+            footer: { text: "This applies to all new conversations" },
+            timestamp: true,
           }],
-          ephemeral: true
+          ephemeral: true,
         });
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'quick-model', `Model: ${model}`);
+        await crashHandler.reportCrash(
+          "main",
+          error instanceof Error ? error : new Error(String(error)),
+          "quick-model",
+          `Model: ${model}`,
+        );
         throw error;
       }
-    }
+    },
   };
 }

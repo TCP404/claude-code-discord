@@ -1,7 +1,7 @@
 /**
  * Role-Based Access Control (RBAC) for Discord commands.
  * Gates dangerous commands behind configurable role requirements.
- * 
+ *
  * @module core/rbac
  */
 
@@ -13,18 +13,18 @@ import type { InteractionContext } from "../discord/types.ts";
  */
 const RESTRICTED_COMMANDS: Record<string, string[]> = {
   /** Full host access — highest risk */
-  shell: ['shell', 'shell-input', 'shell-list', 'shell-kill'],
+  shell: ["shell", "shell-input", "shell-list", "shell-kill"],
   /** Repository modifications */
-  git: ['git', 'worktree', 'worktree-remove', 'worktree-bots', 'worktree-kill'],
+  git: ["git", "worktree", "worktree-remove", "worktree-bots", "worktree-kill"],
   /** System information exposure */
-  system: ['env-vars', 'port-scan', 'system-logs'],
+  system: ["env-vars", "port-scan", "system-logs"],
   /** Bot lifecycle */
-  admin: ['shutdown', 'restart'],
+  admin: ["shutdown", "restart"],
 };
 
 /** Flat set of all restricted command names for fast lookup */
 const ALL_RESTRICTED = new Set(
-  Object.values(RESTRICTED_COMMANDS).flat()
+  Object.values(RESTRICTED_COMMANDS).flat(),
 );
 
 /**
@@ -43,11 +43,11 @@ let cachedConfig: RBACConfig | null = null;
 
 /**
  * Load RBAC configuration from environment variables.
- * 
+ *
  * Environment variables:
  * - `ADMIN_ROLE_IDS`: Comma-separated Discord role IDs (e.g., "123456,789012")
  * - `ADMIN_USER_IDS`: Comma-separated Discord user IDs (e.g., "123456")
- * 
+ *
  * If neither is set, RBAC is disabled and all commands are open.
  */
 export function loadRBACConfig(): RBACConfig {
@@ -57,10 +57,10 @@ export function loadRBACConfig(): RBACConfig {
   const userIdsRaw = Deno.env.get("ADMIN_USER_IDS") ?? "";
 
   const allowedRoleIds = new Set(
-    roleIdsRaw.split(",").map(id => id.trim()).filter(Boolean)
+    roleIdsRaw.split(",").map((id) => id.trim()).filter(Boolean),
   );
   const allowedUserIds = new Set(
-    userIdsRaw.split(",").map(id => id.trim()).filter(Boolean)
+    userIdsRaw.split(",").map((id) => id.trim()).filter(Boolean),
   );
 
   const enabled = allowedRoleIds.size > 0 || allowedUserIds.size > 0;
@@ -68,9 +68,13 @@ export function loadRBACConfig(): RBACConfig {
   cachedConfig = { enabled, allowedRoleIds, allowedUserIds };
 
   if (enabled) {
-    console.log(`[RBAC] Enabled — ${allowedRoleIds.size} admin role(s), ${allowedUserIds.size} admin user(s)`);
+    console.log(
+      `[RBAC] Enabled — ${allowedRoleIds.size} admin role(s), ${allowedUserIds.size} admin user(s)`,
+    );
   } else {
-    console.log("[RBAC] Disabled — no ADMIN_ROLE_IDS or ADMIN_USER_IDS configured. All commands are open.");
+    console.log(
+      "[RBAC] Disabled — no ADMIN_ROLE_IDS or ADMIN_USER_IDS configured. All commands are open.",
+    );
   }
 
   return cachedConfig;
@@ -85,7 +89,7 @@ export function isRestrictedCommand(commandName: string): boolean {
 
 /**
  * Check whether the invoking user has permission to run a restricted command.
- * 
+ *
  * @returns `true` if allowed, `false` if denied
  */
 export function hasPermission(ctx: InteractionContext): boolean {
@@ -110,19 +114,20 @@ export function hasPermission(ctx: InteractionContext): boolean {
 /**
  * RBAC check that can be called before executing a command.
  * Sends an ephemeral denial message if the user lacks permission.
- * 
+ *
  * @returns `true` if the command should proceed, `false` if denied
  */
 export async function checkCommandPermission(
   commandName: string,
-  ctx: InteractionContext
+  ctx: InteractionContext,
 ): Promise<boolean> {
   if (!isRestrictedCommand(commandName)) return true;
   if (hasPermission(ctx)) return true;
 
   await ctx.reply({
-    content: "🔒 **Access Denied** — You don't have permission to run this command. An admin role is required.",
-    ephemeral: true
+    content:
+      "🔒 **Access Denied** — You don't have permission to run this command. An admin role is required.",
+    ephemeral: true,
   });
 
   return false;

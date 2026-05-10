@@ -5,30 +5,27 @@
  * @module claude/discord-sender
  */
 
-import type { ClaudeMessage, DiscordSender, TrackedMessage, RendererContext } from "./types.ts";
+import type { ClaudeMessage, DiscordSender, RendererContext, TrackedMessage } from "./types.ts";
 import type { MessageContent } from "../discord/types.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
-import {
-  hiddenMessageTypes,
-  toStatusLine,
-} from "./sender-utils.ts";
+import { hiddenMessageTypes, toStatusLine } from "./sender-utils.ts";
 import {
   deliverFileMarkers,
-  renderText,
-  renderToolUse,
-  renderToolResult,
-  renderThinking,
-  renderSystem,
   renderOther,
   renderPermissionDenied,
-  renderTaskStarted,
+  renderSystem,
   renderTaskNotification,
+  renderTaskStarted,
+  renderText,
+  renderThinking,
   renderToolProgress,
+  renderToolResult,
   renderToolSummary,
+  renderToolUse,
 } from "./sender-renderers.ts";
 
 // Re-export public API that other modules depend on
-export { hiddenMessageTypes, FILE_MARKER_REGEX } from "./sender-utils.ts";
+export { FILE_MARKER_REGEX, hiddenMessageTypes } from "./sender-utils.ts";
 export type { DiscordSender, TrackedMessage } from "./types.ts";
 
 // Store full content for expand functionality
@@ -58,7 +55,9 @@ export function createClaudeSender(
         await statusMsg.edit({ content });
       } else {
         if (statusMsg) {
-          try { await statusMsg.delete(); } catch { /* ignore */ }
+          try {
+            await statusMsg.delete();
+          } catch { /* ignore */ }
         }
         statusStartTime = Date.now();
         statusMsg = await sender.sendTracked({ content: line });
@@ -74,7 +73,9 @@ export function createClaudeSender(
         await statusMsg.edit({ content });
       } else {
         if (statusMsg) {
-          try { await statusMsg.delete(); } catch { /* ignore */ }
+          try {
+            await statusMsg.delete();
+          } catch { /* ignore */ }
         }
         statusMsg = await sender.sendTracked({ content });
         visibleSentSinceStatus = false;
@@ -84,7 +85,9 @@ export function createClaudeSender(
 
   async function clearStatus() {
     if (statusMsg) {
-      try { await statusMsg.delete(); } catch { /* ignore */ }
+      try {
+        await statusMsg.delete();
+      } catch { /* ignore */ }
       statusMsg = null;
     }
   }
@@ -96,8 +99,12 @@ export function createClaudeSender(
     pendingFileUploads,
     sentFilePaths,
     isThread,
-    get currentSessionId() { return currentSessionId; },
-    setCurrentSessionId: (id: string) => { currentSessionId = id; },
+    get currentSessionId() {
+      return currentSessionId;
+    },
+    setCurrentSessionId: (id: string) => {
+      currentSessionId = id;
+    },
   };
 
   async function sendVisible(content: MessageContent) {
@@ -122,13 +129,19 @@ export function createClaudeSender(
           if (msg.metadata?.subtype === "completion") {
             const activeSessionId = currentSessionId || msg.metadata?.session_id;
             if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
-              recordUsage(activeSessionId, msg.metadata.total_cost_usd, msg.metadata?.duration_ms ?? 0);
+              recordUsage(
+                activeSessionId,
+                msg.metadata.total_cost_usd,
+                msg.metadata?.duration_ms ?? 0,
+              );
             }
             const showCost = Deno.env.get("SHOW_COST") !== "false";
             if (showCost && msg.metadata?.total_cost_usd !== undefined) {
               const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
               const costPart = sessionUsage && sessionUsage.queryCount > 1
-                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${sessionUsage.totalCost.toFixed(4)} / ${sessionUsage.queryCount} queries)`
+                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
+                  sessionUsage.totalCost.toFixed(4)
+                } / ${sessionUsage.queryCount} queries)`
                 : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
               const durPart = msg.metadata?.duration_ms !== undefined
                 ? ` | ${(msg.metadata.duration_ms / 1000).toFixed(1)}s`

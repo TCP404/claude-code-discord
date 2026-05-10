@@ -13,7 +13,8 @@ import type { DiscordSender } from "../claude/types.ts";
  */
 // deno-lint-ignore no-explicit-any
 export async function sendMessageContent(channel: any, content: MessageContent): Promise<void> {
-  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = await import("npm:discord.js@14.14.1");
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } =
+    await import("npm:discord.js@14.14.1");
 
   // deno-lint-ignore no-explicit-any
   const payload: any = {};
@@ -21,12 +22,12 @@ export async function sendMessageContent(channel: any, content: MessageContent):
   if (content.content) payload.content = content.content;
 
   if (content.embeds) {
-    payload.embeds = content.embeds.map(e => {
+    payload.embeds = content.embeds.map((e) => {
       const embed = new EmbedBuilder();
       if (e.color !== undefined) embed.setColor(e.color);
       if (e.title) embed.setTitle(e.title);
       if (e.description) embed.setDescription(e.description);
-      if (e.fields) e.fields.forEach(f => embed.addFields(f));
+      if (e.fields) e.fields.forEach((f) => embed.addFields(f));
       if (e.footer) embed.setFooter(e.footer);
       if (e.timestamp) embed.setTimestamp();
       return embed;
@@ -34,21 +35,31 @@ export async function sendMessageContent(channel: any, content: MessageContent):
   }
 
   if (content.components) {
-    payload.components = content.components.map(row => {
+    payload.components = content.components.map((row) => {
       // deno-lint-ignore no-explicit-any
       const actionRow = new ActionRowBuilder<any>();
-      row.components.forEach(comp => {
+      row.components.forEach((comp) => {
         const button = new ButtonBuilder().setLabel(comp.label);
 
         switch (comp.style) {
-          case 'primary': button.setStyle(ButtonStyle.Primary); break;
-          case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
-          case 'success': button.setStyle(ButtonStyle.Success); break;
-          case 'danger': button.setStyle(ButtonStyle.Danger); break;
-          case 'link': button.setStyle(ButtonStyle.Link); break;
+          case "primary":
+            button.setStyle(ButtonStyle.Primary);
+            break;
+          case "secondary":
+            button.setStyle(ButtonStyle.Secondary);
+            break;
+          case "success":
+            button.setStyle(ButtonStyle.Success);
+            break;
+          case "danger":
+            button.setStyle(ButtonStyle.Danger);
+            break;
+          case "link":
+            button.setStyle(ButtonStyle.Link);
+            break;
         }
 
-        if (comp.style === 'link' && comp.url) {
+        if (comp.style === "link" && comp.url) {
           button.setURL(comp.url);
         } else if (comp.customId) {
           button.setCustomId(comp.customId);
@@ -61,7 +72,9 @@ export async function sendMessageContent(channel: any, content: MessageContent):
   }
 
   if (content.files && content.files.length > 0) {
-    payload.files = content.files.map(f => new AttachmentBuilder(f.path, { name: f.name || 'attachment', description: f.description }));
+    payload.files = content.files.map((f) =>
+      new AttachmentBuilder(f.path, { name: f.name || "attachment", description: f.description })
+    );
   }
 
   await channel.send(payload);
@@ -69,13 +82,18 @@ export async function sendMessageContent(channel: any, content: MessageContent):
 
 /** Like sendMessageContent but returns the Message object for later editing/deleting. */
 // deno-lint-ignore no-explicit-any
-export async function sendMessageContentTracked(channel: any, content: MessageContent): Promise<any> {
+export async function sendMessageContentTracked(
+  channel: any,
+  content: MessageContent,
+): Promise<any> {
   const { AttachmentBuilder } = await import("npm:discord.js@14.14.1");
   // deno-lint-ignore no-explicit-any
   const payload: any = {};
   if (content.content) payload.content = content.content;
   if (content.files && content.files.length > 0) {
-    payload.files = content.files.map(f => new AttachmentBuilder(f.path, { name: f.name || 'attachment', description: f.description }));
+    payload.files = content.files.map((f) =>
+      new AttachmentBuilder(f.path, { name: f.name || "attachment", description: f.description })
+    );
   }
   return await channel.send(payload);
 }
@@ -99,7 +117,7 @@ export function createDiscordSenderAdapter(
       if (channel) {
         await sendMessageContent(channel, content);
       }
-    }
+    },
   };
 }
 

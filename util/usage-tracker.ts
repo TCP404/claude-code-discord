@@ -15,7 +15,7 @@ export interface APIUsageRecord {
   outputTokens?: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
-  requestType: 'chat' | 'agent' | 'command' | 'enhanced';
+  requestType: "chat" | "agent" | "command" | "enhanced";
   sessionId?: string;
 }
 
@@ -59,7 +59,7 @@ let initialized = false;
 
 // Get today's date string (YYYY-MM-DD)
 function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
 // Create empty statistics
@@ -70,7 +70,7 @@ function createEmptyStats(): UsageStatistics {
     totalDurationMs: 0,
     byModel: {},
     byType: {},
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
   };
 }
 
@@ -79,7 +79,7 @@ function createEmptyDailyUsage(date: string): DailyUsage {
   return {
     date,
     records: [],
-    statistics: createEmptyStats()
+    statistics: createEmptyStats(),
   };
 }
 
@@ -88,17 +88,17 @@ function createDefaultUsageData(): UsageData {
   return {
     currentDay: createEmptyDailyUsage(getTodayDate()),
     history: [],
-    allTimeStats: createEmptyStats()
+    allTimeStats: createEmptyStats(),
   };
 }
 
 // Initialize usage tracking
 async function ensureInitialized(): Promise<void> {
   if (initialized) return;
-  
+
   try {
     usageData = await usageManager.load(createDefaultUsageData());
-    
+
     // Check if we need to roll over to a new day
     const today = getTodayDate();
     if (usageData.currentDay.date !== today) {
@@ -114,11 +114,13 @@ async function ensureInitialized(): Promise<void> {
       usageData.currentDay = createEmptyDailyUsage(today);
       await usageManager.save(usageData);
     }
-    
+
     initialized = true;
-    console.log(`Usage Tracking: Initialized with ${usageData.currentDay.records.length} records today`);
+    console.log(
+      `Usage Tracking: Initialized with ${usageData.currentDay.records.length} records today`,
+    );
   } catch (error) {
-    console.error('Usage Tracking: Failed to initialize:', error);
+    console.error("Usage Tracking: Failed to initialize:", error);
     usageData = createDefaultUsageData();
     initialized = true;
   }
@@ -130,7 +132,7 @@ function updateStats(stats: UsageStatistics, record: APIUsageRecord): void {
   stats.totalRequests++;
   stats.totalDurationMs += record.durationMs;
   stats.lastUpdated = new Date().toISOString();
-  
+
   // Update by model
   if (!stats.byModel[record.model]) {
     stats.byModel[record.model] = { cost: 0, requests: 0, durationMs: 0 };
@@ -138,7 +140,7 @@ function updateStats(stats: UsageStatistics, record: APIUsageRecord): void {
   stats.byModel[record.model].cost += record.cost;
   stats.byModel[record.model].requests++;
   stats.byModel[record.model].durationMs += record.durationMs;
-  
+
   // Update by type
   if (!stats.byType[record.requestType]) {
     stats.byType[record.requestType] = { cost: 0, requests: 0 };
@@ -154,21 +156,21 @@ export async function recordAPIUsage(
   model: string,
   cost: number | undefined,
   durationMs: number | undefined,
-  requestType: 'chat' | 'agent' | 'command' | 'enhanced',
+  requestType: "chat" | "agent" | "command" | "enhanced",
   sessionId?: string,
   tokenInfo?: {
     inputTokens?: number;
     outputTokens?: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
-  }
+  },
 ): Promise<void> {
   await ensureInitialized();
   if (!usageData) return;
-  
+
   const record: APIUsageRecord = {
     timestamp: new Date().toISOString(),
-    model: model || 'unknown',
+    model: model || "unknown",
     cost: cost || 0,
     durationMs: durationMs || 0,
     inputTokens: tokenInfo?.inputTokens,
@@ -176,19 +178,19 @@ export async function recordAPIUsage(
     cacheReadTokens: tokenInfo?.cacheReadTokens,
     cacheWriteTokens: tokenInfo?.cacheWriteTokens,
     requestType,
-    sessionId
+    sessionId,
   };
-  
+
   // Add to current day
   usageData.currentDay.records.push(record);
   updateStats(usageData.currentDay.statistics, record);
   updateStats(usageData.allTimeStats, record);
-  
+
   // Save periodically (every 5 records) to avoid too many writes
   if (usageData.currentDay.records.length % 5 === 0) {
     await usageManager.save(usageData);
   }
-  
+
   console.log(`Usage Tracking: Recorded ${requestType} request - $${cost?.toFixed(4) || 0}`);
 }
 
@@ -216,7 +218,7 @@ export async function getUsageHistory(days: number = 7): Promise<DailyUsage[]> {
   const history = usageData?.history || [];
   return [
     usageData?.currentDay || createEmptyDailyUsage(getTodayDate()),
-    ...history.slice(0, days - 1)
+    ...history.slice(0, days - 1),
   ];
 }
 
@@ -236,12 +238,12 @@ export async function getUsageSummary(): Promise<{
   };
 }> {
   await ensureInitialized();
-  
+
   const today = usageData?.currentDay.statistics || createEmptyStats();
   const allTime = usageData?.allTimeStats || createEmptyStats();
-  
+
   // Find top model by requests
-  let topModel = 'N/A';
+  let topModel = "N/A";
   let maxRequests = 0;
   for (const [model, stats] of Object.entries(allTime.byModel)) {
     if (stats.requests > maxRequests) {
@@ -249,20 +251,20 @@ export async function getUsageSummary(): Promise<{
       topModel = model;
     }
   }
-  
+
   return {
     today: {
       cost: `$${today.totalCost.toFixed(4)}`,
       requests: today.totalRequests,
-      avgDuration: today.totalRequests > 0 
+      avgDuration: today.totalRequests > 0
         ? `${(today.totalDurationMs / today.totalRequests / 1000).toFixed(1)}s`
-        : 'N/A'
+        : "N/A",
     },
     allTime: {
       cost: `$${allTime.totalCost.toFixed(4)}`,
       requests: allTime.totalRequests,
-      topModel
-    }
+      topModel,
+    },
   };
 }
 

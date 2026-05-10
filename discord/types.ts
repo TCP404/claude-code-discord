@@ -12,11 +12,11 @@ export interface EmbedData {
 }
 
 export interface ComponentData {
-  type: 'button';
+  type: "button";
   customId?: string;
   url?: string;
   label: string;
-  style: 'primary' | 'secondary' | 'success' | 'danger' | 'link';
+  style: "primary" | "secondary" | "success" | "danger" | "link";
   disabled?: boolean;
 }
 
@@ -32,7 +32,7 @@ export interface FileAttachment {
 export interface MessageContent {
   content?: string;
   embeds?: EmbedData[];
-  components?: Array<{ type: 'actionRow'; components: ComponentData[] }>;
+  components?: Array<{ type: "actionRow"; components: ComponentData[] }>;
   /** File attachments to include */
   files?: FileAttachment[];
 }

@@ -13,10 +13,10 @@ import type { EmbedData, MessageContent } from "../discord/types.ts";
 import { generatePreview } from "./file-preview.ts";
 import { getUsage, recordUsage } from "./session-usage.ts";
 import {
-  FILE_MARKER_REGEX,
-  truncateContent,
-  formatStopReason,
   createActionButtons,
+  FILE_MARKER_REGEX,
+  formatStopReason,
+  truncateContent,
 } from "./sender-utils.ts";
 
 export type { RendererContext } from "./types.ts";
@@ -172,7 +172,11 @@ function renderEditTool(msg: ClaudeMessage): MessageContent {
   };
 }
 
-function renderGenericTool(msg: ClaudeMessage, toolName: string, ctx: RendererContext): MessageContent {
+function renderGenericTool(
+  msg: ClaudeMessage,
+  toolName: string,
+  ctx: RendererContext,
+): MessageContent {
   const inputStr = JSON.stringify(msg.metadata.input || {}, null, 2);
   const { preview, isTruncated } = truncateContent(inputStr, 10, 800);
 
@@ -242,9 +246,7 @@ export function renderThinking(msg: ClaudeMessage): MessageContent[] {
   return chunks.map((chunk, i) => ({
     embeds: [{
       color: 0x9b59b6,
-      title: chunks.length > 1
-        ? `💭 Thinking (${i + 1}/${chunks.length})`
-        : "💭 Thinking",
+      title: chunks.length > 1 ? `💭 Thinking (${i + 1}/${chunks.length})` : "💭 Thinking",
       description: chunk,
       timestamp: true,
     }],
@@ -346,9 +348,7 @@ export function renderOther(msg: ClaudeMessage): MessageContent[] {
   return chunks.map((chunk, i) => ({
     embeds: [{
       color: 0xffaa00,
-      title: chunks.length > 1
-        ? `Other Content (${i + 1}/${chunks.length})`
-        : "Other Content",
+      title: chunks.length > 1 ? `Other Content (${i + 1}/${chunks.length})` : "Other Content",
       description: `\`\`\`json\n${chunk}\n\`\`\``,
       timestamp: true,
     }],
@@ -398,18 +398,12 @@ export function renderTaskNotification(msg: ClaudeMessage): MessageContent {
   const status = msg.metadata?.status || "unknown";
   const summary = msg.metadata?.summary || msg.content || "No summary";
   const statusEmoji = status === "completed" ? "✅" : status === "failed" ? "❌" : "⏹️";
-  const statusColor = status === "completed"
-    ? 0x00ff00
-    : status === "failed"
-    ? 0xff0000
-    : 0xffaa00;
+  const statusColor = status === "completed" ? 0x00ff00 : status === "failed" ? 0xff0000 : 0xffaa00;
 
   return {
     embeds: [{
       color: statusColor,
-      title: `${statusEmoji} Subagent Task ${
-        status.charAt(0).toUpperCase() + status.slice(1)
-      }`,
+      title: `${statusEmoji} Subagent Task ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       description: summary.length > 4000 ? summary.substring(0, 3997) + "..." : summary,
       timestamp: true,
     }],
@@ -437,9 +431,7 @@ export function renderToolSummary(msg: ClaudeMessage): MessageContent | null {
     embeds: [{
       color: 0x00ccff,
       title: "📋 Tool Summary",
-      description: msg.content.length > 4000
-        ? msg.content.substring(0, 3997) + "..."
-        : msg.content,
+      description: msg.content.length > 4000 ? msg.content.substring(0, 3997) + "..." : msg.content,
       timestamp: true,
     }],
   };

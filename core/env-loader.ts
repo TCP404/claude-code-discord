@@ -13,21 +13,23 @@ export async function loadEnvFile(): Promise<void> {
     if (!stat?.isFile) return;
 
     const content = await Deno.readTextFile(envPath);
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
     for (const line of lines) {
       const trimmed = line.trim();
 
-      if (!trimmed || trimmed.startsWith('#')) continue;
+      if (!trimmed || trimmed.startsWith("#")) continue;
 
-      const eqIndex = trimmed.indexOf('=');
+      const eqIndex = trimmed.indexOf("=");
       if (eqIndex === -1) continue;
 
       const key = trimmed.substring(0, eqIndex).trim();
       let value = trimmed.substring(eqIndex + 1).trim();
 
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
 
@@ -36,7 +38,7 @@ export async function loadEnvFile(): Promise<void> {
       }
     }
 
-    console.log('✓ Loaded configuration from .env file');
+    console.log("✓ Loaded configuration from .env file");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Note: Could not load .env file: ${message}`);

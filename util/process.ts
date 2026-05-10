@@ -11,7 +11,7 @@
  */
 export function killProcessCrossPlatform(
   childProcess: Deno.ChildProcess,
-  signal: "SIGTERM" | "SIGKILL" = "SIGTERM"
+  signal: "SIGTERM" | "SIGKILL" = "SIGTERM",
 ): void {
   try {
     childProcess.kill(signal);
