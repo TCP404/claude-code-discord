@@ -1,6 +1,7 @@
 /** @module claude/hot-query — AsyncPushQueue + HotQuerySession for streaming-input mode. */
 
 import type { ClaudeModelOptions, SDKPermissionMode } from "./client.ts";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 /**
  * An async iterable driven by external `push()` calls. Pending `.next()` promises
@@ -99,8 +100,6 @@ export function prepareForTurn(
   }
   return { verdict: "reuse", setters };
 }
-
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 export interface TurnCallbacks {
   onChunk?: (text: string) => void;
