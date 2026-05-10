@@ -155,14 +155,35 @@ export async function deleteWorkspace(deps: AdminDeps, name: string): Promise<Re
 // ─── Sessions ─────────────────────────────────────────
 
 export function listSessions(deps: AdminDeps): Response {
-  const sessions = deps.sessionThreadManager.getAllSessionThreads().map((s) => ({
-    sessionId: s.sessionId,
-    threadId: s.threadId,
-    threadName: s.threadName,
-    createdAt: s.createdAt.toISOString(),
-    lastActivity: s.lastActivity.toISOString(),
-    messageCount: s.messageCount,
-  }));
+  const { sessionThreadManager, workspaceManager, discordClient } = deps;
+  const guild = discordClient.guilds.cache.first();
+
+  const sessions = sessionThreadManager.getAllSessionThreads().map((s) => {
+    // Resolve the parent channel of the thread, then map to a workspace.
+    let parentChannelId: string | null = null;
+    const thread = sessionThreadManager.getThread(s.sessionId);
+    if (thread) {
+      parentChannelId = (thread as unknown as { parentId: string | null }).parentId ?? null;
+    } else if (guild) {
+      // Fall back to fetching from cache by threadId
+      const ch = guild.channels.cache.get(s.threadId);
+      if (ch && "parentId" in ch) parentChannelId = ch.parentId;
+    }
+
+    const workspace = parentChannelId ? workspaceManager.findByChannel(parentChannelId) : undefined;
+
+    return {
+      sessionId: s.sessionId,
+      threadId: s.threadId,
+      threadName: s.threadName,
+      createdAt: s.createdAt.toISOString(),
+      lastActivity: s.lastActivity.toISOString(),
+      messageCount: s.messageCount,
+      workspaceName: workspace?.name ?? null,
+      workspacePath: workspace?.path ?? null,
+      channelId: parentChannelId,
+    };
+  });
   return json(sessions);
 }
 

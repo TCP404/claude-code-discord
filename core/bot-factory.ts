@@ -13,7 +13,6 @@ import {
   type RecoveryOptions,
   setupGlobalErrorHandlers,
 } from "../process/index.ts";
-import { ClaudeSessionManager } from "../claude/enhanced-client.ts";
 import type { AppConfig } from "./config-loader.ts";
 
 // ================================
@@ -33,8 +32,6 @@ export interface BotManagers {
   crashHandler: ProcessCrashHandler;
   /** Health monitor for process status tracking */
   healthMonitor: ProcessHealthMonitor;
-  /** Claude session manager for AI conversation state */
-  claudeSessionManager: ClaudeSessionManager;
 }
 
 /**
@@ -146,20 +143,6 @@ export function createWorktreeBotManager(): WorktreeBotManager {
 }
 
 /**
- * Create the Claude session manager for AI conversation state.
- *
- * @returns Configured ClaudeSessionManager instance
- *
- * @example
- * ```typescript
- * const sessionManager = createClaudeSessionManager();
- * ```
- */
-export function createClaudeSessionManager(): ClaudeSessionManager {
-  return new ClaudeSessionManager();
-}
-
-/**
  * Create and configure the crash handler with health monitor.
  *
  * @param options - Crash handler configuration options
@@ -216,7 +199,6 @@ export function createBotManagers(deps: BotFactoryDeps): BotManagers {
   // Create individual managers
   const shellManager = createShellManager(config.workDir);
   const worktreeBotManager = createWorktreeBotManager();
-  const claudeSessionManager = createClaudeSessionManager();
   const [crashHandler, healthMonitor] = createCrashHandler(crashHandlerOptions);
 
   // Wire up crash handler with managers
@@ -230,7 +212,6 @@ export function createBotManagers(deps: BotFactoryDeps): BotManagers {
     worktreeBotManager,
     crashHandler,
     healthMonitor,
-    claudeSessionManager,
   };
 }
 
@@ -259,7 +240,6 @@ export function setupPeriodicCleanup(
   const cleanup = () => {
     try {
       managers.crashHandler.cleanup();
-      managers.claudeSessionManager.cleanup();
 
       // Run additional cleanup functions
       for (const cleanupFn of additionalCleanup) {
@@ -452,7 +432,6 @@ export function shutdownBotContext(
   // Final cleanup
   try {
     context.crashHandler.cleanup();
-    context.claudeSessionManager.cleanup();
   } catch (error) {
     console.error("Error during final cleanup:", error);
   }

@@ -35,7 +35,7 @@ import type { SessionThreadCallbacks } from "./claude/command.ts";
 import { BOT_SYSTEM_PROMPT } from "./claude/bot-system-prompt.ts";
 import type { AskUserQuestionInput } from "./claude/user-question.ts";
 import type { PermissionRequestCallback } from "./claude/permission-request.ts";
-import { initModels } from "./claude/enhanced-client.ts";
+import { initModels } from "./claude/models.ts";
 import { DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS } from "./settings/index.ts";
 import { BOT_VERSION, runVersionCheck, startPeriodicUpdateCheck } from "./util/version-check.ts";
 
@@ -112,8 +112,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
   });
 
-  const { shellManager, worktreeBotManager, crashHandler, healthMonitor, claudeSessionManager } =
-    managers;
+  const { shellManager, worktreeBotManager, crashHandler, healthMonitor } = managers;
 
   initModels();
 
@@ -197,7 +196,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
       worktreeBotManager,
       crashHandler,
       healthMonitor,
-      claudeSessionManager,
       sendClaudeMessages,
       onAskUser,
       onPermissionRequest,
@@ -331,6 +329,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
 
       const thinkingMsg = await thread.send("`Claude is thinking...`");
+      sessionThreadManager.recordActivity(sessionId);
 
       const { send: threadSender, setSessionId } = createClaudeSender(
         createChannelSenderAdapter(thread),
