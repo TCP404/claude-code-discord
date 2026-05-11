@@ -28,7 +28,6 @@ async function loadMcpServers(
     // Clean configs to match SDK's McpStdioServerConfig shape and resolve placeholders
     const result: Record<string, McpServerConfig> = {};
     for (const [name, cfg] of Object.entries(servers)) {
-      // deno-lint-ignore no-explicit-any
       const raw = cfg as any;
       // Resolve ${workspaceFolder:-.} placeholder in args
       const args = Array.isArray(raw.args)
@@ -166,7 +165,6 @@ export async function buildQueryOptions(
   cwd: string;
   abortController: AbortController;
   permissionMode: SDKPermissionMode;
-  // deno-lint-ignore no-explicit-any
   options: any;
 }> {
   const mcpServers = await loadMcpServers(workDir);
@@ -327,7 +325,6 @@ export async function sendToClaudeCode(
   controller: AbortController,
   sessionId?: string,
   onChunk?: (text: string) => void,
-  // deno-lint-ignore no-explicit-any
   onStreamJson?: (json: any) => void,
   modelOptions?: ClaudeModelOptions,
   onTyping?: () => void,
@@ -424,9 +421,7 @@ export async function sendToClaudeCode(
         // Skip for JSON stream output as it's handled by onStreamJson
         if (message.type === "assistant" && message.message.content && !onStreamJson) {
           const textContent = message.message.content
-            // deno-lint-ignore no-explicit-any
             .filter((c: any) => c.type === "text")
-            // deno-lint-ignore no-explicit-any
             .map((c: any) => c.text)
             .join("");
 
@@ -463,7 +458,6 @@ export async function sendToClaudeCode(
         aborted: controller.signal.aborted,
         modelUsed: modelToUse || "Default",
       };
-      // deno-lint-ignore no-explicit-any
     } catch (error: any) {
       // Clear active query on error
       setActiveQuery(null);
@@ -514,7 +508,6 @@ export async function sendToClaudeCode(
       modelUsed,
       ...(permissionDenials.length > 0 && { permissionDenials }),
     };
-    // deno-lint-ignore no-explicit-any
   } catch (error: any) {
     // For exit code 1 errors (rate limit), retry with Haiku (cheaper/faster fallback)
     if (
@@ -542,7 +535,6 @@ export async function sendToClaudeCode(
           modelUsed: retryResult.modelUsed,
           ...(retryDenials.length > 0 && { permissionDenials: retryDenials }),
         };
-        // deno-lint-ignore no-explicit-any
       } catch (retryError: any) {
         // If Haiku fallback also fails
         if (

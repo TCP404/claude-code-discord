@@ -54,7 +54,6 @@ export async function executeGitCommand(workDir: string, command: string): Promi
     }
 
     return stdout || stderr || "Command executed successfully.";
-    // deno-lint-ignore no-explicit-any
   } catch (error: any) {
     return `Execution error: ${error.message}\n${error.stderr || ""}`;
   }

@@ -39,9 +39,7 @@ import type {
 // Helper Functions
 // ================================
 
-// deno-lint-ignore no-explicit-any
 function convertMessageContent(content: MessageContent): any {
-  // deno-lint-ignore no-explicit-any
   const payload: any = {};
 
   if (content.content) payload.content = content.content;
@@ -122,7 +120,6 @@ export async function createDiscordBot(
   const actualCategoryName = categoryName || repoName;
 
   let myChannel: TextChannel | null = null;
-  // deno-lint-ignore no-explicit-any
   let myCategory: any = null;
 
   const botSettings = dependencies.botSettings || {
@@ -142,14 +139,12 @@ export async function createDiscordBot(
   const commands = dependencies.commands;
 
   // Channel management
-  // deno-lint-ignore no-explicit-any
   async function ensureChannelExists(guild: any): Promise<TextChannel> {
     const channelName = sanitizeChannelName(branchName);
 
     console.log(`Checking category "${actualCategoryName}"...`);
 
     let category = guild.channels.cache.find(
-      // deno-lint-ignore no-explicit-any
       (c: any) => c.type === ChannelType.GuildCategory && c.name === actualCategoryName,
     );
 
@@ -172,7 +167,6 @@ export async function createDiscordBot(
     myCategory = category;
 
     let channel = guild.channels.cache.find(
-      // deno-lint-ignore no-explicit-any
       (c: any) =>
         c.type === ChannelType.GuildText && c.name === channelName && c.parentId === category.id,
     );
@@ -232,7 +226,6 @@ export async function createDiscordBot(
 
       getString(name: string, required?: boolean): string | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getString(name, required ?? false);
         }
         return null;
@@ -240,7 +233,6 @@ export async function createDiscordBot(
 
       getInteger(name: string, required?: boolean): number | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getInteger(name, required ?? false);
         }
         return null;
@@ -248,7 +240,6 @@ export async function createDiscordBot(
 
       getBoolean(name: string, required?: boolean): boolean | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getBoolean(name, required ?? false);
         }
         return null;
@@ -257,7 +248,6 @@ export async function createDiscordBot(
       getMemberRoleIds(): Set<string> {
         const member = interaction.member;
         if (member && "roles" in member && member.roles && "cache" in member.roles) {
-          // deno-lint-ignore no-explicit-any
           const cache = (member.roles as any).cache;
           if (cache && typeof cache.keys === "function") {
             return new Set([...cache.keys()]);
@@ -277,7 +267,6 @@ export async function createDiscordBot(
       getSubcommand(): string | null {
         if (interaction.isCommand && interaction.isCommand()) {
           try {
-            // deno-lint-ignore no-explicit-any
             return (interaction as any).options.getSubcommand(false) ?? null;
           } catch {
             return null;
@@ -304,9 +293,7 @@ export async function createDiscordBot(
 
     // Check if the interaction is inside a thread whose parent is a managed channel
     const channel = client.channels.cache.get(channelId);
-    // deno-lint-ignore no-explicit-any
     if (channel && (channel as any).parentId) {
-      // deno-lint-ignore no-explicit-any
       const parentId = (channel as any).parentId;
       if (parentId === myChannel.id) return true;
       if (managedIds?.has(parentId)) return true;

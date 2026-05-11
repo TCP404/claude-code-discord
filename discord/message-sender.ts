@@ -11,12 +11,10 @@ import type { DiscordSender } from "../claude/types.ts";
 /**
  * Build a Discord.js payload from a MessageContent object and send it to a channel.
  */
-// deno-lint-ignore no-explicit-any
 export async function sendMessageContent(channel: any, content: MessageContent): Promise<void> {
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } =
     await import("npm:discord.js@14.14.1");
 
-  // deno-lint-ignore no-explicit-any
   const payload: any = {};
 
   if (content.content) payload.content = content.content;
@@ -36,7 +34,6 @@ export async function sendMessageContent(channel: any, content: MessageContent):
 
   if (content.components) {
     payload.components = content.components.map((row) => {
-      // deno-lint-ignore no-explicit-any
       const actionRow = new ActionRowBuilder<any>();
       row.components.forEach((comp) => {
         const button = new ButtonBuilder().setLabel(comp.label);
@@ -81,13 +78,11 @@ export async function sendMessageContent(channel: any, content: MessageContent):
 }
 
 /** Like sendMessageContent but returns the Message object for later editing/deleting. */
-// deno-lint-ignore no-explicit-any
 export async function sendMessageContentTracked(
   channel: any,
   content: MessageContent,
 ): Promise<any> {
   const { AttachmentBuilder } = await import("npm:discord.js@14.14.1");
-  // deno-lint-ignore no-explicit-any
   const payload: any = {};
   if (content.content) payload.content = content.content;
   if (content.files && content.files.length > 0) {
@@ -103,9 +98,7 @@ export async function sendMessageContentTracked(
  * Falls back to bot's default channel if no per-channel routing is set.
  */
 export function createDiscordSenderAdapter(
-  // deno-lint-ignore no-explicit-any
   bot: any,
-  // deno-lint-ignore no-explicit-any
   responseChannels: Map<string, any>,
 ): DiscordSender {
   return {
@@ -124,7 +117,6 @@ export function createDiscordSenderAdapter(
 /**
  * Create Discord sender adapter that sends to a specific channel (e.g., a thread).
  */
-// deno-lint-ignore no-explicit-any
 export function createChannelSenderAdapter(channel: any): DiscordSender {
   return {
     async sendMessage(content) {
@@ -134,7 +126,6 @@ export function createChannelSenderAdapter(channel: any): DiscordSender {
       const msg = await sendMessageContentTracked(channel, content);
       return {
         async edit(newContent) {
-          // deno-lint-ignore no-explicit-any
           const payload: any = {};
           if (newContent.content) payload.content = newContent.content;
           await msg.edit(payload);

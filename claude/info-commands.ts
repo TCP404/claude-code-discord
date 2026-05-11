@@ -111,7 +111,6 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
     // ================================
     // /claude-info
     // ================================
-    // deno-lint-ignore no-explicit-any
     async onClaudeInfo(ctx: any, section?: string): Promise<void> {
       await ctx.deferReply();
       const showSection = section || "all";
@@ -238,7 +237,6 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
     // ================================
     // /rewind
     // ================================
-    // deno-lint-ignore no-explicit-any
     async onRewind(ctx: any, turn?: number, dryRun?: boolean): Promise<void> {
       await ctx.deferReply();
 
@@ -375,7 +373,6 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
     // ================================
     // /claude-control
     // ================================
-    // deno-lint-ignore no-explicit-any
     async onClaudeControl(ctx: any, action: string, value?: string): Promise<void> {
       await ctx.deferReply();
 
@@ -434,7 +431,6 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
             });
             return;
           }
-          // deno-lint-ignore no-explicit-any
           const success = await setActivePermissionMode(value as any);
           await ctx.editReply({
             embeds: [{
@@ -504,7 +500,6 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
     // ================================
     // /fast — Toggle fast mode (Opus 4.6 speed-optimized API config)
     // ================================
-    // deno-lint-ignore no-explicit-any
     async onFast(ctx: any): Promise<void> {
       if (!deps.getUnifiedSettings || !deps.updateUnifiedSettings) {
         await ctx.reply({
@@ -561,7 +556,6 @@ async function writeFastModeToLocalSettings(workDir: string, fastMode: boolean):
   const settingsPath = path.join(settingsDir, "settings.local.json");
 
   // Read existing settings (if any)
-  // deno-lint-ignore no-explicit-any
   let existing: Record<string, any> = {};
   try {
     const raw = await Deno.readTextFile(settingsPath);
@@ -584,7 +578,6 @@ async function writeFastModeToLocalSettings(workDir: string, fastMode: boolean):
   console.log(`[/fast] Wrote fastMode=${fastMode} to ${settingsPath}`);
 }
 
-// deno-lint-ignore no-explicit-any
 async function sendFullInfoEmbed(
   ctx: any,
   account: any,

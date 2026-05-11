@@ -21,7 +21,6 @@ import {
  * 4. Waits for a button click (no timeout — user decides)
  * 5. Returns true (allow) or false (deny)
  */
-// deno-lint-ignore no-explicit-any
 export function createPermissionRequestHandler(
   bot: any,
   getTargetChannel?: () => any,
@@ -65,7 +64,6 @@ export function createPermissionRequestHandler(
 
     const msg = await channel.send({ embeds: [embed], components: [row] });
 
-    // deno-lint-ignore no-explicit-any
     const interaction: any = await msg.awaitMessageComponent({
       componentType: ComponentType.Button,
     });

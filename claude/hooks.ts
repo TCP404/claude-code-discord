@@ -47,9 +47,7 @@ export interface HookConfig {
 export interface HookEvent_Discord {
   type: "tool_start" | "tool_complete" | "tool_failure" | "notification" | "task_completed";
   toolName?: string;
-  // deno-lint-ignore no-explicit-any
   toolInput?: any;
-  // deno-lint-ignore no-explicit-any
   toolResponse?: any;
   error?: string;
   message?: string;

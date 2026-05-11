@@ -949,7 +949,6 @@ export const COMMAND_HELP = {
 
 export function createHelpHandlers(deps: HelpHandlerDeps) {
   return {
-    // deno-lint-ignore no-explicit-any
     async onHelp(ctx: any, commandName?: string) {
       if (commandName) {
         if (COMMAND_HELP[commandName as keyof typeof COMMAND_HELP]) {

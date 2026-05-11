@@ -112,7 +112,6 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
      * /claude — Send a message to Claude. Auto-continues the session active in the
      * current channel/thread. Starts a new session only if there isn't one yet.
      */
-    // deno-lint-ignore no-explicit-any
     async onClaude(
       ctx: any,
       prompt: string,
@@ -198,7 +197,6 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
     /**
      * /claude-thread — Start a brand-new session in a dedicated Discord thread.
      */
-    // deno-lint-ignore no-explicit-any
     async onClaudeThread(
       ctx: any,
       prompt: string,
@@ -301,7 +299,6 @@ export function createClaudeHandlers(deps: ClaudeHandlerDeps) {
       return result;
     },
 
-    // deno-lint-ignore no-explicit-any
     onClaudeCancel(_ctx: any, channelId?: string): boolean {
       const currentController = deps.getClaudeController(channelId);
       if (!currentController) {

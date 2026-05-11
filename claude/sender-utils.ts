@@ -114,7 +114,6 @@ export function getFileTypeInfo(filePath: string): { icon: string; language: str
 
 export function formatGenericTool(
   toolName: string,
-  // deno-lint-ignore no-explicit-any
   metadata: any,
 ): { title: string; color: number; description: string } {
   const inputStr = JSON.stringify(metadata.input || {}, null, 2);

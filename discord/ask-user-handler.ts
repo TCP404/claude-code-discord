@@ -20,7 +20,6 @@ import {
  * 3. Waits for button clicks
  * 4. Returns answers to the SDK so Claude can continue
  */
-// deno-lint-ignore no-explicit-any
 export function createAskUserDiscordHandler(
   bot: any,
   getTargetChannel?: () => any,
@@ -85,7 +84,6 @@ export function createAskUserDiscordHandler(
         });
 
         await new Promise<void>((resolve, reject) => {
-          // deno-lint-ignore no-explicit-any
           collector.on("collect", async (i: any) => {
             const parsed = parseAskUserButtonId(i.customId);
             if (parsed && parsed.questionIndex === qi) {
@@ -123,7 +121,6 @@ export function createAskUserDiscordHandler(
           });
         });
       } else {
-        // deno-lint-ignore no-explicit-any
         const interaction: any = await questionMsg.awaitMessageComponent({
           componentType: ComponentType.Button,
         });

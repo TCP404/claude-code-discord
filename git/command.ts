@@ -76,31 +76,26 @@ export function createGitHandlers(deps: GitHandlerDeps) {
   } = deps;
 
   return {
-    // deno-lint-ignore no-explicit-any
     async onGit(_ctx: any, command: string): Promise<string> {
       const { executeGitCommand } = await import("./handler.ts");
       return await executeGitCommand(workDir, `git ${command}`);
     },
 
-    // deno-lint-ignore no-explicit-any
     async onWorktree(_ctx: any, branch: string, ref?: string) {
       const { createWorktree } = await import("./handler.ts");
       return await createWorktree(workDir, branch, ref);
     },
 
-    // deno-lint-ignore no-explicit-any
     async onWorktreeList(_ctx: any) {
       const { listWorktrees } = await import("./handler.ts");
       return await listWorktrees(workDir);
     },
 
-    // deno-lint-ignore no-explicit-any
     async onWorktreeRemove(_ctx: any, branch: string) {
       const { removeWorktree } = await import("./handler.ts");
       return await removeWorktree(workDir, branch);
     },
 
-    // deno-lint-ignore no-explicit-any
     async onWorktreeBot(_ctx: any, fullPath: string, branch: string) {
       await worktreeBotManager.spawnWorktreeBot({
         fullPath,
@@ -112,12 +107,10 @@ export function createGitHandlers(deps: GitHandlerDeps) {
       });
     },
 
-    // deno-lint-ignore no-explicit-any
     onWorktreeBots(_ctx: any) {
       return worktreeBotManager.getStatus();
     },
 
-    // deno-lint-ignore no-explicit-any
     onWorktreeKill(_ctx: any, path: string): { success: boolean; message: string } {
       const success = worktreeBotManager.killWorktreeBot(path);
       return {

@@ -51,7 +51,6 @@ export class AsyncPushQueue<T> implements AsyncIterable<T> {
 
 export interface TurnCallbacks {
   onChunk?: (text: string) => void;
-  // deno-lint-ignore no-explicit-any
   onStreamJson?: (msg: any) => void;
   onTyping?: () => void;
 }
@@ -153,10 +152,8 @@ export class HotQuerySession {
         if (
           msg.type === "assistant" &&
           "message" in msg &&
-          // deno-lint-ignore no-explicit-any
           (msg as any).message?.content
         ) {
-          // deno-lint-ignore no-explicit-any
           const text = ((msg as any).message.content as Array<any>)
             .filter((c) => c?.type === "text")
             .map((c) => c.text)
@@ -170,7 +167,6 @@ export class HotQuerySession {
         }
 
         if (msg.type === "result") {
-          // deno-lint-ignore no-explicit-any
           const r = msg as any;
           const denials = extractPermissionDenials([msg]);
           const resolved: TurnResult = {
@@ -279,7 +275,6 @@ export async function makeSdkQueryFactory(
       prompt: inputIter as AsyncIterable<never>, // SDK accepts AsyncIterable<SDKUserMessage>
       abortController: built.abortController,
       options: built.options,
-      // deno-lint-ignore no-explicit-any
     } as any) as unknown as QueryLike;
   };
 }

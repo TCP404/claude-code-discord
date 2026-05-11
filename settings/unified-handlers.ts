@@ -2287,7 +2287,6 @@ async function showMCPStatus(ctx: any, workDir: string) {
  * Toggle an MCP server on/off mid-session via the SDK.
  * Requires an active Claude query.
  */
-// deno-lint-ignore no-explicit-any
 async function handleMcpToggle(ctx: any, serverName: string, value?: string): Promise<void> {
   // Determine desired state: "on"/"off" or auto-detect from current status
   let enabled: boolean;
@@ -2352,7 +2351,6 @@ async function handleMcpToggle(ctx: any, serverName: string, value?: string): Pr
  * Reconnect a failed MCP server mid-session via the SDK.
  * Requires an active Claude query.
  */
-// deno-lint-ignore no-explicit-any
 async function handleMcpReconnect(ctx: any, serverName: string): Promise<void> {
   const success = await reconnectMcpServerActive(serverName);
   if (success) {

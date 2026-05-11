@@ -53,23 +53,19 @@ export function createShellHandlers(deps: ShellHandlerDeps) {
   const { shellManager } = deps;
 
   return {
-    // deno-lint-ignore no-explicit-any
     async onShell(ctx: any, command: string, input?: string) {
       const result = await shellManager.execute(command, input, ctx);
       return result;
     },
 
-    // deno-lint-ignore no-explicit-any
     async onShellInput(_ctx: any, processId: number, text: string) {
       return await shellManager.sendInput(processId, text);
     },
 
-    // deno-lint-ignore no-explicit-any
     onShellList(_ctx: any) {
       return shellManager.getRunningProcesses();
     },
 
-    // deno-lint-ignore no-explicit-any
     async onShellKill(_ctx: any, processId: number) {
       return await shellManager.killProcess(processId);
     },

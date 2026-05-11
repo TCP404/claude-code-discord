@@ -13,9 +13,7 @@ import { createChannelSenderAdapter, sendMessageContent } from "./message-sender
 
 export interface SessionThreadCallbackDeps {
   sessionThreadManager: SessionThreadManager;
-  // deno-lint-ignore no-explicit-any
   getBot: () => any;
-  // deno-lint-ignore no-explicit-any
   commandChannels: Map<string, any>;
 }
 

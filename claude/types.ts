@@ -30,7 +30,6 @@ export interface ClaudeMessage {
     | "tool_progress"
     | "tool_summary";
   content: string;
-  // deno-lint-ignore no-explicit-any
   metadata?: any;
 }
 

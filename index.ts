@@ -131,7 +131,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   const currentSettings = settingsOps.getSettings();
   const botSettings = currentSettings.legacy;
 
-  // deno-lint-ignore no-explicit-any prefer-const
+  // deno-lint-ignore prefer-const
   let bot: any;
   let claudeSender: {
     send: (messages: ClaudeMessage[]) => Promise<void>;
@@ -160,9 +160,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   });
 
   // Per-channel routing maps
-  // deno-lint-ignore no-explicit-any
   const responseChannels = new Map<string, any>();
-  // deno-lint-ignore no-explicit-any
   const commandChannels = new Map<string, any>();
 
   // Session thread callbacks (thread creation/resume)
@@ -383,12 +381,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
       const threadKey = threadChannelId;
       claudeSessionOps.setController(controller, threadKey);
 
-      // deno-lint-ignore no-explicit-any
       const parentChannelId = (thread as any).parentId ?? threadChannelId;
       const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
       const turnOptions = { appendSystemPrompt: BOT_SYSTEM_PROMPT };
 
-      // deno-lint-ignore no-explicit-any
       const onStreamJson = (jsonData: any) => {
         const claudeMessages = convertToClaudeMessages(jsonData);
         if (claudeMessages.length > 0) {
@@ -506,7 +502,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
       const controller = new AbortController();
       claudeSessionOps.setController(controller, threadChannelId);
 
-      // deno-lint-ignore no-explicit-any
       let thinkingMsg: any = null;
       if (thread) {
         try {
@@ -696,7 +691,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
 const PENDING_RENAME_PREFIX = "new-";
 const DISCORD_THREAD_NAME_MAX = 100;
 
-// deno-lint-ignore no-explicit-any
 async function renameThreadByTopic(thread: any, workDir: string, sessionId: string): Promise<void> {
   try {
     const currentName: string = thread?.name ?? "";
@@ -710,7 +704,6 @@ async function renameThreadByTopic(thread: any, workDir: string, sessionId: stri
 
     let context = "";
     for (const msg of msgs) {
-      // deno-lint-ignore no-explicit-any
       const m = msg as any;
       if (!m.message?.content) continue;
       if (m.type !== "user" && m.type !== "assistant") continue;
@@ -739,7 +732,6 @@ async function renameThreadByTopic(thread: any, workDir: string, sessionId: stri
       },
     });
     for await (const ev of result) {
-      // deno-lint-ignore no-explicit-any
       const e = ev as any;
       if (e.type === "assistant" && e.message?.content) {
         for (const block of e.message.content) {
@@ -787,7 +779,6 @@ function setupSignalHandlers(ctx: {
   branchName: string;
   cleanupInterval: number;
   closeHotQueries?: () => Promise<void>;
-  // deno-lint-ignore no-explicit-any
   bot: any;
 }) {
   const {

@@ -88,9 +88,7 @@ export type ButtonHandlers = Map<string, ButtonHandler>;
 export interface SlashCommand {
   name: string;
   description: string;
-  // deno-lint-ignore no-explicit-any
   options?: any[];
-  // deno-lint-ignore no-explicit-any
   toJSON(): any;
 }
 

@@ -18,7 +18,6 @@ export function createUtilsHandlers(deps: UtilsHandlerDeps) {
     deps;
 
   return {
-    // deno-lint-ignore no-explicit-any
     onSettings(_ctx: any, action: string, value?: string): SettingsResult {
       switch (action) {
         case "mention-on": {
