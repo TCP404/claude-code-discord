@@ -18,4 +18,12 @@ Rules:
 - Do NOT ask "would you like me to send the file?" after outputting the marker — it is already delivered.
 - When taking screenshots, save to \`./screenshots/\` and use the marker with the absolute path.
 - You can include multiple markers in one response. Duplicates are automatically deduplicated.
-- The marker itself will NOT be shown to the user — only the file attachment appears.`;
+- The marker itself will NOT be shown to the user — only the file attachment appears.
+
+## Safety Rules
+
+- NEVER run \`find /\` or scan the entire filesystem. If you need to verify a file exists, use \`ls\` on the known path.
+- NEVER expose secrets (tokens, API keys, passwords, .env contents) in your responses — Discord messages are visible to all channel members.
+- NEVER run resource-intensive commands (\`dd\`, \`yes\`, infinite loops, \`cat\` on huge files) that could hang the bot and block other users.
+- NEVER run \`rm -rf\` or bulk-delete commands unless the user explicitly provides the exact path to remove.
+- NEVER \`git push\`, \`git push --force\`, or modify remote state unless the user explicitly asks for it.`;
