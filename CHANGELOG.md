@@ -1,5 +1,45 @@
 # Changelog
 
+## v3.0.0
+
+### Breaking Changes
+
+- refactor: remove `enhanced-client.ts` and all related dead code — session management now handled directly by `client.ts`
+- refactor: remove `/resume` command and Continue button — thread auto-resume replaces both
+
+### Hot Query (Streaming-Input Reuse)
+
+- feat: add `HotQuerySession` with `AsyncPushQueue` for streaming-input mode
+- feat: add `HotQueryRegistry` with LRU eviction and idle timeout
+- feat: route session thread messages through hot query when `HOT_QUERY_ENABLED=true` (default)
+- feat: close hot queries gracefully on SIGINT/SIGTERM
+- feat: add `/hot-queries` observability command
+- feat: env-var driven config (`HOT_QUERY_ENABLED`, `HOT_QUERY_MAX_SESSIONS`, `HOT_QUERY_IDLE_TIMEOUT_MS`, `HOT_QUERY_TYPING_INTERVAL_MS`)
+- fix: refresh Discord typing indicator during in-flight turns
+
+### Multi-Bot & Mention-Only
+
+- feat: multi-bot coexistence — skip messages that @mention another bot but not us (PR #6 @jj0012006)
+- feat: `THREAD_MENTION_ONLY` env var — only respond in threads when explicitly @mentioned (PR #7 @jj0012006)
+
+### Safety & Reliability
+
+- feat: add safety rules to bot system prompt (no `find /`, no secret leakage, no destructive commands, no unsolicited `git push`)
+- fix: reliable process stop — kill child processes via `pkill -P`, fallback to SIGKILL (PR #5 @mao)
+- feat: add `/restart` Discord command
+
+### Code Quality
+
+- refactor: extract large modules into focused single-responsibility files
+- refactor: add JSDoc `@module` headers to all files, consolidate types, eliminate barrel indirection
+- refactor: extract `buildQueryOptions` and `buildCanUseTool` helpers from client.ts
+- feat: add workspace auto-thread mode for plain text messages
+- feat: `DEFAULT_PERMISSION_MODE` env var for session defaults
+- test: add 238 unit tests covering core logic, utilities, and orchestration
+- fix: remove all 55 unused-vars lint warnings
+- style: apply `deno fmt` to entire codebase
+- docs: update all documentation to reflect v3.0 architecture
+
 ## v2.4.2
 
 - refactor: replace auto file detection with explicit `[FILE:]` marker system

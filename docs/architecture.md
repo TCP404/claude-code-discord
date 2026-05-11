@@ -12,15 +12,14 @@ claude-code-discord/
 ├── claude/                     # Claude SDK integration
 │   ├── types.ts                # Shared types (ClaudeMessage, DiscordSender, RendererContext)
 │   ├── client.ts               # Low-level SDK wrapper: builds query options, streams responses
-│   ├── enhanced-client.ts      # Session manager, model registry, template support
+│   ├── bot-system-prompt.ts    # System prompt injected on every query (file delivery + safety rules)
 │   ├── discord-sender.ts       # Orchestrator: status line management + renderer dispatch
 │   ├── sender-renderers.ts     # Per-message-type render functions → MessageContent
 │   ├── sender-utils.ts         # Pure helpers: truncate, format, constants
-│   ├── command.ts              # /ask slash command (simple single-turn query)
-│   ├── enhanced-commands.ts    # /claude slash command with model/template/thinking options
-│   ├── additional-commands.ts  # Extra slash commands (quick-query, template, etc)
+│   ├── command.ts              # /claude and /claude-thread slash commands
 │   ├── message-converter.ts    # SDK JSON stream → ClaudeMessage[]
 │   ├── model-fetcher.ts        # Dynamic model fetching (API + CLI)
+│   ├── models.ts               # Model definitions and registry
 │   ├── query-manager.ts        # Active query lifecycle, rewind, info retrieval
 │   ├── info-commands.ts        # /claude-info, /rewind, /claude-control
 │   ├── hooks.ts                # Passive SDK callbacks for observability
@@ -28,7 +27,9 @@ claude-code-discord/
 │   ├── permission-request.ts   # Tool permission Allow/Deny embeds
 │   ├── file-preview.ts         # File preview generation (images, PDFs, code)
 │   ├── session-usage.ts        # Per-session cost and query count tracking
-│   └── bot-system-prompt.ts    # System prompt injected on every query
+│   ├── hot-query.ts            # AsyncPushQueue + HotQuerySession for streaming-input mode
+│   ├── hot-query-registry.ts   # LRU + idle eviction for hot query sessions
+│   └── hot-query-config.ts     # Env-var driven hot-query configuration
 │
 ├── core/                       # Bot infrastructure
 │   ├── config-loader.ts        # Env + CLI arg parsing → AppConfig
@@ -116,10 +117,17 @@ claude-code-discord/
 │
 │   # Test files (colocated, pattern: *_test.ts)
 │   # claude/sender-utils_test.ts
+│   # claude/sender-renderers_test.ts
 │   # claude/message-converter_test.ts
+│   # claude/discord-sender_test.ts
+│   # claude/hot-query_test.ts
+│   # claude/hot-query-config_test.ts
+│   # claude/hot-query-registry_test.ts
 │   # discord/utils_test.ts
 │   # discord/formatting_test.ts
+│   # core/config-loader_test.ts
 │   # core/workspace-manager_test.ts
+│   # core/rbac_test.ts
 ```
 
 ## SDK Integration
@@ -130,13 +138,19 @@ Built on `@anthropic-ai/claude-agent-sdk`.
 
 ```
 Discord slash command / thread message
-  → core/handler-registry.ts   (route command, build query options)
-  → claude/enhanced-client.ts  (create SDK query with model/settings)
+  → core/handler-registry.ts        (route command, build query options)
+  → claude/client.ts                (create SDK query with model/settings)
   → @anthropic-ai/claude-agent-sdk  (streaming async generator)
   → claude/message-converter.ts     (SDK JSON → ClaudeMessage[])
   → claude/discord-sender.ts        (orchestrate: status line + dispatch)
     → claude/sender-renderers.ts    (per-type → MessageContent)
   → discord/message-sender.ts       (MessageContent → Discord.js API)
+
+Thread auto-resume (hot query enabled):
+  → discord/bot.ts                  (message filter: multi-bot, mention-only)
+  → claude/hot-query-registry.ts    (get or create HotQuerySession)
+  → claude/hot-query.ts             (push prompt into streaming-input queue)
+  → claude/client.ts                (SDK query via reused Query instance)
 ```
 
 ### Key SDK Features Used
@@ -165,3 +179,20 @@ User sets value via /settings
 ```
 
 Settings include: model, thinking mode, effort level, system prompt, operation mode, git context, output format, sandbox mode, file checkpointing, 1M context beta.
+
+### Hot Query (Streaming-Input Reuse)
+
+```
+First message in thread (cold start):
+  → HotQueryRegistry.get(sessionId) → null
+  → makeSdkQueryFactory() → create new Query instance
+  → HotQuerySession.create() → register in LRU
+  → runTurn(prompt) → stream response
+
+Subsequent messages (warm):
+  → HotQueryRegistry.get(sessionId) → existing session
+  → HotQueryRegistry.touch() → reset idle timer
+  → runTurn(prompt) → push into AsyncPushQueue → stream response
+```
+
+Sessions are evicted after idle timeout (`HOT_QUERY_IDLE_TIMEOUT_MS`, default 5 min) or when LRU capacity (`HOT_QUERY_MAX_SESSIONS`, default 20) is exceeded. Disable entirely with `HOT_QUERY_ENABLED=false`.

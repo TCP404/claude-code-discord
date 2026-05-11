@@ -34,8 +34,8 @@
 │                                 │                                    │
 │  ┌──────────────────────────────▼──────────────────────────────┐    │
 │  │                    claude/ layer                             │    │
-│  │  enhanced-client.ts → session management, model registry    │    │
 │  │  client.ts → SDK query builder, streaming                   │    │
+│  │  hot-query-registry.ts → session reuse (LRU + idle evict)   │    │
 │  │  discord-sender.ts → status line + renderer orchestration   │    │
 │  └──────────────────────────────┬──────────────────────────────┘    │
 │                                 │                                    │

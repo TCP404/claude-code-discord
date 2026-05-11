@@ -21,7 +21,7 @@ Key directories:
 
 - `claude/` — SDK integration: query execution, streaming, model registry, permissions, MCP loading
   - `client.ts` — low-level SDK wrapper (builds options, streams)
-  - `enhanced-client.ts` — session manager, model registry, templates
+  - `bot-system-prompt.ts` — system prompt injected into all sessions (file delivery + safety rules)
   - `discord-sender.ts` — orchestrator: status line + renderer dispatch
   - `sender-renderers.ts` — per-message-type render functions
   - `sender-utils.ts` — pure utility functions and constants
@@ -29,6 +29,9 @@ Key directories:
   - `hooks.ts` — passive SDK callbacks for observability
   - `user-question.ts` — AskUserQuestion embed/button building
   - `permission-request.ts` — tool permission Allow/Deny embeds
+  - `model-fetcher.ts` — model list retrieval
+  - `session-usage.ts` — cumulative session cost/duration tracking
+  - `file-preview.ts` — multi-type inline file preview
   - `hot-query.ts` — AsyncPushQueue + HotQuerySession for streaming-input mode
   - `hot-query-registry.ts` — LRU + idle eviction for hot queries
   - `hot-query-config.ts` — env-var driven hot-query config
@@ -130,14 +133,19 @@ A single bot instance can manage multiple project channels, each with its own wo
 - **Status line:** Single editable Discord message that tracks hidden tool activity, auto-repositions below new visible content (`claude/discord-sender.ts`)
 - **Thread auto-resume:** Plain text in a session thread triggers automatic Claude resume via Message Content Intent (`index.ts`). Works across all workspace channels.
 - **Workspace routing:** `workspaceManager.resolve(channelId)` resolves the correct working directory for any channel. Falls back to default `WORK_DIR`.
-- **Crash handler:** `process/crash-handler.ts` registers SIGINT/SIGTERM, manages graceful shutdown (calls `abortAll()` to cancel all active sessions)
+- **Graceful shutdown:** `core/signal-handler.ts` registers SIGINT/SIGTERM, cancels all active sessions and closes hot queries. `process/crash-handler.ts` handles crash recovery and health monitoring.
 - **File delivery via marker:** The model outputs `[FILE:/absolute/path]` markers when the user asks for a file. The Discord sender detects these markers, strips them from displayed text, and delivers the file as an attachment or preview. Implementation: `claude/discord-sender.ts` (regex + preview logic), `claude/bot-system-prompt.ts` (model instructions, injected as `appendSystemPrompt` on every query).
+- **Bot system prompt:** `claude/bot-system-prompt.ts` is injected into all sessions via `appendSystemPrompt`. Contains file delivery instructions and safety rules (no `find /`, no secret leakage, no destructive commands).
+- **Multi-bot coexistence:** If a message in a session thread @mentions another bot but not us, we skip it (`discord/bot.ts`). Prevents auto-resume when user is talking to a different bot.
+- **Mention-only mode:** `THREAD_MENTION_ONLY=true` makes the bot only respond in session threads when explicitly @mentioned.
 - **Hot query reuse:** Session threads keep one long-lived SDK `Query` per sessionId (`claude/hot-query-registry.ts`). First message pays the 2–3 s cold start; subsequent messages push prompts into a streaming-input queue and skip init. Config via `HOT_QUERY_*` env vars. Disable entirely with `HOT_QUERY_ENABLED=false`. Observability: `/hot-queries` slash command.
 
 ## Environment Variables
 
 Required: `DISCORD_TOKEN`, `APPLICATION_ID`
 
-Key optional: `GUILD_ID` (instant slash command registration), `CLAUDE_CODE_USE_BEDROCK`, `AWS_PROFILE`, `AWS_REGION`, `ANTHROPIC_MODEL`, `ADMIN_USER_IDS`
+Key optional: `GUILD_ID` (instant slash command registration), `CLAUDE_CODE_USE_BEDROCK`, `AWS_PROFILE`, `AWS_REGION`, `ANTHROPIC_MODEL`, `ADMIN_USER_IDS`, `DEFAULT_PERMISSION_MODE`, `THREAD_MENTION_ONLY`
+
+Hot query: `HOT_QUERY_ENABLED` (default true), `HOT_QUERY_MAX_SESSIONS`, `HOT_QUERY_IDLE_TIMEOUT_MS`, `HOT_QUERY_TYPING_INTERVAL_MS`
 
 Full reference in `.env.example`.

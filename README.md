@@ -25,6 +25,8 @@ Run Claude Code through Discord without giving up anything you've already config
 | --------------------------------- | --------------------------------------------------------------------------------------------- |
 | Thread-per-session                | Each `/claude-thread` conversation gets its own Discord thread with custom names              |
 | Session persistence & auto-resume | Sessions survive restarts; posting in a thread auto-resumes Claude                            |
+| Hot query reuse                   | Reuse SDK query instance in threads — subsequent messages skip 2-3s cold start                |
+| Multi-bot coexistence             | Skips messages @mentioning another bot; supports `THREAD_MENTION_ONLY` mode                   |
 | Live status indicator             | Compact, auto-updating status line for hidden tool/system messages                            |
 | MCP server injection              | Loads `.claude/mcp.json` from project; all `mcp__*` tools auto-approved                       |
 | Config inheritance                | Reads `CLAUDE.md`, `settings.local.json`, and user-level settings — same context as local CLI |
@@ -119,6 +121,11 @@ MONITOR_BOT_IDS=987654321,111111111      # Bot/webhook user IDs to trigger auto-
 | `MONITOR_CHANNEL_ID`      |    No    | Discord channel ID to watch for bot/webhook messages                                       |
 | `MONITOR_BOT_IDS`         |    No    | Comma-separated bot/webhook user IDs that trigger auto-investigation                       |
 | `ALLOW_ANY_CHANNEL`       |    No    | Set to `true` to allow slash commands in any channel (default: false)                      |
+| `DEFAULT_PERMISSION_MODE` |    No    | Default SDK permission mode for new sessions (`acceptEdits`, `bypassPermissions`, etc)     |
+| `THREAD_MENTION_ONLY`     |    No    | Set to `true` to only respond in threads when @mentioned (default: false)                  |
+| `HOT_QUERY_ENABLED`       |    No    | Enable session reuse in threads for faster responses (default: true)                       |
+| `HOT_QUERY_MAX_SESSIONS`  |    No    | Max concurrent hot query sessions in LRU (default: 20)                                     |
+| `HOT_QUERY_IDLE_TIMEOUT_MS` |  No   | Idle timeout before evicting a hot query session (default: 300000 = 5 min)                 |
 
 > CLI flags override environment variables. Environment variables override `.env` file values.
 

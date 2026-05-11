@@ -53,6 +53,9 @@ Set via `/settings` > `claude` > `set-effort`.
 | Thread-per-Session              | Dedicated Discord thread for each `/claude-thread` conversation with custom names      |
 | Session Persistence             | Sessions survive bot restarts — threads restored with full context                     |
 | Thread Auto-Resume              | Post plain text in a session thread to automatically resume Claude                     |
+| Hot Query Reuse                 | Reuse SDK query instance across messages in a thread — skip cold start after first msg |
+| Multi-Bot Coexistence           | Skip messages that @mention another bot — prevents accidental auto-resume              |
+| Mention-Only Mode               | `THREAD_MENTION_ONLY=true` — only respond when explicitly @mentioned                   |
 | Live Status Indicator           | Compact, auto-updating status line for hidden tool/system activity                     |
 | Message Filtering               | Toggle visibility of system, tool, and thinking messages via `/show-*` commands        |
 | Auto-Allow MCP Tools            | All `mcp__*` tools auto-approved without interactive prompts                           |
@@ -165,7 +168,13 @@ When enabled, responses follow `json_schema` output format through the SDK.
 
 Sessions are persisted to `.bot-data/session-threads.json` and survive bot restarts. On startup, the bot restores all session-to-thread mappings.
 
-**Auto-resume:** Posting a plain text message in a session thread automatically resumes Claude in that session — no need to use `/claude` or `/resume`. Requires the **Message Content Intent** enabled in the Discord Developer Portal.
+**Auto-resume:** Posting a plain text message in a session thread automatically resumes Claude in that session — no need to use `/claude`. Requires the **Message Content Intent** enabled in the Discord Developer Portal.
+
+**Hot query reuse:** By default (`HOT_QUERY_ENABLED=true`), the first message in a thread pays a 2–3 s cold start to initialize the SDK query. Subsequent messages reuse the same query instance via a streaming-input queue, skipping initialization entirely. Sessions are evicted after idle timeout or when LRU capacity is exceeded. Disable with `HOT_QUERY_ENABLED=false` to fall back to creating a fresh query per message.
+
+**Multi-bot coexistence:** If a message in a session thread @mentions another bot but not this one, the bot skips the message. This prevents auto-resume from triggering when the user is talking to a different bot in the same thread.
+
+**Mention-only mode:** Set `THREAD_MENTION_ONLY=true` to make the bot only respond in session threads when explicitly @mentioned. Useful when multiple bots share the same threads.
 
 ## Live Status Indicator & Message Filtering
 
