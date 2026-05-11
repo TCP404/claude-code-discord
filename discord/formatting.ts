@@ -149,7 +149,9 @@ export function formatShellOutput(
   let cleanOutput = output
     .replace(/\r\n/g, "\n") // Normalize line endings
     .replace(/\r/g, "\n") // Handle remaining carriage returns
+    // deno-lint-ignore no-control-regex
     .replace(/\x1b\[[0-9;]*m/g, "") // Remove ANSI color codes
+    // deno-lint-ignore no-control-regex
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") // Remove other ANSI escape sequences
     .trim();
 

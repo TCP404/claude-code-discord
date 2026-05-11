@@ -10,6 +10,7 @@ function mockContext(opts: {
   return {
     getUserId: () => opts.userId ?? "user-1",
     getMemberRoleIds: () => new Set(opts.roleIds ?? []),
+    // deno-lint-ignore require-await
     reply: async () => {
       replied = true;
     },

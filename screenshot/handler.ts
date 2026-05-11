@@ -30,7 +30,7 @@ function hasDisplay(): boolean {
 /**
  * Get screenshot environment information
  */
-export async function getScreenshotEnvironment(): Promise<ScreenshotEnvironment> {
+export function getScreenshotEnvironment(): ScreenshotEnvironment {
   const display = hasDisplay();
   const platform = Deno.build.os;
 

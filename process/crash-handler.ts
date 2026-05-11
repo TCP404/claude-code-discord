@@ -189,7 +189,7 @@ export class ProcessCrashHandler {
   }
 
   // Recover Claude process
-  private async recoverClaudeProcess(_report: CrashReport): Promise<boolean> {
+  private recoverClaudeProcess(_report: CrashReport): boolean {
     try {
       // Claude processes are typically session-based and self-recovering
       console.log("Claude process crash noted, session will be reset on next request");

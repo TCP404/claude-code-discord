@@ -617,7 +617,7 @@ async function handleModeSettings(
       });
       break;
 
-    case "set-operation":
+    case "set-operation": {
       if (!value || !(value in OPERATION_MODES)) {
         const options = Object.keys(OPERATION_MODES).join(", ");
         await ctx.editReply({
@@ -656,6 +656,7 @@ async function handleModeSettings(
         }],
       });
       break;
+    }
 
     case "set-effort":
       if (!value || !(value in EFFORT_LEVELS)) {
@@ -890,7 +891,7 @@ async function handleClaudeSettings(
   }
 
   switch (action) {
-    case "set-model":
+    case "set-model": {
       if (!value) {
         const availableModels = Object.entries(CLAUDE_MODELS).map(([key, model]) =>
           `• **${key}**: ${model.name}`
@@ -936,8 +937,9 @@ async function handleClaudeSettings(
         }],
       });
       break;
+    }
 
-    case "toggle-git-context":
+    case "toggle-git-context": {
       const newGitContext = !settings.autoIncludeGitContext;
       updateSettings({ autoIncludeGitContext: newGitContext });
       await ctx.editReply({
@@ -949,8 +951,9 @@ async function handleClaudeSettings(
         }],
       });
       break;
+    }
 
-    case "toggle-system-info":
+    case "toggle-system-info": {
       const newSystemInfo = !settings.autoIncludeSystemInfo;
       updateSettings({ autoIncludeSystemInfo: newSystemInfo });
       await ctx.editReply({
@@ -962,6 +965,7 @@ async function handleClaudeSettings(
         }],
       });
       break;
+    }
 
     case "set-system-prompt":
       if (!value) {
@@ -1375,7 +1379,7 @@ async function handleOutputSettings(
   }
 
   switch (action) {
-    case "toggle-highlighting":
+    case "toggle-highlighting": {
       const newHighlighting = !settings.codeHighlighting;
       updateSettings({ codeHighlighting: newHighlighting });
       await ctx.editReply({
@@ -1387,8 +1391,9 @@ async function handleOutputSettings(
         }],
       });
       break;
+    }
 
-    case "toggle-paging":
+    case "toggle-paging": {
       const newPaging = !settings.autoPageLongOutput;
       updateSettings({ autoPageLongOutput: newPaging });
       await ctx.editReply({
@@ -1400,8 +1405,9 @@ async function handleOutputSettings(
         }],
       });
       break;
+    }
 
-    case "set-max-length":
+    case "set-max-length": {
       if (!value) {
         await ctx.editReply({
           content:
@@ -1428,6 +1434,7 @@ async function handleOutputSettings(
         }],
       });
       break;
+    }
 
     case "set-timestamp":
       if (!value || !["relative", "absolute", "both"].includes(value)) {
@@ -1650,7 +1657,7 @@ async function handleDeveloperSettings(
   }
 
   switch (action) {
-    case "toggle-debug":
+    case "toggle-debug": {
       const newDebug = !settings.enableDebugMode;
       updateSettings({ enableDebugMode: newDebug });
       await ctx.editReply({
@@ -1664,8 +1671,9 @@ async function handleDeveloperSettings(
         }],
       });
       break;
+    }
 
-    case "toggle-verbose":
+    case "toggle-verbose": {
       const newVerbose = !settings.verboseErrorReporting;
       updateSettings({ verboseErrorReporting: newVerbose });
       await ctx.editReply({
@@ -1677,8 +1685,9 @@ async function handleDeveloperSettings(
         }],
       });
       break;
+    }
 
-    case "toggle-metrics":
+    case "toggle-metrics": {
       const newMetrics = !settings.enablePerformanceMetrics;
       updateSettings({ enablePerformanceMetrics: newMetrics });
       await ctx.editReply({
@@ -1690,8 +1699,9 @@ async function handleDeveloperSettings(
         }],
       });
       break;
+    }
 
-    case "show-debug":
+    case "show-debug": {
       const debugInfo = {
         denoVersion: Deno.version.deno,
         v8Version: Deno.version.v8,
@@ -1725,6 +1735,7 @@ async function handleDeveloperSettings(
         }],
       });
       break;
+    }
 
     default:
       await ctx.editReply({

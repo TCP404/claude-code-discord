@@ -755,6 +755,7 @@ export async function createDiscordBot(
     let pendingAlerts: string[] = [];
     let lastAlertMessage: Message | null = null;
 
+    // deno-lint-ignore require-await
     client.on(Events.MessageCreate, async (message: Message) => {
       if (message.author.id === client.user?.id) return;
       if (message.channelId !== channelId) return;

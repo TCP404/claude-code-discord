@@ -207,7 +207,7 @@ const agentSessionsManager = getAgentSessionsManager();
 
 // In-memory cache backed by persistence
 let agentSessions: AgentSession[] = [];
-let currentUserAgent: Record<string, string> = {}; // userId -> agentName
+const currentUserAgent: Record<string, string> = {}; // userId -> agentName
 let persistenceInitialized = false;
 
 // Initialize persistence and load data

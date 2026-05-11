@@ -20,16 +20,20 @@ function createMockSender(): MockSender {
   const tracked: MockTracked[] = [];
 
   const sender: DiscordSender = {
+    // deno-lint-ignore require-await
     sendMessage: async (content: MessageContent) => {
       sent.push(content);
     },
+    // deno-lint-ignore require-await
     sendTracked: async (content: MessageContent) => {
       const t: MockTracked = { content, edited: [], deleted: false };
       tracked.push(t);
       const msg: TrackedMessage = {
+        // deno-lint-ignore require-await
         edit: async (c: MessageContent) => {
           t.edited.push(c);
         },
+        // deno-lint-ignore require-await
         delete: async () => {
           t.deleted = true;
         },
@@ -260,6 +264,7 @@ Deno.test("discord-sender: setSessionId updates session for cost tracking", asyn
 Deno.test("discord-sender: works without sendTracked (no status line)", async () => {
   const sent: MessageContent[] = [];
   const plainSender: DiscordSender = {
+    // deno-lint-ignore require-await
     sendMessage: async (content: MessageContent) => {
       sent.push(content);
     },

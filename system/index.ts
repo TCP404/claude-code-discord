@@ -144,7 +144,7 @@ ${systemInfoOutput}`;
       }
     },
 
-    async onEnvVars(_ctx: any, filter?: string) {
+    onEnvVars(_ctx: any, filter?: string) {
       try {
         const envVars = Deno.env.toObject();
         let envInfo = `Environment Variables - ${getPlatformDisplayName()}\n\n`;

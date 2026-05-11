@@ -54,7 +54,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
             });
             break;
 
-          case "set-model":
+          case "set-model": {
             if (!value) {
               const modelList = Object.entries(CLAUDE_MODELS).map(([key, model]) =>
                 `• \`${key}\` - ${model.name}`
@@ -107,6 +107,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
           // NOTE: set-temperature and set-max-tokens removed - NOT supported by Claude Code CLI
 
@@ -138,7 +139,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
             }
             break;
 
-          case "toggle-auto-system-info":
+          case "toggle-auto-system-info": {
             const newSystemInfo = !settings.autoIncludeSystemInfo;
             updateSettings({ autoIncludeSystemInfo: newSystemInfo });
             await ctx.reply({
@@ -153,8 +154,9 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
-          case "toggle-auto-git-context":
+          case "toggle-auto-git-context": {
             const newGitContext = !settings.autoIncludeGitContext;
             updateSettings({ autoIncludeGitContext: newGitContext });
             await ctx.reply({
@@ -169,8 +171,9 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
-          case "reset-defaults":
+          case "reset-defaults": {
             const { DEFAULT_SETTINGS } = await import("./advanced-settings.ts");
             updateSettings({
               defaultModel: DEFAULT_SETTINGS.defaultModel,
@@ -188,6 +191,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
           default:
             await ctx.reply({
@@ -240,7 +244,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
             });
             break;
 
-          case "toggle-code-highlighting":
+          case "toggle-code-highlighting": {
             const newHighlighting = !settings.codeHighlighting;
             updateSettings({ codeHighlighting: newHighlighting });
             await ctx.reply({
@@ -255,8 +259,9 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
-          case "toggle-auto-pagination":
+          case "toggle-auto-pagination": {
             const newPagination = !settings.autoPageLongOutput;
             updateSettings({ autoPageLongOutput: newPagination });
             await ctx.reply({
@@ -271,8 +276,9 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
-          case "set-max-length":
+          case "set-max-length": {
             if (!value) {
               await ctx.reply({
                 content: "Please provide a max length value between 1000 and 8000",
@@ -301,6 +307,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               ephemeral: true,
             });
             break;
+          }
 
           case "set-timestamp-format":
             if (!value || !["relative", "absolute", "both"].includes(value)) {

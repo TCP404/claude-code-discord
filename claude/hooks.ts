@@ -69,6 +69,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
 
   if (config.logToolUse) {
     // PreToolUse — log when a tool is about to be used
+    // deno-lint-ignore require-await
     const preToolHook: HookCallback = async (input: HookInput) => {
       const preInput = input as PreToolUseHookInput;
       config.onHookEvent({
@@ -86,6 +87,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     }];
 
     // PostToolUse — log after a tool runs successfully
+    // deno-lint-ignore require-await
     const postToolHook: HookCallback = async (input: HookInput) => {
       const postInput = input as PostToolUseHookInput;
       config.onHookEvent({
@@ -103,6 +105,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
     }];
 
     // PostToolUseFailure — log tool failures
+    // deno-lint-ignore require-await
     const failureHook: HookCallback = async (input: HookInput) => {
       const failInput = input as PostToolUseFailureHookInput;
       config.onHookEvent({
@@ -122,6 +125,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
 
   if (config.logNotifications) {
     // Notification — forward Claude's notifications to Discord
+    // deno-lint-ignore require-await
     const notificationHook: HookCallback = async (input: HookInput) => {
       const notifInput = input as NotificationHookInput;
       config.onHookEvent({
@@ -140,6 +144,7 @@ export function buildHooks(config: HookConfig): Partial<Record<HookEvent, HookCa
 
   if (config.logTaskCompletions) {
     // TaskCompleted — notify when background tasks finish
+    // deno-lint-ignore require-await
     const taskHook: HookCallback = async (input: HookInput) => {
       const taskInput = input as TaskCompletedHookInput;
       config.onHookEvent({

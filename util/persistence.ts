@@ -93,9 +93,9 @@ export class PersistenceManager<T> {
   /**
    * Get cached data (or load if not cached)
    */
-  async get(defaultValue: T): Promise<T> {
+  get(defaultValue: T): Promise<T> {
     if (this.cache !== null) {
-      return this.cache;
+      return Promise.resolve(this.cache);
     }
     return this.load(defaultValue);
   }
