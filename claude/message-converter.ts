@@ -1,16 +1,14 @@
+/** @module claude/message-converter — Converts raw SDK JSON messages to ClaudeMessage[]. */
 import type { ClaudeMessage } from "./types.ts";
 
 // Convert JSON messages to ClaudeMessage
-// deno-lint-ignore no-explicit-any
 export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
   const messages: ClaudeMessage[] = [];
 
   if (jsonData.type === "assistant") {
     if (jsonData.message?.content) {
       const textContent = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type === "text")
-        // deno-lint-ignore no-explicit-any
         .map((c: any) => c.text)
         .join("");
 
@@ -20,7 +18,6 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
 
       // Process tool_use individually
       const toolUseContent = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type === "tool_use");
 
       for (const tool of toolUseContent) {
@@ -33,7 +30,6 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
 
       // Process thinking content
       const thinkingContent = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type === "thinking");
 
       for (const thinking of thinkingContent) {
@@ -47,7 +43,6 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
 
       // Process other content
       const otherContent = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type !== "text" && c.type !== "tool_use" && c.type !== "thinking");
 
       for (const other of otherContent) {
@@ -61,7 +56,6 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
   } else if (jsonData.type === "user") {
     if (jsonData.message?.content) {
       const toolResults = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type === "tool_result");
 
       for (const result of toolResults) {
@@ -84,7 +78,6 @@ export function convertToClaudeMessages(jsonData: any): ClaudeMessage[] {
       }
 
       const otherContent = jsonData.message.content
-        // deno-lint-ignore no-explicit-any
         .filter((c: any) => c.type !== "tool_result");
 
       for (const other of otherContent) {

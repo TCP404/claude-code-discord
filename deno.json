@@ -1,12 +1,13 @@
 {
-  "version": "2.4.2",
+  "version": "3.0.0",
   "compilerOptions": {
     "lib": ["deno.window"],
     "strict": true
   },
   "lint": {
     "rules": {
-      "tags": ["recommended"]
+      "tags": ["recommended"],
+      "exclude": ["no-explicit-any"]
     },
     "exclude": ["node_modules/", ".git/"]
   },
@@ -22,6 +23,7 @@
   "tasks": {
     "start": "deno run --allow-all index.ts",
     "dev": "deno run --allow-all --watch index.ts",
+    "test": "deno test --allow-all --no-lock",
     "lint": "deno lint",
     "fmt": "deno fmt",
     "check": "deno check index.ts"
@@ -30,7 +32,7 @@
     "discord.js": "npm:discord.js@14.14.1",
     "@anthropic-ai/claude-agent-sdk": "npm:@anthropic-ai/claude-agent-sdk@0.2.119"
   },
-  "permissions": {
-    "allow-all": true
+  "test": {
+    "include": ["**/*_test.ts"]
   }
 }

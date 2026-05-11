@@ -1,19 +1,18 @@
 /**
  * Bot factory for creating and assembling Discord bot components.
  * Handles manager creation, crash handler initialization, and Discord client setup.
- * 
+ *
  * @module core/bot-factory
  */
 
 import { ShellManager } from "../shell/index.ts";
 import { WorktreeBotManager } from "../git/index.ts";
-import { 
-  ProcessCrashHandler, 
-  ProcessHealthMonitor, 
+import {
+  ProcessCrashHandler,
+  ProcessHealthMonitor,
+  type RecoveryOptions,
   setupGlobalErrorHandlers,
-  type RecoveryOptions 
 } from "../process/index.ts";
-import { ClaudeSessionManager } from "../claude/index.ts";
 import type { AppConfig } from "./config-loader.ts";
 
 // ================================
@@ -33,8 +32,6 @@ export interface BotManagers {
   crashHandler: ProcessCrashHandler;
   /** Health monitor for process status tracking */
   healthMonitor: ProcessHealthMonitor;
-  /** Claude session manager for AI conversation state */
-  claudeSessionManager: ClaudeSessionManager;
 }
 
 /**
@@ -60,7 +57,7 @@ export interface CrashHandlerOptions extends RecoveryOptions {
  */
 export interface CrashReport {
   timestamp: Date;
-  processType: 'shell' | 'worktree' | 'claude' | 'main';
+  processType: "shell" | "worktree" | "claude" | "main";
   processId?: number | string;
   error: Error;
   context?: string;
@@ -97,7 +94,9 @@ export interface ValidationResult {
 /**
  * Default crash handler options.
  */
-export const DEFAULT_CRASH_HANDLER_OPTIONS: Required<Omit<CrashHandlerOptions, 'onCrashNotification'>> = {
+export const DEFAULT_CRASH_HANDLER_OPTIONS: Required<
+  Omit<CrashHandlerOptions, "onCrashNotification">
+> = {
   maxRetries: 3,
   retryDelay: 5000,
   enableAutoRestart: true,
@@ -116,10 +115,10 @@ export const DEFAULT_CLEANUP_INTERVAL_MS = 3600000;
 
 /**
  * Create the shell manager for command execution.
- * 
+ *
  * @param workDir - Working directory for shell commands
  * @returns Configured ShellManager instance
- * 
+ *
  * @example
  * ```typescript
  * const shellManager = createShellManager('/path/to/project');
@@ -131,9 +130,9 @@ export function createShellManager(workDir: string): ShellManager {
 
 /**
  * Create the worktree bot manager for git operations.
- * 
+ *
  * @returns Configured WorktreeBotManager instance
- * 
+ *
  * @example
  * ```typescript
  * const worktreeBotManager = createWorktreeBotManager();
@@ -144,25 +143,11 @@ export function createWorktreeBotManager(): WorktreeBotManager {
 }
 
 /**
- * Create the Claude session manager for AI conversation state.
- * 
- * @returns Configured ClaudeSessionManager instance
- * 
- * @example
- * ```typescript
- * const sessionManager = createClaudeSessionManager();
- * ```
- */
-export function createClaudeSessionManager(): ClaudeSessionManager {
-  return new ClaudeSessionManager();
-}
-
-/**
  * Create and configure the crash handler with health monitor.
- * 
+ *
  * @param options - Crash handler configuration options
  * @returns Tuple of [ProcessCrashHandler, ProcessHealthMonitor]
- * 
+ *
  * @example
  * ```typescript
  * const [crashHandler, healthMonitor] = createCrashHandler({
@@ -174,7 +159,7 @@ export function createClaudeSessionManager(): ClaudeSessionManager {
  * ```
  */
 export function createCrashHandler(
-  options: CrashHandlerOptions = {}
+  options: CrashHandlerOptions = {},
 ): [ProcessCrashHandler, ProcessHealthMonitor] {
   const crashHandler = new ProcessCrashHandler({
     maxRetries: options.maxRetries ?? DEFAULT_CRASH_HANDLER_OPTIONS.maxRetries,
@@ -196,10 +181,10 @@ export function createCrashHandler(
 
 /**
  * Create all bot managers with proper initialization and wiring.
- * 
+ *
  * @param deps - Bot factory dependencies
  * @returns All configured bot managers
- * 
+ *
  * @example
  * ```typescript
  * const managers = createBotManagers({
@@ -214,7 +199,6 @@ export function createBotManagers(deps: BotFactoryDeps): BotManagers {
   // Create individual managers
   const shellManager = createShellManager(config.workDir);
   const worktreeBotManager = createWorktreeBotManager();
-  const claudeSessionManager = createClaudeSessionManager();
   const [crashHandler, healthMonitor] = createCrashHandler(crashHandlerOptions);
 
   // Wire up crash handler with managers
@@ -228,18 +212,17 @@ export function createBotManagers(deps: BotFactoryDeps): BotManagers {
     worktreeBotManager,
     crashHandler,
     healthMonitor,
-    claudeSessionManager,
   };
 }
 
 /**
  * Setup periodic cleanup tasks for bot managers.
- * 
+ *
  * @param managers - Bot managers to clean up periodically
  * @param intervalMs - Cleanup interval in milliseconds
  * @param additionalCleanup - Optional additional cleanup functions
  * @returns Interval ID for cleanup task
- * 
+ *
  * @example
  * ```typescript
  * const intervalId = setupPeriodicCleanup(
@@ -252,23 +235,22 @@ export function createBotManagers(deps: BotFactoryDeps): BotManagers {
 export function setupPeriodicCleanup(
   managers: BotManagers,
   intervalMs: number = DEFAULT_CLEANUP_INTERVAL_MS,
-  additionalCleanup: Array<() => void> = []
+  additionalCleanup: Array<() => void> = [],
 ): number {
   const cleanup = () => {
     try {
       managers.crashHandler.cleanup();
-      managers.claudeSessionManager.cleanup();
-      
+
       // Run additional cleanup functions
       for (const cleanupFn of additionalCleanup) {
         try {
           cleanupFn();
         } catch (error) {
-          console.error('Error during additional cleanup:', error);
+          console.error("Error during additional cleanup:", error);
         }
       }
     } catch (error) {
-      console.error('Error during periodic cleanup:', error);
+      console.error("Error during periodic cleanup:", error);
     }
   };
 
@@ -278,11 +260,11 @@ export function setupPeriodicCleanup(
 /**
  * Create complete bot context with managers and cleanup setup.
  * This is the main entry point for bot initialization.
- * 
+ *
  * @param deps - Bot factory dependencies
  * @param additionalCleanup - Optional additional cleanup functions
  * @returns Complete bot context with cleanup controls
- * 
+ *
  * @example
  * ```typescript
  * const botContext = createBotContext(
@@ -297,22 +279,22 @@ export function setupPeriodicCleanup(
  *   },
  *   [() => cleanupPaginationStates()]
  * );
- * 
+ *
  * // Later, during shutdown:
  * botContext.stopCleanup();
  * ```
  */
 export function createBotContext(
   deps: BotFactoryDeps,
-  additionalCleanup: Array<() => void> = []
+  additionalCleanup: Array<() => void> = [],
 ): BotContext {
   const managers = createBotManagers(deps);
   const cleanupIntervalMs = deps.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
-  
+
   const cleanupIntervalId = setupPeriodicCleanup(
     managers,
     cleanupIntervalMs,
-    additionalCleanup
+    additionalCleanup,
   );
 
   const stopCleanup = () => {
@@ -328,10 +310,10 @@ export function createBotContext(
 
 /**
  * Validate bot factory dependencies.
- * 
+ *
  * @param deps - Dependencies to validate
  * @returns Validation result with any errors
- * 
+ *
  * @example
  * ```typescript
  * const result = validateBotFactoryDeps(deps);
@@ -344,24 +326,24 @@ export function validateBotFactoryDeps(deps: BotFactoryDeps): ValidationResult {
   const errors: string[] = [];
 
   if (!deps.config) {
-    errors.push('Configuration is required');
+    errors.push("Configuration is required");
   } else {
     if (!deps.config.workDir) {
-      errors.push('Working directory is required in configuration');
+      errors.push("Working directory is required in configuration");
     }
   }
 
   if (deps.cleanupIntervalMs !== undefined && deps.cleanupIntervalMs <= 0) {
-    errors.push('Cleanup interval must be a positive number');
+    errors.push("Cleanup interval must be a positive number");
   }
 
   if (deps.crashHandlerOptions) {
     const opts = deps.crashHandlerOptions;
     if (opts.maxRetries !== undefined && opts.maxRetries < 0) {
-      errors.push('Max retries must be non-negative');
+      errors.push("Max retries must be non-negative");
     }
     if (opts.retryDelay !== undefined && opts.retryDelay < 0) {
-      errors.push('Retry delay must be non-negative');
+      errors.push("Retry delay must be non-negative");
     }
   }
 
@@ -374,12 +356,12 @@ export function validateBotFactoryDeps(deps: BotFactoryDeps): ValidationResult {
 /**
  * Create bot context with validation.
  * Throws an error if validation fails.
- * 
+ *
  * @param deps - Bot factory dependencies
  * @param additionalCleanup - Optional additional cleanup functions
  * @returns Complete bot context
  * @throws Error if validation fails
- * 
+ *
  * @example
  * ```typescript
  * try {
@@ -392,12 +374,12 @@ export function validateBotFactoryDeps(deps: BotFactoryDeps): ValidationResult {
  */
 export function createBotContextOrThrow(
   deps: BotFactoryDeps,
-  additionalCleanup: Array<() => void> = []
+  additionalCleanup: Array<() => void> = [],
 ): BotContext {
   const validation = validateBotFactoryDeps(deps);
-  
+
   if (!validation.valid) {
-    throw new Error(`Bot factory validation failed:\n${validation.errors.join('\n')}`);
+    throw new Error(`Bot factory validation failed:\n${validation.errors.join("\n")}`);
   }
 
   return createBotContext(deps, additionalCleanup);
@@ -405,10 +387,10 @@ export function createBotContextOrThrow(
 
 /**
  * Gracefully shutdown bot context and release all resources.
- * 
+ *
  * @param context - Bot context to shutdown
  * @param options - Shutdown options
- * 
+ *
  * @example
  * ```typescript
  * shutdownBotContext(botContext, {
@@ -422,7 +404,7 @@ export function shutdownBotContext(
   options: {
     killShellProcesses?: boolean;
     killWorktreeBots?: boolean;
-  } = {}
+  } = {},
 ): void {
   const { killShellProcesses = true, killWorktreeBots = true } = options;
 
@@ -434,7 +416,7 @@ export function shutdownBotContext(
     try {
       context.shellManager.killAllProcesses();
     } catch (error) {
-      console.error('Error killing shell processes:', error);
+      console.error("Error killing shell processes:", error);
     }
   }
 
@@ -443,15 +425,14 @@ export function shutdownBotContext(
     try {
       context.worktreeBotManager.killAllWorktreeBots();
     } catch (error) {
-      console.error('Error killing worktree bots:', error);
+      console.error("Error killing worktree bots:", error);
     }
   }
 
   // Final cleanup
   try {
     context.crashHandler.cleanup();
-    context.claudeSessionManager.cleanup();
   } catch (error) {
-    console.error('Error during final cleanup:', error);
+    console.error("Error during final cleanup:", error);
   }
 }

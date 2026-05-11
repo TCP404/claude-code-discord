@@ -5,39 +5,37 @@
  * @module core/handler-registry
  */
 
-import type {
-  CommandHandlers,
-  ButtonHandlers,
-  BotDependencies
-} from "../discord/index.ts";
+import type { BotDependencies, ButtonHandlers, CommandHandlers } from "../discord/index.ts";
 
-import type { ClaudeMessage } from "../claude/index.ts";
-
-// Import command definitions
-import { claudeCommands, createClaudeHandlers } from "../claude/index.ts";
-import { enhancedClaudeCommands, createEnhancedClaudeHandlers } from "../claude/index.ts";
-import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "../claude/additional-index.ts";
-import { advancedSettingsCommands, createAdvancedSettingsHandlers, type AdvancedBotSettings } from "../settings/index.ts";
-import { unifiedSettingsCommands, createUnifiedSettingsHandlers, type UnifiedBotSettings } from "../settings/index.ts";
-import { gitCommands, createGitHandlers } from "../git/index.ts";
-import { shellCommands, createShellHandlers } from "../shell/index.ts";
-import { utilsCommands, createUtilsHandlers } from "../util/index.ts";
-import { systemCommands, createSystemHandlers } from "../system/index.ts";
-import { helpCommand, createHelpHandlers } from "../help/index.ts";
-import { agentCommand, createAgentHandlers } from "../agent/index.ts";
-import { screenshotCommands, createScreenshotHandlers } from "../screenshot/index.ts";
-import { workspaceCommands } from "../workspace/index.ts";
-import { infoCommands, createInfoCommandHandlers } from "../claude/index.ts";
-import { cleanSessionId, ClaudeSessionManager } from "../claude/index.ts";
-import type { SessionThreadCallbacks } from "../claude/index.ts";
-import type { ClaudeModelOptions } from "../claude/index.ts";
-import type { AskUserCallback } from "../claude/index.ts";
+import type { ClaudeMessage } from "../claude/types.ts";
+import type { ClaudeModelOptions } from "../claude/client.ts";
+import type { SessionThreadCallbacks } from "../claude/command.ts";
+import type { AskUserCallback } from "../claude/user-question.ts";
+import type { PermissionRequestCallback } from "../claude/permission-request.ts";
+import { claudeCommands, createClaudeHandlers } from "../claude/command.ts";
+import { createInfoCommandHandlers, infoCommands } from "../claude/info-commands.ts";
+import { cleanSessionId } from "../claude/client.ts";
 import { BOT_SYSTEM_PROMPT } from "../claude/bot-system-prompt.ts";
-import type { PermissionRequestCallback } from "../claude/index.ts";
-import { buildHooks } from "../claude/hooks.ts";
-import type { HookEvent_Discord } from "../claude/hooks.ts";
-import { THINKING_MODES, OPERATION_MODES, EFFORT_LEVELS } from "../settings/index.ts";
-import { hiddenMessageTypes } from "../claude/index.ts";
+import { buildHooks, type HookEvent_Discord } from "../claude/hooks.ts";
+import {
+  type AdvancedBotSettings,
+  advancedSettingsCommands,
+  createAdvancedSettingsHandlers,
+} from "../settings/index.ts";
+import {
+  createUnifiedSettingsHandlers,
+  type UnifiedBotSettings,
+  unifiedSettingsCommands,
+} from "../settings/index.ts";
+import { OPERATION_MODES, THINKING_MODES } from "../settings/index.ts";
+import { createGitHandlers, gitCommands } from "../git/index.ts";
+import { createShellHandlers, shellCommands } from "../shell/index.ts";
+import { createUtilsHandlers, utilsCommands } from "../util/index.ts";
+import { createSystemHandlers, systemCommands } from "../system/index.ts";
+import { createHelpHandlers, helpCommand } from "../help/index.ts";
+import { agentCommand, createAgentHandlers } from "../agent/index.ts";
+import { createScreenshotHandlers, screenshotCommands } from "../screenshot/index.ts";
+import { workspaceCommands } from "../workspace/index.ts";
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 
 import type { ShellManager } from "../shell/index.ts";
@@ -133,8 +131,6 @@ export interface BotSettingsOps {
  */
 export interface AllHandlers {
   claude: ReturnType<typeof createClaudeHandlers>;
-  enhancedClaude: ReturnType<typeof createEnhancedClaudeHandlers>;
-  additionalClaude: ReturnType<typeof createAdditionalClaudeHandlers>;
   advancedSettings: ReturnType<typeof createAdvancedSettingsHandlers>;
   unifiedSettings: ReturnType<typeof createUnifiedSettingsHandlers>;
   git: ReturnType<typeof createGitHandlers>;
@@ -175,12 +171,12 @@ export interface HandlerRegistryDeps {
   crashHandler: ProcessCrashHandler;
   /** Health monitor instance */
   healthMonitor: ProcessHealthMonitor;
-  /** Claude session manager instance */
-  claudeSessionManager: ClaudeSessionManager;
   /** Function to send Claude messages */
   sendClaudeMessages: (messages: ClaudeMessage[]) => Promise<void>;
   /** Callback when bot settings update */
-  onBotSettingsUpdate?: (settings: { mentionEnabled: boolean; mentionUserId: string | null }) => void;
+  onBotSettingsUpdate?: (
+    settings: { mentionEnabled: boolean; mentionUserId: string | null },
+  ) => void;
   /** Late-bound callback for AskUserQuestion tool — Claude asks the Discord user mid-session.
    *  Set from index.ts after bot is created. */
   onAskUser?: AskUserCallback;
@@ -279,7 +275,7 @@ export function createMessageHistory(maxSize: number = 50): MessageHistoryOps {
  * @returns Claude session operations
  */
 export function createClaudeSession(): ClaudeSessionOps {
-  const DEFAULT_KEY = '__default__';
+  const DEFAULT_KEY = "__default__";
   const state: ClaudeSessionState = {
     controllers: new Map(),
     sessionIds: new Map(),
@@ -339,7 +335,7 @@ export function createClaudeSession(): ClaudeSessionOps {
 export function createBotSettings(
   defaultMentionUserId: string | undefined,
   defaultAdvanced: AdvancedBotSettings,
-  defaultUnified: UnifiedBotSettings
+  defaultUnified: UnifiedBotSettings,
 ): BotSettingsOps {
   const state: BotSettingsState = {
     advanced: {
@@ -422,12 +418,20 @@ export function createBotSettings(
 export function createAllHandlers(
   deps: HandlerRegistryDeps,
   claudeSession: ClaudeSessionOps,
-  settings: BotSettingsOps
+  settings: BotSettingsOps,
 ): AllHandlers {
   const {
-    workDir, repoName, branchName, categoryName, discordToken, applicationId,
-    shellManager, worktreeBotManager, crashHandler, claudeSessionManager,
-    sendClaudeMessages, onBotSettingsUpdate
+    workDir,
+    repoName,
+    branchName,
+    categoryName,
+    discordToken,
+    applicationId,
+    shellManager,
+    worktreeBotManager,
+    crashHandler,
+    sendClaudeMessages,
+    onBotSettingsUpdate,
   } = deps;
 
   const currentSettings = settings.getSettings();
@@ -477,13 +481,13 @@ export function createAllHandlers(
         HTTPS_PROXY: s.proxyUrl,
       };
       if (s.noProxyDomains.length > 0) {
-        opts.extraEnv.NO_PROXY = s.noProxyDomains.join(',');
+        opts.extraEnv.NO_PROXY = s.noProxyDomains.join(",");
       }
     }
 
     // Advanced features
     if (s.enable1MContext) {
-      opts.betas = ['context-1m-2025-08-07'];
+      opts.betas = ["context-1m-2025-08-07"];
     }
     if (s.enableFileCheckpointing) {
       opts.enableFileCheckpointing = true;
@@ -498,7 +502,7 @@ export function createAllHandlers(
       opts.enableAgentTeams = true;
     }
     if (s.outputJsonSchema) {
-      opts.outputFormat = { type: 'json_schema', schema: s.outputJsonSchema };
+      opts.outputFormat = { type: "json_schema", schema: s.outputJsonSchema };
     }
     // Additional directories for multi-repo access
     if (s.additionalDirectories && s.additionalDirectories.length > 0) {
@@ -508,27 +512,31 @@ export function createAllHandlers(
     // Hooks — passive SDK callbacks for tool/notification/task observability
     if (s.hooksLogToolUse || s.hooksLogNotifications || s.hooksLogTaskCompletions) {
       const hookEventToMessage = (event: HookEvent_Discord): void => {
-        const prefix = '🪝';
-        let content = '';
+        const prefix = "🪝";
+        let content = "";
         switch (event.type) {
-          case 'tool_start':
+          case "tool_start":
             content = `${prefix} Tool started: **${event.toolName}**`;
             break;
-          case 'tool_complete':
+          case "tool_complete":
             content = `${prefix} Tool completed: **${event.toolName}**`;
             break;
-          case 'tool_failure':
-            content = `${prefix} Tool failed: **${event.toolName}** — ${event.error ?? 'unknown error'}`;
+          case "tool_failure":
+            content = `${prefix} Tool failed: **${event.toolName}** — ${
+              event.error ?? "unknown error"
+            }`;
             break;
-          case 'notification':
-            content = `${prefix} Notification: ${event.title ? `**${event.title}** — ` : ''}${event.message ?? ''}`;
+          case "notification":
+            content = `${prefix} Notification: ${event.title ? `**${event.title}** — ` : ""}${
+              event.message ?? ""
+            }`;
             break;
-          case 'task_completed':
-            content = `${prefix} Task completed: ${event.taskSubject ?? event.taskId ?? 'unknown'}`;
+          case "task_completed":
+            content = `${prefix} Task completed: ${event.taskSubject ?? event.taskId ?? "unknown"}`;
             break;
         }
         if (content) {
-          sendClaudeMessages([{ type: 'system', content }]);
+          sendClaudeMessages([{ type: "system", content }]);
         }
       };
       opts.hooks = buildHooks({
@@ -609,31 +617,9 @@ export function createAllHandlers(
     categoryName,
   });
 
-  const enhancedClaudeHandlers = createEnhancedClaudeHandlers({
-    workDir,
-    getClaudeController: claudeSession.getController,
-    setClaudeController: claudeSession.setController,
-    setClaudeSessionId: claudeSession.setSessionId,
-    sendClaudeMessages,
-    sessionManager: claudeSessionManager,
-    crashHandler,
-    getQueryOptions,
-  });
-
   const systemHandlers = createSystemHandlers({
     workDir,
     crashHandler,
-  });
-
-  const additionalClaudeHandlers = createAdditionalClaudeHandlers({
-    workDir,
-    getClaudeController: claudeSession.getController,
-    setClaudeController: claudeSession.setController,
-    sendClaudeMessages,
-    sessionManager: claudeSessionManager,
-    crashHandler,
-    settings: currentSettings.advanced,
-    getQueryOptions,
   });
 
   const advancedSettingsHandlers = createAdvancedSettingsHandlers({
@@ -653,7 +639,6 @@ export function createAllHandlers(
     workDir,
     crashHandler,
     sendClaudeMessages,
-    sessionManager: claudeSessionManager,
     getQueryOptions,
   });
 
@@ -670,8 +655,6 @@ export function createAllHandlers(
 
   return {
     claude: claudeHandlers,
-    enhancedClaude: enhancedClaudeHandlers,
-    additionalClaude: additionalClaudeHandlers,
     advancedSettings: advancedSettingsHandlers,
     unifiedSettings: unifiedSettingsHandlers,
     git: gitHandlers,
@@ -688,15 +671,19 @@ export function createAllHandlers(
 // Display toggle commands — control which message types are shown in threads
 const displayToggleCommands = [
   new SlashCommandBuilder()
-    .setName('show-system')
-    .setDescription('Toggle system messages (init, completion) on/off'),
+    .setName("show-system")
+    .setDescription("Toggle system messages (init, completion) on/off"),
   new SlashCommandBuilder()
-    .setName('show-tool-details')
-    .setDescription('Toggle tool messages (tool_use, tool_result, progress, summary) on/off'),
+    .setName("show-tool-details")
+    .setDescription("Toggle tool messages (tool_use, tool_result, progress, summary) on/off"),
   new SlashCommandBuilder()
-    .setName('show-thinking')
-    .setDescription('Toggle thinking messages on/off'),
+    .setName("show-thinking")
+    .setDescription("Toggle thinking messages on/off"),
 ];
+
+const hotQueriesCommand = new SlashCommandBuilder()
+  .setName("hot-queries")
+  .setDescription("List current active hot query sessions");
 
 /**
  * Get all command definitions for bot registration.
@@ -706,8 +693,6 @@ const displayToggleCommands = [
 export function getAllCommands() {
   return [
     ...claudeCommands,
-    ...enhancedClaudeCommands,
-    ...additionalClaudeCommands,
     ...advancedSettingsCommands,
     ...unifiedSettingsCommands,
     agentCommand,
@@ -719,6 +704,7 @@ export function getAllCommands() {
     ...infoCommands,
     ...workspaceCommands,
     helpCommand,
+    hotQueriesCommand,
     ...displayToggleCommands,
   ];
 }

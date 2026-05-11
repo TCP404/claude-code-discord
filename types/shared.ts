@@ -6,7 +6,7 @@
 /**
  * Basic bot settings for mention functionality.
  * Used by various modules that need to control @mention behavior.
- * 
+ *
  * @example
  * ```typescript
  * const settings: BotSettings = {

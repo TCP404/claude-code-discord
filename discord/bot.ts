@@ -1,3 +1,4 @@
+/** @module discord/bot — Discord.js client creation, slash command registration, and event routing. */
 import {
   ActionRowBuilder,
   AttachmentBuilder,
@@ -20,7 +21,7 @@ import {
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
-import { pendingFileUploads } from "../claude/index.ts";
+import { pendingFileUploads } from "../claude/discord-sender.ts";
 import { isVoiceTranscriptionEnabled, transcribeAudio } from "../voice/transcribe.ts";
 import { checkCommandPermission } from "../core/rbac.ts";
 import { SETTINGS_ACTIONS, SETTINGS_VALUES } from "../settings/unified-settings.ts";
@@ -38,9 +39,7 @@ import type {
 // Helper Functions
 // ================================
 
-// deno-lint-ignore no-explicit-any
 function convertMessageContent(content: MessageContent): any {
-  // deno-lint-ignore no-explicit-any
   const payload: any = {};
 
   if (content.content) payload.content = content.content;
@@ -121,7 +120,6 @@ export async function createDiscordBot(
   const actualCategoryName = categoryName || repoName;
 
   let myChannel: TextChannel | null = null;
-  // deno-lint-ignore no-explicit-any no-unused-vars
   let myCategory: any = null;
 
   const botSettings = dependencies.botSettings || {
@@ -141,14 +139,12 @@ export async function createDiscordBot(
   const commands = dependencies.commands;
 
   // Channel management
-  // deno-lint-ignore no-explicit-any
   async function ensureChannelExists(guild: any): Promise<TextChannel> {
     const channelName = sanitizeChannelName(branchName);
 
     console.log(`Checking category "${actualCategoryName}"...`);
 
     let category = guild.channels.cache.find(
-      // deno-lint-ignore no-explicit-any
       (c: any) => c.type === ChannelType.GuildCategory && c.name === actualCategoryName,
     );
 
@@ -171,7 +167,6 @@ export async function createDiscordBot(
     myCategory = category;
 
     let channel = guild.channels.cache.find(
-      // deno-lint-ignore no-explicit-any
       (c: any) =>
         c.type === ChannelType.GuildText && c.name === channelName && c.parentId === category.id,
     );
@@ -231,7 +226,6 @@ export async function createDiscordBot(
 
       getString(name: string, required?: boolean): string | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getString(name, required ?? false);
         }
         return null;
@@ -239,7 +233,6 @@ export async function createDiscordBot(
 
       getInteger(name: string, required?: boolean): number | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getInteger(name, required ?? false);
         }
         return null;
@@ -247,7 +240,6 @@ export async function createDiscordBot(
 
       getBoolean(name: string, required?: boolean): boolean | null {
         if (interaction.isCommand && interaction.isCommand()) {
-          // deno-lint-ignore no-explicit-any
           return (interaction as any).options.getBoolean(name, required ?? false);
         }
         return null;
@@ -256,7 +248,6 @@ export async function createDiscordBot(
       getMemberRoleIds(): Set<string> {
         const member = interaction.member;
         if (member && "roles" in member && member.roles && "cache" in member.roles) {
-          // deno-lint-ignore no-explicit-any
           const cache = (member.roles as any).cache;
           if (cache && typeof cache.keys === "function") {
             return new Set([...cache.keys()]);
@@ -276,7 +267,6 @@ export async function createDiscordBot(
       getSubcommand(): string | null {
         if (interaction.isCommand && interaction.isCommand()) {
           try {
-            // deno-lint-ignore no-explicit-any
             return (interaction as any).options.getSubcommand(false) ?? null;
           } catch {
             return null;
@@ -303,9 +293,7 @@ export async function createDiscordBot(
 
     // Check if the interaction is inside a thread whose parent is a managed channel
     const channel = client.channels.cache.get(channelId);
-    // deno-lint-ignore no-explicit-any
     if (channel && (channel as any).parentId) {
-      // deno-lint-ignore no-explicit-any
       const parentId = (channel as any).parentId;
       if (parentId === myChannel.id) return true;
       if (managedIds?.has(parentId)) return true;
@@ -457,45 +445,6 @@ export async function createDiscordBot(
 
     // Handle dynamic button IDs with patterns
     const buttonId = interaction.customId;
-
-    // Handle continue with session ID pattern: "continue:sessionId"
-    if (buttonId.startsWith("continue:")) {
-      if (dependencies.onContinueSession) {
-        try {
-          await dependencies.onContinueSession(ctx);
-        } catch (error) {
-          console.error("Error handling continue button:", error);
-          try {
-            await ctx.followUp({
-              content: `Error continuing session: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-              ephemeral: true,
-            });
-          } catch { /* ignore follow-up errors */ }
-        }
-      } else {
-        // Fallback: show session ID text if callback not wired
-        const sessionId = buttonId.split(":")[1];
-        try {
-          await ctx.update({
-            embeds: [{
-              color: 0xffff00,
-              title: "\u27a1\ufe0f Continue Session",
-              description:
-                `Use \`/continue\` or \`/claude session_id:${sessionId}\` to continue this conversation.`,
-              fields: [
-                { name: "Session ID", value: `\`${sessionId}\``, inline: false },
-              ],
-              timestamp: true,
-            }],
-          });
-        } catch (error) {
-          console.error(`Error handling continue button fallback:`, error);
-        }
-      }
-      return;
-    }
 
     // Handle copy session ID pattern: "copy-session:sessionId" (legacy — kept for old messages)
     if (buttonId.startsWith("copy-session:")) {
@@ -735,7 +684,7 @@ export async function createDiscordBot(
       const mentionedUsers = message.mentions.users;
       const mentionsMe = mentionedUsers.has(client.user!.id);
       if (mentionedUsers.size > 0) {
-        const mentionsOtherBot = mentionedUsers.some(u => u.bot && u.id !== client.user!.id);
+        const mentionsOtherBot = mentionedUsers.some((u) => u.bot && u.id !== client.user!.id);
         if (mentionsOtherBot && !mentionsMe) return;
       }
 
@@ -793,6 +742,7 @@ export async function createDiscordBot(
     let pendingAlerts: string[] = [];
     let lastAlertMessage: Message | null = null;
 
+    // deno-lint-ignore require-await
     client.on(Events.MessageCreate, async (message: Message) => {
       if (message.author.id === client.user?.id) return;
       if (message.channelId !== channelId) return;

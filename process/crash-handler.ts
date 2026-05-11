@@ -1,10 +1,10 @@
-// Enhanced process crash handling and recovery
+/** @module process/crash-handler — Crash recovery, SIGINT/SIGTERM handling, health monitoring. */
 import type { ShellManager } from "../shell/handler.ts";
 import type { WorktreeBotManager } from "../git/process-manager.ts";
 
 export interface CrashReport {
   timestamp: Date;
-  processType: 'shell' | 'worktree' | 'claude' | 'main';
+  processType: "shell" | "worktree" | "claude" | "main";
   processId?: number | string;
   error: Error;
   context?: string;
@@ -34,7 +34,7 @@ export class ProcessCrashHandler {
       enableAutoRestart: true,
       logCrashes: true,
       notifyOnCrash: true,
-      ...options
+      ...options,
     };
   }
 
@@ -49,10 +49,10 @@ export class ProcessCrashHandler {
 
   // Report a process crash
   async reportCrash(
-    processType: CrashReport['processType'],
+    processType: CrashReport["processType"],
     error: Error,
     processId?: number | string,
-    context?: string
+    context?: string,
   ): Promise<boolean> {
     const report: CrashReport = {
       timestamp: new Date(),
@@ -60,7 +60,7 @@ export class ProcessCrashHandler {
       processId,
       error,
       context,
-      recoverable: this.isRecoverable(error)
+      recoverable: this.isRecoverable(error),
     };
 
     this.crashes.push(report);
@@ -76,7 +76,7 @@ export class ProcessCrashHandler {
         id: processId,
         error: error.message,
         context,
-        recoverable: report.recoverable
+        recoverable: report.recoverable,
       });
     }
 
@@ -84,7 +84,7 @@ export class ProcessCrashHandler {
       try {
         await this.notificationCallback(report);
       } catch (notificationError) {
-        console.error('Failed to send crash notification:', notificationError);
+        console.error("Failed to send crash notification:", notificationError);
       }
     }
 
@@ -107,7 +107,7 @@ export class ProcessCrashHandler {
       /SIGKILL/i, // Force killed
     ];
 
-    return !unrecoverablePatterns.some(pattern => pattern.test(error.message));
+    return !unrecoverablePatterns.some((pattern) => pattern.test(error.message));
   }
 
   // Attempt to recover from a crash
@@ -122,18 +122,20 @@ export class ProcessCrashHandler {
 
     this.retryCounters.set(key, currentRetries + 1);
 
-    console.log(`Attempting recovery for ${key} (attempt ${currentRetries + 1}/${this.options.maxRetries})`);
+    console.log(
+      `Attempting recovery for ${key} (attempt ${currentRetries + 1}/${this.options.maxRetries})`,
+    );
 
     // Wait before retry
-    await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
+    await new Promise((resolve) => setTimeout(resolve, this.options.retryDelay));
 
     try {
       switch (report.processType) {
-        case 'shell':
+        case "shell":
           return await this.recoverShellProcess(report);
-        case 'worktree':
+        case "worktree":
           return await this.recoverWorktreeProcess(report);
-        case 'claude':
+        case "claude":
           return await this.recoverClaudeProcess(report);
         default:
           console.warn(`Recovery not implemented for process type: ${report.processType}`);
@@ -147,7 +149,7 @@ export class ProcessCrashHandler {
 
   // Recover shell process
   private async recoverShellProcess(report: CrashReport): Promise<boolean> {
-    if (!this.shellManager || typeof report.processId !== 'number') {
+    if (!this.shellManager || typeof report.processId !== "number") {
       return false;
     }
 
@@ -165,16 +167,16 @@ export class ProcessCrashHandler {
 
   // Recover worktree process
   private async recoverWorktreeProcess(report: CrashReport): Promise<boolean> {
-    if (!this.worktreeManager || typeof report.processId !== 'string') {
+    if (!this.worktreeManager || typeof report.processId !== "string") {
       return false;
     }
 
     try {
       // Kill the crashed worktree bot
       this.worktreeManager.killWorktreeBot(report.processId);
-      
+
       // Wait a bit for cleanup
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Attempt to restart the worktree bot
       // Note: This would need additional context about the original spawn parameters
@@ -187,13 +189,13 @@ export class ProcessCrashHandler {
   }
 
   // Recover Claude process
-  private async recoverClaudeProcess(report: CrashReport): Promise<boolean> {
+  private recoverClaudeProcess(_report: CrashReport): boolean {
     try {
       // Claude processes are typically session-based and self-recovering
-      console.log('Claude process crash noted, session will be reset on next request');
+      console.log("Claude process crash noted, session will be reset on next request");
       return true;
     } catch (error) {
-      console.error('Failed to recover Claude process:', error);
+      console.error("Failed to recover Claude process:", error);
       return false;
     }
   }
@@ -208,39 +210,39 @@ export class ProcessCrashHandler {
     const now = Date.now();
     const oneHourAgo = now - 3600000; // 1 hour
 
-    const recentCrashes = this.crashes.filter(crash => 
-      crash.timestamp.getTime() > oneHourAgo
-    );
+    const recentCrashes = this.crashes.filter((crash) => crash.timestamp.getTime() > oneHourAgo);
 
     const crashesByType = this.crashes.reduce((acc, crash) => {
       acc[crash.processType] = (acc[crash.processType] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const recoverableCrashes = this.crashes.filter(crash => crash.recoverable).length;
+    const recoverableCrashes = this.crashes.filter((crash) => crash.recoverable).length;
     const recoveryRate = this.crashes.length > 0 ? recoverableCrashes / this.crashes.length : 0;
 
     return {
       totalCrashes: this.crashes.length,
       recentCrashes: recentCrashes.length,
       crashesByType,
-      recoveryRate
+      recoveryRate,
     };
   }
 
   // Get recent crash reports
   getRecentCrashes(hours: number = 24): CrashReport[] {
     const cutoff = Date.now() - (hours * 3600000);
-    return this.crashes.filter(crash => crash.timestamp.getTime() > cutoff);
+    return this.crashes.filter((crash) => crash.timestamp.getTime() > cutoff);
   }
 
   // Clean up old crash reports
   cleanup(maxAge: number = 7 * 24 * 3600000): void { // 7 days default
     const cutoff = Date.now() - maxAge;
-    this.crashes = this.crashes.filter(crash => crash.timestamp.getTime() > cutoff);
-    
+    this.crashes = this.crashes.filter((crash) => crash.timestamp.getTime() > cutoff);
+
     // Clean up retry counters for old processes
-    const activeKeys = new Set(this.crashes.map(crash => `${crash.processType}_${crash.processId}`));
+    const activeKeys = new Set(
+      this.crashes.map((crash) => `${crash.processType}_${crash.processId}`),
+    );
     for (const key of this.retryCounters.keys()) {
       if (!activeKeys.has(key)) {
         this.retryCounters.delete(key);
@@ -258,51 +260,48 @@ export class ProcessCrashHandler {
 // Global process error handlers
 export function setupGlobalErrorHandlers(crashHandler: ProcessCrashHandler) {
   // Handle uncaught exceptions
-  globalThis.addEventListener('error', (event) => {
-    crashHandler.reportCrash('main', event.error, 'global', 'Uncaught exception');
+  globalThis.addEventListener("error", (event) => {
+    crashHandler.reportCrash("main", event.error, "global", "Uncaught exception");
   });
 
   // Handle unhandled promise rejections
-  globalThis.addEventListener('unhandledrejection', (event) => {
+  globalThis.addEventListener("unhandledrejection", (event) => {
     const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-    crashHandler.reportCrash('main', error, 'global', 'Unhandled promise rejection');
+    crashHandler.reportCrash("main", error, "global", "Unhandled promise rejection");
   });
 
   // Handle Deno-specific signals
   const handleSignal = (signal: string) => {
     console.log(`Received ${signal}, initiating graceful shutdown...`);
-    
+
     // Perform cleanup here
     crashHandler.cleanup();
-    
+
     // Exit after cleanup
     setTimeout(() => Deno.exit(0), 1000);
   };
 
   try {
-    // Cross-platform signal handling
-    const platform = Deno.build.os;
-    
     // SIGINT (Ctrl+C) is supported on all platforms
     Deno.addSignalListener("SIGINT", () => handleSignal("SIGINT"));
-    
+
     try {
       Deno.addSignalListener("SIGTERM", () => handleSignal("SIGTERM"));
-      console.log('Signal handlers registered (SIGINT, SIGTERM)');
+      console.log("Signal handlers registered (SIGINT, SIGTERM)");
     } catch (unixError) {
-      console.warn('Could not register SIGTERM handler:', unixError);
+      console.warn("Could not register SIGTERM handler:", unixError);
     }
   } catch (error) {
-    console.warn('Could not register signal handlers:', error);
+    console.warn("Could not register signal handlers:", error);
   }
 }
 
 // Wrapper function to automatically report crashes from async operations
 export function withCrashReporting<T extends any[], R>(
   crashHandler: ProcessCrashHandler,
-  processType: CrashReport['processType'],
+  processType: CrashReport["processType"],
   processId?: number | string,
-  context?: string
+  context?: string,
 ) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
@@ -315,7 +314,7 @@ export function withCrashReporting<T extends any[], R>(
           processType,
           error instanceof Error ? error : new Error(String(error)),
           processId,
-          `${target.constructor.name}.${propertyKey}: ${context || ''}`
+          `${target.constructor.name}.${propertyKey}: ${context || ""}`,
         );
         throw error;
       }
@@ -329,41 +328,41 @@ export function withCrashReporting<T extends any[], R>(
 export class ProcessHealthMonitor {
   private intervals = new Map<string, number>();
   private healthStatus = new Map<string, boolean>();
-  
+
   constructor(private crashHandler: ProcessCrashHandler) {}
 
   // Start monitoring a process
   startMonitoring(
     processId: string,
     checkFunction: () => Promise<boolean>,
-    interval: number = 30000
+    interval: number = 30000,
   ): void {
     this.stopMonitoring(processId); // Stop any existing monitoring
-    
+
     const intervalId = setInterval(async () => {
       try {
         const isHealthy = await checkFunction();
         this.healthStatus.set(processId, isHealthy);
-        
+
         if (!isHealthy) {
           await this.crashHandler.reportCrash(
-            'main',
-            new Error('Health check failed'),
+            "main",
+            new Error("Health check failed"),
             processId,
-            'Process health monitor'
+            "Process health monitor",
           );
         }
       } catch (error) {
         this.healthStatus.set(processId, false);
         await this.crashHandler.reportCrash(
-          'main',
+          "main",
           error instanceof Error ? error : new Error(String(error)),
           processId,
-          'Health check error'
+          "Health check error",
         );
       }
     }, interval);
-    
+
     this.intervals.set(processId, intervalId);
   }
 

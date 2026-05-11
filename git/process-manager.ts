@@ -1,3 +1,4 @@
+/** @module git/process-manager — Manages worktree bot child processes (spawn, kill, list). */
 // Worktree bot process management
 import { killProcessCrossPlatform } from "../util/process.ts";
 import type { BotSettings } from "../types/shared.ts";
@@ -23,8 +24,9 @@ export class WorktreeBotManager {
     /** Bot mention settings to propagate to spawned bot */
     botSettings: BotSettings;
   }): Promise<void> {
-    const { fullPath, branch, actualCategoryName, discordToken, applicationId, botSettings } = config;
-    
+    const { fullPath, branch, actualCategoryName, discordToken, applicationId, botSettings } =
+      config;
+
     // Check if bot already exists for this path
     const existingBot = this.spawnedBots.get(fullPath);
     if (existingBot) {
@@ -50,7 +52,7 @@ export class WorktreeBotManager {
     });
 
     const childProcess = botProcess.spawn();
-    
+
     // Store the process info
     this.spawnedBots.set(fullPath, {
       process: childProcess,
@@ -63,7 +65,7 @@ export class WorktreeBotManager {
     // Monitor the process for completion
     this.monitorProcess(fullPath, childProcess);
 
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
     console.log(`Started worktree bot process: ${fullPath}`);
   }
 
@@ -73,7 +75,11 @@ export class WorktreeBotManager {
       const status = await process.status;
       console.log(`Worktree bot for ${path} exited with code ${status.code}`);
     } catch (error) {
-      console.log(`Worktree bot for ${path} terminated: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `Worktree bot for ${path} terminated: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     } finally {
       // Clean up from our tracking
       this.spawnedBots.delete(path);
@@ -102,7 +108,7 @@ export class WorktreeBotManager {
   // Kill all spawned worktree bots
   killAllWorktreeBots(): void {
     console.log(`Killing ${this.spawnedBots.size} worktree bot processes...`);
-    
+
     for (const [path, botInfo] of this.spawnedBots.entries()) {
       try {
         killProcessCrossPlatform(botInfo.process, "SIGTERM");
@@ -111,7 +117,7 @@ export class WorktreeBotManager {
         console.error(`Failed to kill worktree bot ${path}:`, error);
       }
     }
-    
+
     // Clear the tracking map
     this.spawnedBots.clear();
   }
@@ -133,7 +139,7 @@ export class WorktreeBotManager {
     }>;
   } {
     const now = new Date();
-    const bots = Array.from(this.spawnedBots.values()).map(bot => ({
+    const bots = Array.from(this.spawnedBots.values()).map((bot) => ({
       branch: bot.branch,
       workDir: bot.workDir,
       startTime: bot.startTime.toISOString(),

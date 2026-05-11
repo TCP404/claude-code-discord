@@ -1,2 +1,2 @@
-export { startAdminServer, type AdminServerOptions } from "./server.ts";
-
+/** @module admin — Barrel export for admin HTTP server. */
+export { type AdminServerOptions, startAdminServer } from "./server.ts";

@@ -7,7 +7,7 @@ import { exec as execCallback } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { ScreenshotResult, ScreenshotEnvironment } from "./types.ts";
+import type { ScreenshotEnvironment, ScreenshotResult } from "./types.ts";
 
 const exec = promisify(execCallback);
 
@@ -16,12 +16,12 @@ const exec = promisify(execCallback);
  */
 function hasDisplay(): boolean {
   const os = Deno.build.os;
-  
+
   // macOS - check if running in a GUI session
   if (os === "darwin") {
     return true; // Assume GUI on macOS
   }
-  
+
   // Linux - check DISPLAY environment variable
   const display = Deno.env.get("DISPLAY");
   return !!display;
@@ -30,7 +30,7 @@ function hasDisplay(): boolean {
 /**
  * Get screenshot environment information
  */
-export async function getScreenshotEnvironment(): Promise<ScreenshotEnvironment> {
+export function getScreenshotEnvironment(): ScreenshotEnvironment {
   const display = hasDisplay();
   const platform = Deno.build.os;
 
@@ -56,18 +56,18 @@ export async function getScreenshotEnvironment(): Promise<ScreenshotEnvironment>
  */
 export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise<ScreenshotResult> {
   const env = await getScreenshotEnvironment();
-  
+
   if (!env.canCapture) {
     return {
       success: false,
       error: env.reason || "Cannot capture screenshot",
     };
   }
-  
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `screenshot-${timestamp}.png`;
   const filePath = join(outputDir, filename);
-  
+
   try {
     switch (env.platform) {
       case "darwin": {
@@ -75,7 +75,7 @@ export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise
         await exec(`screencapture -x "${filePath}"`);
         break;
       }
-      
+
       case "linux": {
         // Try different Linux screenshot tools
         const tools = [
@@ -83,7 +83,7 @@ export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise
           `import -window root "${filePath}"`,
           `scrot "${filePath}"`,
         ];
-        
+
         let captured = false;
         for (const tool of tools) {
           try {
@@ -94,7 +94,7 @@ export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise
             // Try next tool
           }
         }
-        
+
         if (!captured) {
           return {
             success: false,
@@ -103,14 +103,14 @@ export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise
         }
         break;
       }
-      
+
       default:
         return {
           success: false,
           error: `Unsupported platform: ${env.platform}`,
         };
     }
-    
+
     // Verify the file was created
     if (existsSync(filePath)) {
       return {
@@ -127,12 +127,12 @@ export async function captureScreenshot(outputDir: string = Deno.cwd()): Promise
     // Extract just the core error message, avoiding command details
     const fullError = error instanceof Error ? error.message : String(error);
     // Try to extract just the meaningful part of the error
-    const cleanError = fullError.includes("error:") 
+    const cleanError = fullError.includes("error:")
       ? fullError.split("error:").pop()?.trim() || "Capture command failed"
-      : fullError.length > 200 
-        ? "Screenshot capture failed - check if you have display access"
-        : fullError;
-    
+      : fullError.length > 200
+      ? "Screenshot capture failed - check if you have display access"
+      : fullError;
+
     return {
       success: false,
       error: `Screenshot capture failed: ${cleanError}`,

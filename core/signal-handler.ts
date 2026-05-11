@@ -15,6 +15,8 @@ export interface CleanupContext {
   killAllWorktreeBots: () => void;
   /** AbortController for the Claude session, if active */
   getClaudeController: () => AbortController | null;
+  /** Callback to close all hot queries (streaming-input sessions) */
+  closeHotQueries?: () => Promise<void>;
   /** Callback to send shutdown notification */
   sendShutdownNotification: (signal: string) => Promise<void>;
   /** Callback to destroy the Discord client */
@@ -24,7 +26,7 @@ export interface CleanupContext {
 /**
  * Signal types that can trigger shutdown.
  */
-export type ShutdownSignal = 'SIGINT' | 'SIGTERM';
+export type ShutdownSignal = "SIGINT" | "SIGTERM";
 
 /**
  * Configuration for signal handler setup.
@@ -48,45 +50,54 @@ export interface SignalHandlerResult {
 
 /**
  * Creates the shutdown handler function.
- * 
+ *
  * @param ctx - Cleanup context with callbacks for shutdown operations
  * @param config - Configuration options
  * @returns Async function that handles the shutdown process
  */
 export function createShutdownHandler(
   ctx: CleanupContext,
-  config: SignalHandlerConfig = {}
+  config: SignalHandlerConfig = {},
 ): (signal: ShutdownSignal) => Promise<void> {
   const { exitDelay = 1000, verbose = true } = config;
-  
+
   return async (signal: ShutdownSignal): Promise<void> => {
     if (verbose) {
       console.log(`\n${signal} signal received. Stopping bot...`);
     }
-    
+
     try {
       // Stop all shell processes
       ctx.killAllShellProcesses();
-      
+
       // Kill all worktree bots
       ctx.killAllWorktreeBots();
-      
+
       // Cancel Claude Code session if active
       const claudeController = ctx.getClaudeController();
       if (claudeController) {
         claudeController.abort();
       }
-      
+
+      // Close all hot queries (streaming-input sessions)
+      if (ctx.closeHotQueries) {
+        try {
+          await ctx.closeHotQueries();
+        } catch (err) {
+          console.error("Error closing hot queries:", err);
+        }
+      }
+
       // Send shutdown notification
       await ctx.sendShutdownNotification(signal);
-      
+
       // Allow time for messages to be sent before destroying client
       setTimeout(() => {
         ctx.destroyClient();
         Deno.exit(0);
       }, exitDelay);
     } catch (error) {
-      console.error('Error during shutdown:', error);
+      console.error("Error during shutdown:", error);
       Deno.exit(1);
     }
   };
@@ -94,14 +105,14 @@ export function createShutdownHandler(
 
 /**
  * Register a signal listener with error handling.
- * 
+ *
  * @param signal - Signal to listen for
  * @param handler - Handler function to call when signal is received
  * @returns True if registration succeeded, error message if failed
  */
 function tryRegisterSignal(
   signal: Deno.Signal,
-  handler: () => void
+  handler: () => void,
 ): { success: true } | { success: false; error: string } {
   try {
     Deno.addSignalListener(signal, handler);
@@ -119,7 +130,7 @@ function tryRegisterSignal(
  */
 export function setupSignalHandlers(
   ctx: CleanupContext,
-  config: SignalHandlerConfig = {}
+  config: SignalHandlerConfig = {},
 ): SignalHandlerResult {
   const { verbose = true } = config;
 
@@ -132,24 +143,24 @@ export function setupSignalHandlers(
   const handleSignal = createShutdownHandler(ctx, config);
 
   // SIGINT (Ctrl+C)
-  const sigintResult = tryRegisterSignal('SIGINT', () => handleSignal('SIGINT'));
+  const sigintResult = tryRegisterSignal("SIGINT", () => handleSignal("SIGINT"));
   if (sigintResult.success) {
-    result.registeredSignals.push('SIGINT');
+    result.registeredSignals.push("SIGINT");
   } else {
-    result.failedSignals.push({ signal: 'SIGINT', error: sigintResult.error });
+    result.failedSignals.push({ signal: "SIGINT", error: sigintResult.error });
     if (verbose) {
-      console.warn('Could not register SIGINT handler:', sigintResult.error);
+      console.warn("Could not register SIGINT handler:", sigintResult.error);
     }
   }
 
   // SIGTERM
-  const sigtermResult = tryRegisterSignal('SIGTERM', () => handleSignal('SIGTERM'));
+  const sigtermResult = tryRegisterSignal("SIGTERM", () => handleSignal("SIGTERM"));
   if (sigtermResult.success) {
-    result.registeredSignals.push('SIGTERM');
+    result.registeredSignals.push("SIGTERM");
   } else {
-    result.failedSignals.push({ signal: 'SIGTERM', error: sigtermResult.error });
+    result.failedSignals.push({ signal: "SIGTERM", error: sigtermResult.error });
     if (verbose) {
-      console.warn('Could not register SIGTERM handler:', sigtermResult.error);
+      console.warn("Could not register SIGTERM handler:", sigtermResult.error);
     }
   }
 
@@ -159,7 +170,7 @@ export function setupSignalHandlers(
 /**
  * Remove all registered signal handlers.
  * Useful for cleanup in tests or when restarting signal handling.
- * 
+ *
  * @param signals - Array of signals to remove handlers for
  */
 export function removeSignalHandlers(signals: ShutdownSignal[]): void {

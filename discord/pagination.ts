@@ -1,4 +1,5 @@
-import type { EmbedData, ComponentData } from "./types.ts";
+/** @module discord/pagination — Paginated embed messages with navigation buttons. */
+import type { ComponentData, EmbedData } from "./types.ts";
 
 export interface PaginationOptions {
   pageSize?: number;
@@ -37,29 +38,29 @@ export function smartSplit(text: string, maxLength: number = 4000): string[] {
   }
 
   const chunks: string[] = [];
-  const lines = text.split('\n');
-  let currentChunk = '';
-  
+  const lines = text.split("\n");
+  let currentChunk = "";
+
   for (const line of lines) {
     // If adding this line would exceed the limit
     if (currentChunk.length + line.length + 1 > maxLength) {
       if (currentChunk) {
         chunks.push(currentChunk.trim());
-        currentChunk = '';
+        currentChunk = "";
       }
-      
+
       // If a single line is too long, split it at word boundaries
       if (line.length > maxLength) {
-        const words = line.split(' ');
-        let wordChunk = '';
-        
+        const words = line.split(" ");
+        let wordChunk = "";
+
         for (const word of words) {
           if (wordChunk.length + word.length + 1 > maxLength) {
             if (wordChunk) {
               chunks.push(wordChunk.trim());
-              wordChunk = '';
+              wordChunk = "";
             }
-            
+
             // If a single word is still too long, force split it
             if (word.length > maxLength) {
               for (let i = 0; i < word.length; i += maxLength) {
@@ -69,10 +70,10 @@ export function smartSplit(text: string, maxLength: number = 4000): string[] {
               wordChunk = word;
             }
           } else {
-            wordChunk += (wordChunk ? ' ' : '') + word;
+            wordChunk += (wordChunk ? " " : "") + word;
           }
         }
-        
+
         if (wordChunk) {
           currentChunk = wordChunk;
         }
@@ -80,28 +81,28 @@ export function smartSplit(text: string, maxLength: number = 4000): string[] {
         currentChunk = line;
       }
     } else {
-      currentChunk += (currentChunk ? '\n' : '') + line;
+      currentChunk += (currentChunk ? "\n" : "") + line;
     }
   }
-  
+
   if (currentChunk) {
     chunks.push(currentChunk.trim());
   }
-  
-  return chunks.filter(chunk => chunk.length > 0);
+
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
 // Create paginated content from long text
 export function createPaginatedEmbeds(
   title: string,
   content: string,
-  options: PaginationOptions = {}
+  options: PaginationOptions = {},
 ): PaginatedContent {
   const {
     pageSize = 4000,
     maxEmbedSize = 6000,
     includePageInfo = true,
-    color = 0x0099ff
+    color = 0x0099ff,
   } = options;
 
   const chunks = smartSplit(content, pageSize);
@@ -109,15 +110,15 @@ export function createPaginatedEmbeds(
   const totalPages = chunks.length;
 
   for (let i = 0; i < chunks.length; i++) {
-    const pageTitle = totalPages > 1 && includePageInfo 
+    const pageTitle = totalPages > 1 && includePageInfo
       ? `${title} (Page ${i + 1}/${totalPages})`
       : title;
 
     let description = chunks[i];
-    
+
     // Ensure we don't exceed Discord's embed limits
     if (description.length > maxEmbedSize) {
-      description = description.substring(0, maxEmbedSize - 3) + '...';
+      description = description.substring(0, maxEmbedSize - 3) + "...";
     }
 
     embeds.push({
@@ -125,9 +126,11 @@ export function createPaginatedEmbeds(
       title: pageTitle,
       description,
       timestamp: true,
-      footer: totalPages > 1 ? { 
-        text: `Page ${i + 1} of ${totalPages} • Use buttons to navigate` 
-      } : undefined
+      footer: totalPages > 1
+        ? {
+          text: `Page ${i + 1} of ${totalPages} • Use buttons to navigate`,
+        }
+        : undefined,
     });
   }
 
@@ -139,7 +142,7 @@ export function createPaginationButtons(
   paginationId: string,
   currentPage: number,
   totalPages: number,
-  disabled: boolean = false
+  disabled: boolean = false,
 ): ComponentData[] {
   if (totalPages <= 1) {
     return [];
@@ -147,40 +150,40 @@ export function createPaginationButtons(
 
   return [
     {
-      type: 'button',
+      type: "button",
       customId: `pagination:${paginationId}:first`,
-      label: '⏮️ First',
-      style: 'secondary',
-      disabled: disabled || currentPage === 0
+      label: "⏮️ First",
+      style: "secondary",
+      disabled: disabled || currentPage === 0,
     },
     {
-      type: 'button',
+      type: "button",
       customId: `pagination:${paginationId}:prev`,
-      label: '⬅️ Previous',
-      style: 'secondary',
-      disabled: disabled || currentPage === 0
+      label: "⬅️ Previous",
+      style: "secondary",
+      disabled: disabled || currentPage === 0,
     },
     {
-      type: 'button',
+      type: "button",
       customId: `pagination:${paginationId}:info`,
       label: `${currentPage + 1}/${totalPages}`,
-      style: 'primary',
-      disabled: true
+      style: "primary",
+      disabled: true,
     },
     {
-      type: 'button',
+      type: "button",
       customId: `pagination:${paginationId}:next`,
-      label: '➡️ Next',
-      style: 'secondary',
-      disabled: disabled || currentPage === totalPages - 1
+      label: "➡️ Next",
+      style: "secondary",
+      disabled: disabled || currentPage === totalPages - 1,
     },
     {
-      type: 'button',
+      type: "button",
       customId: `pagination:${paginationId}:last`,
-      label: '⏭️ Last',
-      style: 'secondary',
-      disabled: disabled || currentPage === totalPages - 1
-    }
+      label: "⏭️ Last",
+      style: "secondary",
+      disabled: disabled || currentPage === totalPages - 1,
+    },
   ];
 }
 
@@ -188,14 +191,14 @@ export function createPaginationButtons(
 export function initializePagination(
   title: string,
   content: string,
-  options: PaginationOptions = {}
+  options: PaginationOptions = {},
 ): { paginationId: string; embed: EmbedData; components?: ComponentData[] } {
   const paginatedContent = createPaginatedEmbeds(title, content, options);
-  
+
   if (paginatedContent.totalPages <= 1) {
     return {
-      paginationId: '',
-      embed: paginatedContent.embeds[0]
+      paginationId: "",
+      embed: paginatedContent.embeds[0],
     };
   }
 
@@ -205,7 +208,7 @@ export function initializePagination(
     totalPages: paginatedContent.totalPages,
     content: smartSplit(content, options.pageSize || 4000),
     options,
-    title
+    title,
   };
 
   paginationStates.set(paginationId, paginationState);
@@ -215,42 +218,42 @@ export function initializePagination(
   return {
     paginationId,
     embed: paginatedContent.embeds[0],
-    components: buttons.length > 0 ? buttons : undefined
+    components: buttons.length > 0 ? buttons : undefined,
   };
 }
 
 // Handle pagination button interactions
 export function handlePaginationInteraction(
-  buttonId: string
+  buttonId: string,
 ): { embed: EmbedData; components?: ComponentData[] } | null {
-  const parts = buttonId.split(':');
-  if (parts.length !== 3 || parts[0] !== 'pagination') {
+  const parts = buttonId.split(":");
+  if (parts.length !== 3 || parts[0] !== "pagination") {
     return null;
   }
 
   const [, paginationId, action] = parts;
   const state = paginationStates.get(paginationId);
-  
+
   if (!state) {
     return null;
   }
 
   let newPage = state.currentPage;
-  
+
   switch (action) {
-    case 'first':
+    case "first":
       newPage = 0;
       break;
-    case 'prev':
+    case "prev":
       newPage = Math.max(0, state.currentPage - 1);
       break;
-    case 'next':
+    case "next":
       newPage = Math.min(state.totalPages - 1, state.currentPage + 1);
       break;
-    case 'last':
+    case "last":
       newPage = state.totalPages - 1;
       break;
-    case 'info':
+    case "info":
       return null; // Info button doesn't change page
     default:
       return null;
@@ -263,7 +266,7 @@ export function handlePaginationInteraction(
   const paginatedContent = createPaginatedEmbeds(
     state.title,
     state.content[newPage],
-    { ...state.options, includePageInfo: true }
+    { ...state.options, includePageInfo: true },
   );
 
   const buttons = createPaginationButtons(paginationId, newPage, state.totalPages);
@@ -273,9 +276,9 @@ export function handlePaginationInteraction(
       ...paginatedContent.embeds[0],
       title: state.options.includePageInfo !== false
         ? `${state.title} (Page ${newPage + 1}/${state.totalPages})`
-        : state.title
+        : state.title,
     },
-    components: buttons.length > 0 ? buttons : undefined
+    components: buttons.length > 0 ? buttons : undefined,
   };
 }
 
@@ -283,15 +286,15 @@ export function handlePaginationInteraction(
 export function cleanupPaginationStates(maxAge: number = 3600000): void { // 1 hour default
   const now = Date.now();
   const toDelete: string[] = [];
-  
-  for (const [id, state] of paginationStates.entries()) {
+
+  for (const [id, _state] of paginationStates.entries()) {
     // Extract timestamp from pagination ID
-    const timestamp = parseInt(id.split('_')[1]);
+    const timestamp = parseInt(id.split("_")[1]);
     if (now - timestamp > maxAge) {
       toDelete.push(id);
     }
   }
-  
+
   for (const id of toDelete) {
     paginationStates.delete(id);
   }
@@ -307,19 +310,21 @@ export function createPaginatedMessage(
   title: string,
   content: string,
   codeBlock?: string,
-  options: PaginationOptions = {}
-): { embed: EmbedData; components?: Array<{ type: 'actionRow'; components: ComponentData[] }> } {
+  options: PaginationOptions = {},
+): { embed: EmbedData; components?: Array<{ type: "actionRow"; components: ComponentData[] }> } {
   let processedContent = content;
-  
+
   // Add code block formatting if specified
   if (codeBlock) {
     processedContent = `\`\`\`${codeBlock}\n${content}\n\`\`\``;
   }
 
   const result = initializePagination(title, processedContent, options);
-  
+
   return {
     embed: result.embed,
-    components: result.components ? [{ type: 'actionRow', components: result.components }] : undefined
+    components: result.components
+      ? [{ type: "actionRow", components: result.components }]
+      : undefined,
   };
 }

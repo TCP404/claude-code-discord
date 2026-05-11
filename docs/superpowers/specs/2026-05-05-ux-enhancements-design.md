@@ -49,13 +49,13 @@ Replace the current "detect file path → show button" flow with type-aware inli
 
 ### Preview Rules
 
-| File Type | Extensions | Preview | Size Limit | Fallback |
-|-----------|-----------|---------|------------|----------|
-| Image | png, jpg, jpeg, gif, webp | Inline attachment (Discord auto-embeds) | 10 MB | Button |
-| PDF | pdf | First-page PNG via `sips` + page count text | N/A | Button + page count text |
-| Code | ts, js, py, go, rs, java, c, cpp, h, sh, sql, json, yaml, toml, md | First 20 lines in fenced code block + "View full file" button | 100 KB | Button only |
-| CSV | csv | First 5 rows as Markdown table + row count | 50 KB | Row count + button |
-| Other | zip, tar, gz, etc. | No preview (existing button behavior) | — | — |
+| File Type | Extensions                                                         | Preview                                                       | Size Limit | Fallback                 |
+| --------- | ------------------------------------------------------------------ | ------------------------------------------------------------- | ---------- | ------------------------ |
+| Image     | png, jpg, jpeg, gif, webp                                          | Inline attachment (Discord auto-embeds)                       | 10 MB      | Button                   |
+| PDF       | pdf                                                                | First-page PNG via `sips` + page count text                   | N/A        | Button + page count text |
+| Code      | ts, js, py, go, rs, java, c, cpp, h, sh, sql, json, yaml, toml, md | First 20 lines in fenced code block + "View full file" button | 100 KB     | Button only              |
+| CSV       | csv                                                                | First 5 rows as Markdown table + row count                    | 50 KB      | Row count + button       |
+| Other     | zip, tar, gz, etc.                                                 | No preview (existing button behavior)                         | —          | —                        |
 
 ### Implementation
 
@@ -64,8 +64,8 @@ New function in `claude/discord-sender.ts`:
 ```typescript
 async function previewFile(
   filePath: string,
-  sender: DiscordSender
-): Promise<void>
+  sender: DiscordSender,
+): Promise<void>;
 ```
 
 Dispatches based on extension. Returns without error on failure (silent fallback to button).
@@ -87,7 +87,7 @@ await sender.sendMessage({ files: [{ path: filePath, name: basename(filePath) }]
 ```typescript
 const tmpPng = `/tmp/pdf-preview-${Date.now()}.png`;
 const cmd = new Deno.Command("sips", {
-  args: ["-s", "format", "png", filePath, "--out", tmpPng]
+  args: ["-s", "format", "png", filePath, "--out", tmpPng],
 });
 const result = await cmd.output();
 if (result.success) {
@@ -103,9 +103,9 @@ Note: `sips` on macOS can convert PDF first page to PNG. On Linux, fallback to `
 
 ```typescript
 const content = await Deno.readTextFile(filePath);
-const lines = content.split('\n').slice(0, 20);
+const lines = content.split("\n").slice(0, 20);
 const ext = extname(filePath).slice(1);
-const codeBlock = `\`\`\`${ext}\n${lines.join('\n')}\n\`\`\``;
+const codeBlock = `\`\`\`${ext}\n${lines.join("\n")}\n\`\`\``;
 // Send code block + "View full file" button if file has more than 20 lines
 ```
 
@@ -113,7 +113,7 @@ const codeBlock = `\`\`\`${ext}\n${lines.join('\n')}\n\`\`\``;
 
 ```typescript
 const content = await Deno.readTextFile(filePath);
-const lines = content.split('\n');
+const lines = content.split("\n");
 const totalRows = lines.length - 1; // minus header
 const previewLines = lines.slice(0, 6); // header + 5 rows
 // Format as Markdown table
@@ -142,9 +142,9 @@ Images no longer go through `pendingFileUploads` map since they're sent inline. 
 
 ```typescript
 interface SessionUsage {
-  totalCost: number;      // cumulative USD
-  totalDuration: number;  // cumulative ms
-  queryCount: number;     // number of queries in session
+  totalCost: number; // cumulative USD
+  totalDuration: number; // cumulative ms
+  queryCount: number; // number of queries in session
 }
 
 const sessionUsageMap = new Map<string, SessionUsage>();
@@ -201,7 +201,7 @@ The completion message handler in `discord-sender.ts` needs access to `sessionId
 
 - Pass `sessionId` in the `options` parameter of `createClaudeSender()`:
   ```typescript
-  createClaudeSender(sender, { isThread, sessionId })
+  createClaudeSender(sender, { isThread, sessionId });
   ```
 - Update `sessionId` dynamically (since it may be assigned after first query), expose a setter on the returned sender function.
 
@@ -211,12 +211,12 @@ Recommended: pass via options, update when sessionId changes.
 
 ## Summary of Files to Modify
 
-| File | Changes |
-|------|---------|
-| `claude/client.ts` | Add `onTyping` callback, call `recordUsage()` at query end |
-| `claude/discord-sender.ts` | Add `previewFile()`, modify file detection flow, extend completion embed with cumulative usage |
-| `claude/session-usage.ts` | **New file** — session usage tracking module |
-| Command handlers (index.ts / handler-registry.ts) | Pass `onTyping` callback, pass `sessionId` to sender |
+| File                                              | Changes                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `claude/client.ts`                                | Add `onTyping` callback, call `recordUsage()` at query end                                     |
+| `claude/discord-sender.ts`                        | Add `previewFile()`, modify file detection flow, extend completion embed with cumulative usage |
+| `claude/session-usage.ts`                         | **New file** — session usage tracking module                                                   |
+| Command handlers (index.ts / handler-registry.ts) | Pass `onTyping` callback, pass `sessionId` to sender                                           |
 
 ## Dependencies
 

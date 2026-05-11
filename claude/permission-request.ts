@@ -38,7 +38,7 @@ const INPUT_PREVIEW_MAX = 800;
 function truncateJson(obj: Record<string, unknown>, maxLen: number): string {
   const raw = JSON.stringify(obj, null, 2);
   if (raw.length <= maxLen) return raw;
-  return raw.slice(0, maxLen) + '\n… (truncated)';
+  return raw.slice(0, maxLen) + "\n… (truncated)";
 }
 
 /**
@@ -47,18 +47,18 @@ function truncateJson(obj: Record<string, unknown>, maxLen: number): string {
  */
 export function describeToolAction(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
-    case 'Bash':
-    case 'bash':
-      return `Run command: \`${String(input.command ?? input.cmd ?? '').slice(0, 200)}\``;
-    case 'Write':
-    case 'write':
-    case 'CreateFile':
-      return `Write file: \`${String(input.file_path ?? input.path ?? 'unknown')}\``;
-    case 'Edit':
-    case 'edit':
-      return `Edit file: \`${String(input.file_path ?? input.path ?? 'unknown')}\``;
-    case 'MultiEdit':
-      return `Multi-edit file: \`${String(input.file_path ?? input.path ?? 'unknown')}\``;
+    case "Bash":
+    case "bash":
+      return `Run command: \`${String(input.command ?? input.cmd ?? "").slice(0, 200)}\``;
+    case "Write":
+    case "write":
+    case "CreateFile":
+      return `Write file: \`${String(input.file_path ?? input.path ?? "unknown")}\``;
+    case "Edit":
+    case "edit":
+      return `Edit file: \`${String(input.file_path ?? input.path ?? "unknown")}\``;
+    case "MultiEdit":
+      return `Multi-edit file: \`${String(input.file_path ?? input.path ?? "unknown")}\``;
     default:
       return `Use tool: **${toolName}**`;
   }
@@ -83,12 +83,15 @@ export function buildPermissionEmbed(toolName: string, input: Record<string, unk
   return {
     color: 0xff9900, // Orange — "waiting for you"
     title: `🔐 Permission Request: ${toolName}`,
-    description: `Claude wants to ${action}\n\nClick **Allow** to proceed or **Deny** to block this action.`,
+    description:
+      `Claude wants to ${action}\n\nClick **Allow** to proceed or **Deny** to block this action.`,
     fields: [
-      { name: 'Tool', value: `\`${toolName}\``, inline: true },
-      { name: 'Input', value: `\`\`\`json\n${preview}\n\`\`\``, inline: false },
+      { name: "Tool", value: `\`${toolName}\``, inline: true },
+      { name: "Input", value: `\`\`\`json\n${preview}\n\`\`\``, inline: false },
     ],
-    footer: { text: 'Claude is waiting for your decision — this controls what tools are permitted' },
+    footer: {
+      text: "Claude is waiting for your decision — this controls what tools are permitted",
+    },
   };
 }
 
@@ -97,8 +100,10 @@ export function buildPermissionEmbed(toolName: string, input: Record<string, unk
  *
  * Custom IDs follow the pattern: `perm-req:<nonce>:allow` or `perm-req:<nonce>:deny`.
  */
-export function parsePermissionButtonId(customId: string): { nonce: string; allowed: boolean } | null {
+export function parsePermissionButtonId(
+  customId: string,
+): { nonce: string; allowed: boolean } | null {
   const match = customId.match(/^perm-req:([^:]+):(allow|deny)$/);
   if (!match) return null;
-  return { nonce: match[1], allowed: match[2] === 'allow' };
+  return { nonce: match[1], allowed: match[2] === "allow" };
 }

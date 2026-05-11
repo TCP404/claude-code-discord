@@ -1,4 +1,10 @@
-import type { ShellProcess, ShellExecutionResult, ShellInputResult, ShellKillResult } from "./types.ts";
+/** @module shell/handler — ShellManager: spawns, tracks, and kills shell processes. */
+import type {
+  ShellExecutionResult,
+  ShellInputResult,
+  ShellKillResult,
+  ShellProcess,
+} from "./types.ts";
 import { detectPlatform, getShellCommand } from "../util/platform.ts";
 import { killProcessCrossPlatform } from "../util/process.ts";
 
@@ -13,27 +19,30 @@ export class ShellManager {
     this.platform = detectPlatform();
   }
 
-  // deno-lint-ignore no-explicit-any
-  async execute(command: string, input?: string, discordContext?: any): Promise<ShellExecutionResult> {
+  async execute(
+    command: string,
+    input?: string,
+    discordContext?: any,
+  ): Promise<ShellExecutionResult> {
     const processId = ++this.processIdCounter;
-    let output = '';
+    let output = "";
     const outputCallbacks: ((data: string) => void)[] = [];
     const completeCallbacks: ((code: number, output: string) => void)[] = [];
     const errorCallbacks: ((error: Error) => void)[] = [];
 
     // Cross-platform command handling
     let modifiedCommand = command;
-    
+
     // Handle Python3 buffering issues by adding -u flag for unbuffered output
-    if (command.trim().startsWith('python3') && !command.includes('-u')) {
-      modifiedCommand = command.replace(/^python3\s*/, 'python3 -u ');
-    } else if (command.trim() === 'python3') {
-      modifiedCommand = 'python3 -u';
+    if (command.trim().startsWith("python3") && !command.includes("-u")) {
+      modifiedCommand = command.replace(/^python3\s*/, "python3 -u ");
+    } else if (command.trim() === "python3") {
+      modifiedCommand = "python3 -u";
     }
 
     // Get platform-appropriate shell command
     const shellCmd = getShellCommand();
-    
+
     const proc = new Deno.Command(shellCmd[0], {
       args: [...shellCmd.slice(1), modifiedCommand],
       cwd: this.workDir,
@@ -51,11 +60,11 @@ export class ShellManager {
       child,
       stdin,
       discordContext,
-      outputSinceLastUpdate: '',
+      outputSinceLastUpdate: "",
     });
 
     if (input) {
-      await stdin.write(new TextEncoder().encode(input + '\n'));
+      await stdin.write(new TextEncoder().encode(input + "\n"));
     }
 
     const decoder = new TextDecoder();
@@ -73,10 +82,10 @@ export class ShellManager {
           if (process) {
             process.outputSinceLastUpdate += text;
           }
-          outputCallbacks.forEach(cb => cb(text));
+          outputCallbacks.forEach((cb) => cb(text));
         }
       } catch (error) {
-        console.error('stdout read error:', error);
+        console.error("stdout read error:", error);
       }
     })();
 
@@ -93,19 +102,19 @@ export class ShellManager {
           if (process) {
             process.outputSinceLastUpdate += text;
           }
-          outputCallbacks.forEach(cb => cb(text));
+          outputCallbacks.forEach((cb) => cb(text));
         }
       } catch (error) {
-        console.error('stderr read error:', error);
+        console.error("stderr read error:", error);
       }
     })();
 
     child.status.then((status) => {
       this.runningProcesses.delete(processId);
-      completeCallbacks.forEach(cb => cb(status.code, output));
+      completeCallbacks.forEach((cb) => cb(status.code, output));
     }).catch((error) => {
       this.runningProcesses.delete(processId);
-      errorCallbacks.forEach(cb => cb(error));
+      errorCallbacks.forEach((cb) => cb(error));
     });
 
     return {
@@ -129,7 +138,7 @@ export class ShellManager {
     }
 
     try {
-      await process.stdin.write(new TextEncoder().encode(text + '\n'));
+      await process.stdin.write(new TextEncoder().encode(text + "\n"));
       return { success: true, process };
     } catch (error) {
       console.error(`Failed to send input to process ${processId}:`, error);
@@ -144,11 +153,11 @@ export class ShellManager {
   getNewOutput(processId: number): string {
     const process = this.runningProcesses.get(processId);
     if (!process) {
-      return '';
+      return "";
     }
-    
-    const newOutput = process.outputSinceLastUpdate || '';
-    process.outputSinceLastUpdate = ''; // Clear after getting
+
+    const newOutput = process.outputSinceLastUpdate || "";
+    process.outputSinceLastUpdate = ""; // Clear after getting
     return newOutput;
   }
 

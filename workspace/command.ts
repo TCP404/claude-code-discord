@@ -1,3 +1,4 @@
+/** @module workspace/command — /workspace add|remove|list command definition and handlers. */
 import { ChannelType, SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import type { WorkspaceManager } from "../core/workspace-manager.ts";
 import type { SessionThreadManager } from "../discord/session-threads.ts";
@@ -59,9 +60,7 @@ export const workspaceCommands = [
 export interface WorkspaceHandlerDeps {
   workspaceManager: WorkspaceManager;
   sessionThreadManager: SessionThreadManager;
-  // deno-lint-ignore no-explicit-any
   getGuild: () => any;
-  // deno-lint-ignore no-explicit-any
   getCategory: () => any;
 }
 
@@ -69,7 +68,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
   const { workspaceManager, sessionThreadManager, getGuild, getCategory } = deps;
 
   return {
-    // deno-lint-ignore no-explicit-any
     async onWorkspace(ctx: any) {
       const subcommand = ctx.getSubcommand();
 
@@ -87,7 +85,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     },
   };
 
-  // deno-lint-ignore no-explicit-any
   async function handleAutoThread(ctx: any) {
     const name = ctx.getString("name", true);
     const enabled = ctx.getBoolean("enabled", true);
@@ -118,7 +115,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     });
   }
 
-  // deno-lint-ignore no-explicit-any
   async function handleAdd(ctx: any) {
     const name = ctx.getString("name", true);
     const workPath = ctx.getString("path", true);
@@ -182,7 +178,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     }
   }
 
-  // deno-lint-ignore no-explicit-any
   async function handleList(ctx: any) {
     const workspaces = workspaceManager.list();
 
@@ -211,7 +206,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     });
   }
 
-  // deno-lint-ignore no-explicit-any
   async function handleRemove(ctx: any) {
     const name = ctx.getString("name", true);
 
@@ -246,7 +240,6 @@ export function createWorkspaceHandlers(deps: WorkspaceHandlerDeps) {
     });
   }
 
-  // deno-lint-ignore no-explicit-any
   async function handleListSessions(ctx: any) {
     const channelId = ctx.getChannelId();
     const sessions = sessionThreadManager.getSessionsByChannel(channelId);

@@ -18,17 +18,21 @@ export function createScreenshotHandlers(deps: ScreenshotHandlerDeps) {
   return {
     async screenshot(ctx: InteractionContext): Promise<void> {
       await ctx.deferReply();
-      
+
       // Check if screenshot is available in this environment
       const env = await getScreenshotEnvironment();
-      
+
       if (!env.canCapture) {
         await ctx.editReply({
-          content: `❌ **Screenshot Not Available**\n\n${env.reason || "Cannot capture screenshot in this environment."}\n\n**Environment Details:**\n• Platform: ${env.platform}\n• Docker: ${env.isDocker ? "Yes" : "No"}\n• Display: ${env.hasDisplay ? "Available" : "Not available"}`,
+          content: `❌ **Screenshot Not Available**\n\n${
+            env.reason || "Cannot capture screenshot in this environment."
+          }\n\n**Environment Details:**\n• Platform: ${env.platform}\n• Docker: ${
+            env.isDocker ? "Yes" : "No"
+          }\n• Display: ${env.hasDisplay ? "Available" : "Not available"}`,
         });
         return;
       }
-      
+
       // Get delay parameter
       const delayStr = ctx.getString("delay");
       let delay = 0;
@@ -38,39 +42,43 @@ export function createScreenshotHandlers(deps: ScreenshotHandlerDeps) {
           await ctx.editReply({
             content: `⏳ Capturing screenshot in ${delay} seconds...`,
           });
-          await new Promise(resolve => setTimeout(resolve, delay * 1000));
+          await new Promise((resolve) => setTimeout(resolve, delay * 1000));
         }
       }
-      
+
       await ctx.editReply({
         content: "📸 Capturing screenshot...",
       });
-      
+
       // Capture screenshot
       const result = await captureScreenshot(workDir);
-      
+
       if (!result.success || !result.filePath) {
         // Truncate error message to stay under Discord's 2000 char limit
         const errorMsg = result.error || "Unknown error occurred.";
-        const truncatedError = errorMsg.length > 500 ? errorMsg.substring(0, 500) + "..." : errorMsg;
-        
+        const truncatedError = errorMsg.length > 500
+          ? errorMsg.substring(0, 500) + "..."
+          : errorMsg;
+
         await ctx.editReply({
           content: `❌ **Screenshot Failed**\n\n${truncatedError}`,
         });
         return;
       }
-      
+
       try {
         // Send the screenshot with file attachment
         await ctx.editReply({
-          content: `📸 **Screenshot Captured**\n\n• Platform: ${env.platform}\n• Time: ${new Date().toLocaleString()}`,
+          content: `📸 **Screenshot Captured**\n\n• Platform: ${env.platform}\n• Time: ${
+            new Date().toLocaleString()
+          }`,
           files: [{
             path: result.filePath,
             name: "screenshot.png",
             description: "Screenshot of host machine",
           }],
         });
-        
+
         // Clean up the temporary file after a short delay to ensure upload completes
         setTimeout(async () => {
           await cleanupScreenshot(result.filePath!);
@@ -78,12 +86,14 @@ export function createScreenshotHandlers(deps: ScreenshotHandlerDeps) {
       } catch (error) {
         // Truncate error message for Discord
         const errMessage = error instanceof Error ? error.message : "Could not upload screenshot.";
-        const truncatedErr = errMessage.length > 500 ? errMessage.substring(0, 500) + "..." : errMessage;
-        
+        const truncatedErr = errMessage.length > 500
+          ? errMessage.substring(0, 500) + "..."
+          : errMessage;
+
         await ctx.editReply({
           content: `❌ **Upload Failed**\n\n${truncatedErr}`,
         });
-        
+
         // Clean up on error
         await cleanupScreenshot(result.filePath);
       }

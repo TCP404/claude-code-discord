@@ -1,4 +1,4 @@
-// Discord module types
+/** @module discord/types — Shared type definitions for the Discord layer. */
 import type { TextChannel } from "npm:discord.js@14.14.1";
 import type { BotSettings } from "../types/shared.ts";
 
@@ -88,9 +88,7 @@ export type ButtonHandlers = Map<string, ButtonHandler>;
 export interface SlashCommand {
   name: string;
   description: string;
-  // deno-lint-ignore no-explicit-any
   options?: any[];
-  // deno-lint-ignore no-explicit-any
   toJSON(): any;
 }
 
@@ -126,8 +124,6 @@ export interface BotDependencies {
   cleanSessionId?: (sessionId: string) => string;
   /** Optional bot settings for mention functionality */
   botSettings?: BotSettings;
-  /** Callback to actually continue a Claude session from a button click */
-  onContinueSession?: (ctx: InteractionContext) => Promise<void>;
   /** Optional channel monitoring config for auto-responding to messages */
   monitorConfig?: MonitorConfig;
   /** Callback for plain text messages in session threads (auto-resume) */

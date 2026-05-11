@@ -1,7 +1,7 @@
 /**
  * Configuration loader for the Claude Code Discord Bot.
  * Handles command-line argument parsing and environment variable validation.
- * 
+ *
  * @module core/config-loader
  */
 
@@ -61,21 +61,21 @@ export interface ConfigLoaderDeps {
 
 /**
  * Parse command-line arguments into structured format.
- * 
+ *
  * Supports the following argument formats:
  * - `--category <value>` or `--category=<value>`
  * - `--user-id <value>` or `--user-id=<value>`
  * - Positional arguments (backward compatibility): `<category> [userId]`
- * 
+ *
  * @param args - Array of command-line arguments
  * @returns Parsed arguments object
- * 
+ *
  * @example
  * ```typescript
  * // Named arguments
  * parseArgs(['--category', 'my-project', '--user-id', '123456'])
  * // => { category: 'my-project', userId: '123456' }
- * 
+ *
  * // Positional arguments (legacy support)
  * parseArgs(['my-project', '123456'])
  * // => { category: 'my-project', userId: '123456' }
@@ -83,21 +83,21 @@ export interface ConfigLoaderDeps {
  */
 export function parseArgs(args: string[]): ParsedArgs {
   const result: ParsedArgs = {};
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
-    if (arg === '--category' && i + 1 < args.length) {
+
+    if (arg === "--category" && i + 1 < args.length) {
       result.category = args[i + 1];
       i++; // Skip next argument
-    } else if (arg === '--user-id' && i + 1 < args.length) {
+    } else if (arg === "--user-id" && i + 1 < args.length) {
       result.userId = args[i + 1];
       i++; // Skip next argument
-    } else if (arg.startsWith('--category=')) {
-      result.category = arg.split('=')[1];
-    } else if (arg.startsWith('--user-id=')) {
-      result.userId = arg.split('=')[1];
-    } else if (!arg.startsWith('--')) {
+    } else if (arg.startsWith("--category=")) {
+      result.category = arg.split("=")[1];
+    } else if (arg.startsWith("--user-id=")) {
+      result.userId = arg.split("=")[1];
+    } else if (!arg.startsWith("--")) {
       // Positional arguments for backward compatibility
       if (!result.category) {
         result.category = arg;
@@ -106,13 +106,13 @@ export function parseArgs(args: string[]): ParsedArgs {
       }
     }
   }
-  
+
   return result;
 }
 
 /**
  * Load environment variables into structured format.
- * 
+ *
  * @param getEnv - Function to retrieve environment variables
  * @returns Environment configuration object
  */
@@ -131,30 +131,30 @@ export function loadEnvConfig(getEnv: (key: string) => string | undefined): EnvC
 export class ConfigurationError extends Error {
   /** List of missing required configuration keys */
   readonly missingKeys: string[];
-  
+
   constructor(missingKeys: string[]) {
-    super(`Missing required configuration: ${missingKeys.join(', ')}`);
-    this.name = 'ConfigurationError';
+    super(`Missing required configuration: ${missingKeys.join(", ")}`);
+    this.name = "ConfigurationError";
     this.missingKeys = missingKeys;
   }
 }
 
 /**
  * Validate that all required environment variables are present.
- * 
+ *
  * @param envConfig - Environment configuration to validate
  * @throws {ConfigurationError} If required variables are missing
  */
 export function validateEnvConfig(envConfig: EnvConfig): void {
   const missing: string[] = [];
-  
+
   if (!envConfig.discordToken) {
-    missing.push('DISCORD_TOKEN');
+    missing.push("DISCORD_TOKEN");
   }
   if (!envConfig.applicationId) {
-    missing.push('APPLICATION_ID');
+    missing.push("APPLICATION_ID");
   }
-  
+
   if (missing.length > 0) {
     throw new ConfigurationError(missing);
   }
@@ -162,20 +162,20 @@ export function validateEnvConfig(envConfig: EnvConfig): void {
 
 /**
  * Load complete application configuration from environment and CLI arguments.
- * 
+ *
  * This function combines environment variables and command-line arguments
  * to produce the final configuration. CLI arguments take precedence over
  * environment variables for overlapping settings.
- * 
+ *
  * @param deps - Dependencies for loading configuration (defaults to Deno globals)
  * @returns Complete application configuration
  * @throws {ConfigurationError} If required configuration is missing
- * 
+ *
  * @example
  * ```typescript
  * // Using defaults (Deno environment)
  * const config = loadConfig();
- * 
+ *
  * // Using custom dependencies (for testing)
  * const config = loadConfig({
  *   getEnv: (key) => mockEnv[key],
@@ -189,16 +189,16 @@ export function loadConfig(deps?: Partial<ConfigLoaderDeps>): AppConfig {
   const getEnv = deps?.getEnv ?? ((key: string) => Deno.env.get(key));
   const getCwd = deps?.getCwd ?? (() => Deno.cwd());
   const args = deps?.args ?? Deno.args;
-  
+
   // Load environment configuration
   const envConfig = loadEnvConfig(getEnv);
-  
+
   // Validate required environment variables
   validateEnvConfig(envConfig);
-  
+
   // Parse command-line arguments
   const parsedArgs = parseArgs(args);
-  
+
   // Combine environment and CLI (CLI takes precedence)
   return {
     discordToken: envConfig.discordToken!,
@@ -212,7 +212,7 @@ export function loadConfig(deps?: Partial<ConfigLoaderDeps>): AppConfig {
 /**
  * Get configuration with validation, suitable for main entry point.
  * Logs errors and exits process on failure.
- * 
+ *
  * @param deps - Optional dependencies for testing
  * @returns Application configuration or exits process on error
  */
@@ -222,9 +222,9 @@ export function loadConfigOrExit(deps?: Partial<ConfigLoaderDeps>): AppConfig {
   } catch (error) {
     if (error instanceof ConfigurationError) {
       console.error(`Error: ${error.message}`);
-      console.error('Please set the required environment variables and try again.');
+      console.error("Please set the required environment variables and try again.");
     } else {
-      console.error('Configuration error:', error instanceof Error ? error.message : String(error));
+      console.error("Configuration error:", error instanceof Error ? error.message : String(error));
     }
     Deno.exit(1);
   }

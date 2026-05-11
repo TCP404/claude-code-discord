@@ -21,22 +21,24 @@ Run Claude Code through Discord without giving up anything you've already config
 
 <kbd>
 
-| Feature | Details |
-|---------|---------|
-| Thread-per-session | Each `/claude-thread` conversation gets its own Discord thread with custom names |
-| Session persistence & auto-resume | Sessions survive restarts; posting in a thread auto-resumes Claude |
-| Live status indicator | Compact, auto-updating status line for hidden tool/system messages |
-| MCP server injection | Loads `.claude/mcp.json` from project; all `mcp__*` tools auto-approved |
-| Config inheritance | Reads `CLAUDE.md`, `settings.local.json`, and user-level settings — same context as local CLI |
-| AWS Bedrock support | `/refresh-bedrock` for enterprise AWS SSO credential refresh |
-| Mid-session controls | Interrupt, change model, change permissions, stop tasks, and rewind without restarting |
-| Granular sandbox | Full SDK sandbox with network rules, filesystem ACLs, and excluded commands |
-| Role-based access control | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles |
-| Interactive permission prompts | Allow/Deny buttons when Claude wants to use unapproved tools |
-| Multi-workspace | Single bot instance manages multiple project channels, each with its own working directory |
-| Admin UI | Local HTTP server (localhost:7860) for workspace management |
-| Channel monitoring | Watch a channel for bot/webhook messages and auto-investigate in a thread |
-| Audit trail | Channel history provides a searchable record of who ran what and when |
+| Feature                           | Details                                                                                       |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| Thread-per-session                | Each `/claude-thread` conversation gets its own Discord thread with custom names              |
+| Session persistence & auto-resume | Sessions survive restarts; posting in a thread auto-resumes Claude                            |
+| Hot query reuse                   | Reuse SDK query instance in threads — subsequent messages skip 2-3s cold start                |
+| Multi-bot coexistence             | Skips messages @mentioning another bot; supports `THREAD_MENTION_ONLY` mode                   |
+| Live status indicator             | Compact, auto-updating status line for hidden tool/system messages                            |
+| MCP server injection              | Loads `.claude/mcp.json` from project; all `mcp__*` tools auto-approved                       |
+| Config inheritance                | Reads `CLAUDE.md`, `settings.local.json`, and user-level settings — same context as local CLI |
+| AWS Bedrock support               | `/refresh-bedrock` for enterprise AWS SSO credential refresh                                  |
+| Mid-session controls              | Interrupt, change model, change permissions, stop tasks, and rewind without restarting        |
+| Granular sandbox                  | Full SDK sandbox with network rules, filesystem ACLs, and excluded commands                   |
+| Role-based access control         | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles      |
+| Interactive permission prompts    | Allow/Deny buttons when Claude wants to use unapproved tools                                  |
+| Multi-workspace                   | Single bot instance manages multiple project channels, each with its own working directory    |
+| Admin UI                          | Local HTTP server (localhost:7860) for workspace management                                   |
+| Channel monitoring                | Watch a channel for bot/webhook messages and auto-investigate in a thread                     |
+| Audit trail                       | Channel history provides a searchable record of who ran what and when                         |
 
 </kbd>
 
@@ -54,13 +56,13 @@ If you insist on doing everything by hand in 2026, the skill source is right the
 
 ## Documentation
 
-| Doc | Description |
-| --- | --- |
-| [Discord Bot Setup](docs/setup-discord.md) | Create a Discord app, get your token and application ID, invite the bot |
-| [Commands](docs/commands.md) | Full reference for all 45+ slash commands |
-| [Features](docs/features.md) | Thinking modes, agents, MCP, rewind, structured output, mid-session controls |
-| [Architecture](docs/architecture.md) | Project structure and SDK integration details |
-| [Updating](docs/updating.md) | How to update (git pull, version check) |
+| Doc                                        | Description                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| [Discord Bot Setup](docs/setup-discord.md) | Create a Discord app, get your token and application ID, invite the bot      |
+| [Commands](docs/commands.md)               | Full reference for all 45+ slash commands                                    |
+| [Features](docs/features.md)               | Thinking modes, agents, MCP, rewind, structured output, mid-session controls |
+| [Architecture](docs/architecture.md)       | Project structure and SDK integration details                                |
+| [Updating](docs/updating.md)               | How to update (git pull, version check)                                      |
 
 ## Select Newest Model Available
 
@@ -101,24 +103,29 @@ MONITOR_CHANNEL_ID=123456789012345678    # Channel to monitor for alerts
 MONITOR_BOT_IDS=987654321,111111111      # Bot/webhook user IDs to trigger auto-investigation
 ```
 
-| Variable | Required | Description |
-| --- | :---: | --- |
-| `DISCORD_TOKEN` | **Yes** | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
-| `APPLICATION_ID` | **Yes** | Application ID from the Developer Portal |
-| `GUILD_ID` | No | Server ID for instant slash command registration |
-| `ANTHROPIC_API_KEY` | No | Enables dynamic model discovery; refreshes hourly |
-| `USER_ID` | No | Your Discord user ID — bot @mentions you when tasks finish |
-| `CATEGORY_NAME` | No | Discord category name for channels (default: repo name) |
-| `WORK_DIR` | No | Working directory for Claude operations (default: current dir) |
-| `CLAUDE_CODE_USE_BEDROCK` | No | Set to `1` to use AWS Bedrock instead of Anthropic API |
-| `AWS_PROFILE` | No | AWS SSO profile name (for Bedrock auth) |
-| `AWS_REGION` | No | AWS region for Bedrock |
-| `ANTHROPIC_MODEL` | No | Override default model (Bedrock ARN or Anthropic model ID) |
-| `ADMIN_ROLE_IDS` | No | Comma-separated role IDs for RBAC (shell, git, system, admin) |
-| `ADMIN_USER_IDS` | No | Comma-separated user IDs for RBAC — grants access regardless of roles |
-| `MONITOR_CHANNEL_ID` | No | Discord channel ID to watch for bot/webhook messages |
-| `MONITOR_BOT_IDS` | No | Comma-separated bot/webhook user IDs that trigger auto-investigation |
-| `ALLOW_ANY_CHANNEL` | No | Set to `true` to allow slash commands in any channel (default: false) |
+| Variable                  | Required | Description                                                                                |
+| ------------------------- | :------: | ------------------------------------------------------------------------------------------ |
+| `DISCORD_TOKEN`           | **Yes**  | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
+| `APPLICATION_ID`          | **Yes**  | Application ID from the Developer Portal                                                   |
+| `GUILD_ID`                |    No    | Server ID for instant slash command registration                                           |
+| `ANTHROPIC_API_KEY`       |    No    | Enables dynamic model discovery; refreshes hourly                                          |
+| `USER_ID`                 |    No    | Your Discord user ID — bot @mentions you when tasks finish                                 |
+| `CATEGORY_NAME`           |    No    | Discord category name for channels (default: repo name)                                    |
+| `WORK_DIR`                |    No    | Working directory for Claude operations (default: current dir)                             |
+| `CLAUDE_CODE_USE_BEDROCK` |    No    | Set to `1` to use AWS Bedrock instead of Anthropic API                                     |
+| `AWS_PROFILE`             |    No    | AWS SSO profile name (for Bedrock auth)                                                    |
+| `AWS_REGION`              |    No    | AWS region for Bedrock                                                                     |
+| `ANTHROPIC_MODEL`         |    No    | Override default model (Bedrock ARN or Anthropic model ID)                                 |
+| `ADMIN_ROLE_IDS`          |    No    | Comma-separated role IDs for RBAC (shell, git, system, admin)                              |
+| `ADMIN_USER_IDS`          |    No    | Comma-separated user IDs for RBAC — grants access regardless of roles                      |
+| `MONITOR_CHANNEL_ID`      |    No    | Discord channel ID to watch for bot/webhook messages                                       |
+| `MONITOR_BOT_IDS`         |    No    | Comma-separated bot/webhook user IDs that trigger auto-investigation                       |
+| `ALLOW_ANY_CHANNEL`       |    No    | Set to `true` to allow slash commands in any channel (default: false)                      |
+| `DEFAULT_PERMISSION_MODE` |    No    | Default SDK permission mode for new sessions (`acceptEdits`, `bypassPermissions`, etc)     |
+| `THREAD_MENTION_ONLY`     |    No    | Set to `true` to only respond in threads when @mentioned (default: false)                  |
+| `HOT_QUERY_ENABLED`       |    No    | Enable session reuse in threads for faster responses (default: true)                       |
+| `HOT_QUERY_MAX_SESSIONS`  |    No    | Max concurrent hot query sessions in LRU (default: 20)                                     |
+| `HOT_QUERY_IDLE_TIMEOUT_MS` |  No   | Idle timeout before evicting a hot query session (default: 300000 = 5 min)                 |
 
 > CLI flags override environment variables. Environment variables override `.env` file values.
 
@@ -174,10 +181,10 @@ npx deno run --allow-all index.ts
 npx deno run --allow-all index.ts --category myproject --user-id YOUR_DISCORD_ID
 ```
 
-| Flag | Env Variable | Description |
-| --- | --- | --- |
+| Flag                | Env Variable    | Description                                                 |
+| ------------------- | --------------- | ----------------------------------------------------------- |
 | `--category <name>` | `CATEGORY_NAME` | Discord category name for channels (default: `claude-code`) |
-| `--user-id <id>` | `USER_ID` | Your Discord user ID for mentions when tasks finish |
+| `--user-id <id>`    | `USER_ID`       | Your Discord user ID for mentions when tasks finish         |
 
 > CLI flags override environment variables. Environment variables override `.env` file values.
 

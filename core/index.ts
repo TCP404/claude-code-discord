@@ -1,121 +1,93 @@
-/**
- * Core module barrel export.
- * Provides centralized configuration and signal handling utilities.
- * 
- * @module core
- * 
- * @example
- * ```typescript
- * import { loadConfig, setupSignalHandlers } from "./core/index.ts";
- * 
- * // Load configuration from environment and CLI
- * const config = loadConfig();
- * 
- * // Setup graceful shutdown handlers
- * setupSignalHandlers({
- *   killAllShellProcesses: () => shellManager.killAll(),
- *   killAllWorktreeBots: () => worktreeManager.killAll(),
- *   getClaudeController: () => claudeController,
- *   sendShutdownNotification: async (signal) => { ... },
- *   destroyClient: () => client.destroy(),
- * });
- * ```
- */
+/** @module core — Barrel export for bot infrastructure (config, signal, factory, handlers). */
+//
+// Prefer importing from source files directly for better traceability.
+// This barrel exists for the top-level index.ts assembly.
+//
 
-// Configuration loading
 export {
-  type AppConfig,
-  type ParsedArgs,
-  type EnvConfig,
-  type ConfigLoaderDeps,
-  parseArgs,
-  loadEnvConfig,
-  validateEnvConfig,
+  ConfigurationError,
   loadConfig,
   loadConfigOrExit,
-  ConfigurationError,
+  loadEnvConfig,
+  parseArgs,
+  validateEnvConfig,
 } from "./config-loader.ts";
+export type { AppConfig, ConfigLoaderDeps, EnvConfig, ParsedArgs } from "./config-loader.ts";
 
-// Signal handling
 export {
-  type CleanupContext,
-  type ShutdownSignal,
-  type SignalHandlerConfig,
-  type SignalHandlerResult,
   createShutdownHandler,
-  setupSignalHandlers,
   removeSignalHandlers,
+  setupSignalHandlers,
+} from "./signal-handler.ts";
+export type {
+  CleanupContext,
+  ShutdownSignal,
+  SignalHandlerConfig,
+  SignalHandlerResult,
 } from "./signal-handler.ts";
 
-// Bot factory
 export {
-  type BotManagers,
-  type BotContext,
-  type CrashHandlerOptions,
-  type CrashReport,
-  type BotFactoryDeps,
-  type ValidationResult,
-  DEFAULT_CRASH_HANDLER_OPTIONS,
-  DEFAULT_CLEANUP_INTERVAL_MS,
+  createBotContext,
+  createBotContextOrThrow,
+  createBotManagers,
+  createCrashHandler,
   createShellManager,
   createWorktreeBotManager,
-  createClaudeSessionManager,
-  createCrashHandler,
-  createBotManagers,
+  DEFAULT_CLEANUP_INTERVAL_MS,
+  DEFAULT_CRASH_HANDLER_OPTIONS,
   setupPeriodicCleanup,
-  createBotContext,
-  validateBotFactoryDeps,
-  createBotContextOrThrow,
   shutdownBotContext,
+  validateBotFactoryDeps,
+} from "./bot-factory.ts";
+export type {
+  BotContext,
+  BotFactoryDeps,
+  BotManagers,
+  CrashHandlerOptions,
+  CrashReport,
+  ValidationResult,
 } from "./bot-factory.ts";
 
-// Handler registry
 export {
-  type MessageHistoryState,
-  type MessageHistoryOps,
-  type ClaudeSessionState,
-  type ClaudeSessionOps,
-  type BotSettingsState,
-  type BotSettingsOps,
-  type AllHandlers,
-  type HandlerRegistryDeps,
-  type HandlerRegistry,
-  createMessageHistory,
-  createClaudeSession,
-  createBotSettings,
-  createAllHandlers,
-  getAllCommands,
   cleanSessionId,
+  createAllHandlers,
+  createBotSettings,
+  createClaudeSession,
+  createMessageHistory,
+  getAllCommands,
+} from "./handler-registry.ts";
+export type {
+  AllHandlers,
+  BotSettingsOps,
+  BotSettingsState,
+  ClaudeSessionOps,
+  ClaudeSessionState,
+  HandlerRegistry,
+  HandlerRegistryDeps,
+  MessageHistoryOps,
+  MessageHistoryState,
 } from "./handler-registry.ts";
 
-// Button handlers
-export {
-  type ButtonHandlerDeps,
-  type ExpandableContentMap,
-  createButtonHandlers,
-  createExpandButtonHandler,
-} from "./button-handlers.ts";
+export { createButtonHandlers, createExpandButtonHandler } from "./button-handlers.ts";
+export type { ButtonHandlerDeps, ExpandableContentMap } from "./button-handlers.ts";
 
-// Command wrappers
 export {
-  type CommandWrapperDeps,
-  createSystemCommandHandlers,
-  createParameterizedSystemHandlers,
-  createClaudeCommandHandlers,
-  createSettingsCommandHandlers,
   createAllCommandHandlers,
+  createClaudeCommandHandlers,
+  createParameterizedSystemHandlers,
+  createSettingsCommandHandlers,
+  createSystemCommandHandlers,
 } from "./command-wrappers.ts";
+export type { CommandWrapperDeps } from "./command-wrappers.ts";
 
-// Git and Shell handlers
 export {
-  type GitShellHandlerDeps,
   createGitCommandHandlers,
   createShellCommandHandlers,
   createUtilityCommandHandlers,
 } from "./git-shell-handlers.ts";
+export type { GitShellHandlerDeps } from "./git-shell-handlers.ts";
 
-// Workspace manager
-export {
-  type WorkspaceEntry,
-  WorkspaceManager,
-} from "./workspace-manager.ts";
+export { WorkspaceManager } from "./workspace-manager.ts";
+export type { WorkspaceEntry } from "./workspace-manager.ts";
+
+export { loadEnvFile } from "./env-loader.ts";

@@ -9,7 +9,6 @@ export interface WorkspaceEntry {
   name: string;
   path: string;
   channelId: string;
-  /** When true, plain text messages in this workspace channel auto-open a Claude thread. */
   autoThread?: boolean;
 }
 

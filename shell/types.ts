@@ -1,9 +1,9 @@
+/** @module shell/types — Type definitions for shell process management. */
 export interface ShellProcess {
   command: string;
   startTime: Date;
   child: Deno.ChildProcess;
   stdin?: WritableStreamDefaultWriter;
-  // deno-lint-ignore no-explicit-any
   discordContext?: any;
   outputSinceLastUpdate?: string;
 }

@@ -9,7 +9,7 @@
  * @module claude/user-question
  */
 
-import type { EmbedData, ComponentData, MessageContent } from "../discord/types.ts";
+import type { ComponentData, EmbedData, MessageContent } from "../discord/types.ts";
 
 // ================================
 // Types (matches SDK AskUserQuestion schema)
@@ -82,33 +82,33 @@ export function buildQuestionMessages(questions: AskUserQuestionItem[]): Message
       })),
       footer: {
         text: q.multiSelect
-          ? 'Select one or more options, then click Confirm'
-          : 'Click an option to answer',
+          ? "Select one or more options, then click Confirm"
+          : "Click an option to answer",
       },
       timestamp: true,
     };
 
     // Build buttons — max 5 per row, SDK allows 2-4 options
     const buttons: ComponentData[] = q.options.map((opt, oi) => ({
-      type: 'button' as const,
+      type: "button" as const,
       customId: `ask-user:${qi}:${oi}`,
       label: opt.label,
-      style: 'primary' as const,
+      style: "primary" as const,
     }));
 
     // For multi-select, add a confirm button
     if (q.multiSelect) {
       buttons.push({
-        type: 'button' as const,
+        type: "button" as const,
         customId: `ask-user-confirm:${qi}`,
-        label: '✅ Confirm',
-        style: 'success' as const,
+        label: "✅ Confirm",
+        style: "success" as const,
       });
     }
 
     messages.push({
       embeds: [embed],
-      components: [{ type: 'actionRow', components: buttons }],
+      components: [{ type: "actionRow", components: buttons }],
     });
   }
 
@@ -119,7 +119,9 @@ export function buildQuestionMessages(questions: AskUserQuestionItem[]): Message
  * Parse an `ask-user:qi:oi` custom ID into question/option indices.
  * Returns null if the ID doesn't match the pattern.
  */
-export function parseAskUserButtonId(customId: string): { questionIndex: number; optionIndex: number } | null {
+export function parseAskUserButtonId(
+  customId: string,
+): { questionIndex: number; optionIndex: number } | null {
   const match = customId.match(/^ask-user:(\d+):(\d+)$/);
   if (!match) return null;
   return {

@@ -1,1 +1,6 @@
-export { workspaceCommands, createWorkspaceHandlers, type WorkspaceHandlerDeps } from "./command.ts";
+/** @module workspace — Barrel export for multi-workspace slash commands. */
+export {
+  createWorkspaceHandlers,
+  workspaceCommands,
+  type WorkspaceHandlerDeps,
+} from "./command.ts";
