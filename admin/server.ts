@@ -17,6 +17,7 @@ import {
   listChannels,
   listSessions,
   listWorkspaces,
+  refreshSessions,
   toggleSessionHotQuery,
   updateWorkspace,
 } from "./routes.ts";
@@ -77,6 +78,9 @@ export function startAdminServer(options: AdminServerOptions): Deno.HttpServer |
     }
     if (path === "/api/sessions/cleanup" && method === "POST") {
       return await cleanupSessions(deps, req);
+    }
+    if (path === "/api/sessions/refresh" && method === "POST") {
+      return await refreshSessions(deps);
     }
 
     // /api/sessions/:id/hot-query

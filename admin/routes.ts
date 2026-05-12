@@ -205,6 +205,35 @@ export async function cleanupSessions(deps: AdminDeps, req: Request): Promise<Re
   return json({ ok: true, removed });
 }
 
+export async function refreshSessions(deps: AdminDeps): Promise<Response> {
+  const guild = deps.discordClient.guilds.cache.first();
+  if (!guild) {
+    return json({ error: "No guild available" }, 500);
+  }
+
+  const allSessions = deps.sessionThreadManager.getAllSessionThreads();
+  let removed = 0;
+  const toRemove: string[] = [];
+
+  for (const s of allSessions) {
+    try {
+      const fetched = await guild.channels.fetch(s.threadId);
+      if (!fetched || !fetched.isThread()) {
+        toRemove.push(s.sessionId);
+      }
+    } catch {
+      toRemove.push(s.sessionId);
+    }
+  }
+
+  for (const id of toRemove) {
+    deps.sessionThreadManager.deleteSession(id);
+    removed++;
+  }
+
+  return json({ ok: true, removed, total: allSessions.length });
+}
+
 export async function toggleSessionHotQuery(
   deps: AdminDeps,
   sessionId: string,

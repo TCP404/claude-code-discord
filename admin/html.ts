@@ -89,6 +89,7 @@ input:checked + .slider:before { transform: translateX(18px); }
 <div id="sessions" class="panel">
   <div id="hq-config" style="margin-bottom: 12px; padding: 8px 12px; background: #1e293b; border-radius: 6px; font-size: 13px; color: #94a3b8;"></div>
   <div style="margin-bottom: 12px;">
+    <button class="btn" onclick="refreshSessions()">Refresh</button>
     <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>72h)</button>
   </div>
   <div id="sess-groups"></div>
@@ -302,6 +303,14 @@ async function deleteSession(sessionId) {
   const d = await res.json();
   if (!res.ok) { toast(d.error, true); return; }
   toast(d.threadDeleted ? 'Session and thread deleted' : 'Session removed (thread already gone)');
+  loadSessions();
+}
+
+async function refreshSessions() {
+  const res = await fetch('/api/sessions/refresh', { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error, true); return; }
+  toast('Refreshed: removed ' + d.removed + ' stale (of ' + d.total + ' total)');
   loadSessions();
 }
 
