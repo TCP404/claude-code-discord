@@ -721,6 +721,30 @@ export async function createDiscordBot(
         }
       }
 
+      // Append image attachments as temp files so Claude can read them
+      const imageAttachments = message.attachments.filter((a) =>
+        a.contentType?.startsWith("image/")
+      );
+      if (imageAttachments.size > 0) {
+        const imagePaths: string[] = [];
+        for (const img of imageAttachments.values()) {
+          try {
+            const resp = await fetch(img.url);
+            const buf = await resp.arrayBuffer();
+            const ext = img.contentType?.split("/")[1]?.split(";")[0] ?? "png";
+            const tmpPath = `/tmp/discord-img-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            await Deno.writeFile(tmpPath, new Uint8Array(buf));
+            imagePaths.push(tmpPath);
+          } catch (err) {
+            console.error("[Image] Failed to download attachment:", err);
+          }
+        }
+        if (imagePaths.length > 0) {
+          const imageNote = imagePaths.map((p) => `[Image attached: ${p}]`).join("\n");
+          textContent = textContent ? `${textContent}\n${imageNote}` : imageNote;
+        }
+      }
+
       if (!textContent) return;
 
       try {
