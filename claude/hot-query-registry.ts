@@ -111,6 +111,11 @@ export class HotQueryRegistry {
     const existing = this.timers.get(sessionId);
     if (existing !== undefined) clearTimeout(existing);
     const timer = setTimeout(() => {
+      const session = this.sessions.get(sessionId);
+      if (session?.busy) {
+        this.scheduleIdle(sessionId);
+        return;
+      }
       this.close(sessionId, "idle").catch((err) => {
         console.error(`[HotQueryRegistry] idle close failed for ${sessionId}:`, err);
       });
