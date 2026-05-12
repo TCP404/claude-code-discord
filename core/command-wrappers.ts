@@ -559,6 +559,11 @@ function createInfoCommandsMap(
         await infoHandlers.onClaudeControl(ctx, action, value || undefined);
       },
     }],
+    ["stop", {
+      execute: async (ctx: InteractionContext) => {
+        await infoHandlers.onStop(ctx);
+      },
+    }],
     ["fast", {
       execute: async (ctx: InteractionContext) => {
         await infoHandlers.onFast(ctx);

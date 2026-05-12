@@ -12,6 +12,7 @@ export interface AdminDeps {
   sessionThreadManager: SessionThreadManager;
   discordClient: Client;
   botStartTime: number;
+  hotQueryConfig?: { enabled: boolean; idleMs: number; maxSessions: number };
 }
 
 function json(data: unknown, status = 200): Response {
@@ -34,6 +35,7 @@ export function getStatus(deps: AdminDeps): Response {
     managedChannels: [...workspaceManager.getManagedChannelIds()],
     workspaceCount: workspaceManager.list().length,
     sessionCount: sessionThreadManager.getAllSessionThreads().length,
+    hotQueryConfig: deps.hotQueryConfig ?? null,
   });
 }
 

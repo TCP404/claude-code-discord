@@ -100,6 +100,16 @@ export class HotQueryRegistry {
     this.config.onEvict?.(sessionId, reason);
   }
 
+  /** Interrupt any currently-busy hot query session. Returns true if one was interrupted. */
+  async interruptBusy(): Promise<boolean> {
+    for (const session of this.sessions.values()) {
+      if (session.busy) {
+        return session.interrupt();
+      }
+    }
+    return false;
+  }
+
   async closeAll(reason: EvictReason): Promise<void> {
     const ids = Array.from(this.sessions.keys());
     for (const id of ids) {

@@ -27,6 +27,7 @@ export interface AdminServerOptions {
   discordClient: Client;
   botStartTime: number;
   port?: number;
+  hotQueryConfig?: { enabled: boolean; idleMs: number; maxSessions: number };
 }
 
 export function startAdminServer(options: AdminServerOptions): Deno.HttpServer | null {
@@ -36,6 +37,7 @@ export function startAdminServer(options: AdminServerOptions): Deno.HttpServer |
     sessionThreadManager: options.sessionThreadManager,
     discordClient: options.discordClient,
     botStartTime: options.botStartTime,
+    hotQueryConfig: options.hotQueryConfig,
   };
 
   const handler = async (req: Request): Promise<Response> => {

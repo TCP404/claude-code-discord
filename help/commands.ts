@@ -56,6 +56,17 @@ export const COMMAND_HELP = {
       "Use when Claude is taking too long or stuck",
     ],
   },
+  stop: {
+    title: "⏸️ Stop / Interrupt",
+    description: "Interrupt the active Claude query gracefully (shortcut for /claude-control interrupt)",
+    usage: "/stop",
+    examples: ["/stop"],
+    parameters: [],
+    notes: [
+      "Gracefully interrupts — session stays alive and can be resumed",
+      "Use /claude-cancel for a hard kill that also clears the session",
+    ],
+  },
   git: {
     title: "📂 Git Operations",
     description: "Execute Git commands in the current working directory",

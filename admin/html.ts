@@ -87,6 +87,7 @@ input:checked + .slider:before { transform: translateX(18px); }
 
 <!-- Sessions Panel -->
 <div id="sessions" class="panel">
+  <div id="hq-config" style="margin-bottom: 12px; padding: 8px 12px; background: #1e293b; border-radius: 6px; font-size: 13px; color: #94a3b8;"></div>
   <div style="margin-bottom: 12px;">
     <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>72h)</button>
   </div>
@@ -217,8 +218,17 @@ function escapeHtml(str) {
 }
 
 async function loadSessions() {
-  const res = await fetch('/api/sessions');
+  const [res, statusRes] = await Promise.all([fetch('/api/sessions'), fetch('/api/status')]);
   const list = await res.json();
+  const status = await statusRes.json();
+  const hqCfg = status.hotQueryConfig;
+  const hqEl = $('#hq-config');
+  if (hqCfg) {
+    const idleMin = Math.round(hqCfg.idleMs / 60000);
+    hqEl.innerHTML = \`🔥 <strong>Hot Query</strong>: \${hqCfg.enabled ? '<span style="color:#4ade80">enabled</span>' : '<span style="color:#f87171">disabled</span>'} &nbsp;|&nbsp; max sessions: <strong>\${hqCfg.maxSessions}</strong> &nbsp;|&nbsp; idle timeout: <strong>\${idleMin}m</strong>\`;
+  } else {
+    hqEl.style.display = 'none';
+  }
   const container = $('#sess-groups');
   if (!list.length) { container.innerHTML = '<div class="empty">No active sessions</div>'; return; }
 

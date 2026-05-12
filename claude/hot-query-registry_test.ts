@@ -107,6 +107,27 @@ Deno.test("HotQueryRegistry: closeAll propagates shutdown reason to onEvict", as
   assertEquals(evicted.sort(), ["a:shutdown", "b:shutdown"]);
 });
 
+Deno.test("HotQueryRegistry: interruptBusy interrupts active session", async () => {
+  const reg = new HotQueryRegistry({ maxSessions: 3, idleMs: 10_000 });
+  const s = makeFakeSession("busy");
+  await reg.register(s);
+  // Start a turn that won't auto-finish (no result message from fake)
+  const pending = s.runTurn("hello", new AbortController(), {});
+  assertEquals(s.busy, true);
+  const result = await reg.interruptBusy();
+  assertEquals(result, true);
+  await reg.closeAll("test");
+  await pending.catch(() => {});
+});
+
+Deno.test("HotQueryRegistry: interruptBusy returns false when no session is busy", async () => {
+  const reg = new HotQueryRegistry({ maxSessions: 3, idleMs: 10_000 });
+  await reg.register(makeFakeSession("idle"));
+  const result = await reg.interruptBusy();
+  assertEquals(result, false);
+  await reg.closeAll("test");
+});
+
 Deno.test("HotQueryRegistry: stats tracks created and reused counts", async () => {
   const reg = new HotQueryRegistry({ maxSessions: 3, idleMs: 10_000 });
   await reg.register(makeFakeSession("a"));

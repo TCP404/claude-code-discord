@@ -113,18 +113,35 @@ export function clearTrackedMessages(): void {
 // Query Control Methods
 // ================================
 
+let fallbackInterrupt: (() => Promise<boolean>) | null = null;
+
+/**
+ * Register a fallback interrupt handler (used by hot query sessions that
+ * don't set the global activeQuery).
+ */
+export function setFallbackInterrupt(fn: (() => Promise<boolean>) | null): void {
+  fallbackInterrupt = fn;
+}
+
 /**
  * Interrupt the active query gracefully via SDK (better than AbortController).
  * The query will stop processing and return control.
+ * Falls back to the registered fallback (e.g. hot query interrupt) if no
+ * cold-mode activeQuery is present.
  */
 export async function interruptActiveQuery(): Promise<boolean> {
-  if (!activeQuery) return false;
-  try {
-    await activeQuery.interrupt();
-    return true;
-  } catch {
-    return false;
+  if (activeQuery) {
+    try {
+      await activeQuery.interrupt();
+      return true;
+    } catch {
+      return false;
+    }
   }
+  if (fallbackInterrupt) {
+    return fallbackInterrupt();
+  }
+  return false;
 }
 
 /**

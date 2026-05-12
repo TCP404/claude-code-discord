@@ -59,7 +59,12 @@ export class WorkspaceManager {
   }
 
   findByChannel(channelId: string): WorkspaceEntry | undefined {
-    return this.workspaces.find((w) => w.channelId === channelId);
+    const explicit = this.workspaces.find((w) => w.channelId === channelId);
+    if (explicit) return explicit;
+    if (channelId === this.defaultChannelId) {
+      return { name: "default", path: this.defaultWorkDir, channelId };
+    }
+    return undefined;
   }
 
   findByName(name: string): WorkspaceEntry | undefined {

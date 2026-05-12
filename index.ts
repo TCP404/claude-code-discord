@@ -32,6 +32,7 @@ import { sendToClaudeCode } from "./claude/client.ts";
 import { readHotQueryConfig } from "./claude/hot-query-config.ts";
 import { HotQueryRegistry } from "./claude/hot-query-registry.ts";
 import { HotQuerySession, makeSdkQueryFactory } from "./claude/hot-query.ts";
+import { setFallbackInterrupt } from "./claude/query-manager.ts";
 import { convertToClaudeMessages } from "./claude/message-converter.ts";
 import type { ClaudeMessage } from "./claude/types.ts";
 import type { SessionThreadCallbacks } from "./claude/command.ts";
@@ -162,6 +163,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
       thread.send(msg).catch(() => {});
     },
   });
+
+  // Register hot query interrupt as fallback for /stop when no cold-mode activeQuery
+  setFallbackInterrupt(() => hotQueryRegistry.interruptBusy());
 
   // Per-channel routing maps
   const responseChannels = new Map<string, any>();
@@ -657,6 +661,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     sessionThreadManager,
     discordClient: bot.client,
     botStartTime: Date.now(),
+    hotQueryConfig,
   });
 
   // Create Discord sender for Claude messages

@@ -83,6 +83,10 @@ export const infoCommands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("stop")
+    .setDescription("Interrupt the active Claude query (shortcut for /claude-control interrupt)"),
+
+  new SlashCommandBuilder()
     .setName("fast")
     .setDescription(
       "Toggle fast mode — 2.5x faster Opus 4.6 responses (higher cost, same quality)",
@@ -495,6 +499,26 @@ export function createInfoCommandHandlers(deps: InfoCommandHandlerDeps) {
             ephemeral: true,
           });
       }
+    },
+
+    // ================================
+    // /stop — Shortcut for interrupt
+    // ================================
+    async onStop(ctx: any): Promise<void> {
+      await ctx.deferReply();
+      console.log("[/stop] Interrupt requested");
+      const success = await interruptActiveQuery();
+      console.log(`[/stop] Interrupt ${success ? "succeeded" : "failed (no active query)"}`);
+      await ctx.editReply({
+        embeds: [{
+          color: success ? 0x00ff00 : 0xff0000,
+          title: success ? "⏸️ Query Interrupted" : "❌ No Active Query",
+          description: success
+            ? "The current query has been interrupted. It will stop processing and return control."
+            : "No active Claude query to interrupt.",
+          timestamp: new Date().toISOString(),
+        }],
+      });
     },
 
     // ================================

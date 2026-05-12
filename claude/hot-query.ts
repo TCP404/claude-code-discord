@@ -139,6 +139,17 @@ export class HotQuerySession {
     return this.currentTurn !== null;
   }
 
+  /** Interrupt the current turn gracefully without closing the session. */
+  async interrupt(): Promise<boolean> {
+    if (!this.currentTurn) return false;
+    try {
+      await this.query.interrupt();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async runConsumer(): Promise<void> {
     try {
       for await (const msg of this.query) {

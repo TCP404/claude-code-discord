@@ -211,6 +211,41 @@ Deno.test("HotQuerySession: runTurn after close rejects immediately", async () =
   );
 });
 
+Deno.test("HotQuerySession: interrupt returns true when turn is active", async () => {
+  const { factory, query } = makeFakeQuery([[]]); // no result → stays busy
+  const session = HotQuerySession.create({
+    sessionId: "sess-int",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  const _pending = session.runTurn("hello", new AbortController(), {});
+  assertEquals(session.busy, true);
+  const interrupted = await session.interrupt();
+  assertEquals(interrupted, true);
+  // Send result after interrupt so the turn resolves
+  const outQueue = (query as any);
+  // The session is still alive but turn was interrupted via the mock
+  await session.close("test");
+  await _pending.catch(() => {});
+});
+
+Deno.test("HotQuerySession: interrupt returns false when no turn active", async () => {
+  const done = { type: "result", session_id: "sess-noint" } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[done]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-noint",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+  });
+  await session.runTurn("hello", new AbortController(), {});
+  assertEquals(session.busy, false);
+  const interrupted = await session.interrupt();
+  assertEquals(interrupted, false);
+  await session.close("test");
+});
+
 Deno.test("HotQuerySession: onChunk receives assistant text", async () => {
   const asst = {
     type: "assistant",
