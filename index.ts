@@ -159,6 +159,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
   });
 
+  // Per-session hot query overrides (enable/disable per thread)
+  const hotQueryOverrides = new Map<string, boolean>();
+
   // Per-channel routing maps
   const responseChannels = new Map<string, any>();
   const commandChannels = new Map<string, any>();
@@ -281,6 +284,50 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
   });
 
+  // Per-thread hot query toggle
+  handlers.set("hot-query", {
+    execute: async (ctx) => {
+      const sub = ctx.getSubcommand();
+      const channelId = ctx.getChannelId();
+      const sessionId = sessionThreadManager.findSessionByThreadId(channelId);
+
+      if (!sessionId) {
+        await ctx.reply({
+          content: "⚠️ This command must be used inside a session thread.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (sub === "enable") {
+        hotQueryOverrides.set(sessionId, true);
+        await ctx.reply({
+          content: "🔥 Hot query enabled for this thread. Next message will use hot mode.",
+          ephemeral: true,
+        });
+      } else if (sub === "disable") {
+        hotQueryOverrides.set(sessionId, false);
+        const existing = hotQueryRegistry.get(sessionId);
+        if (existing && !existing.busy) {
+          await hotQueryRegistry.close(sessionId, "manual");
+        }
+        await ctx.reply({
+          content: "🧊 Hot query disabled for this thread. Next message will use cold mode.",
+          ephemeral: true,
+        });
+      } else {
+        const current = hotQueryOverrides.get(sessionId) ?? hotQueryConfig.enabled;
+        const active = hotQueryRegistry.get(sessionId);
+        const status = current ? "🔥 enabled" : "🧊 disabled";
+        const activeStr = active ? " (active session)" : "";
+        await ctx.reply({
+          content: `Hot query: ${status}${activeStr} (global default: ${hotQueryConfig.enabled ? "on" : "off"})`,
+          ephemeral: true,
+        });
+      }
+    },
+  });
+
   // Button handlers
   const buttonHandlers: ButtonHandlers = createButtonHandlers(
     {
@@ -385,7 +432,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
       const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
       const turnOptions = { appendSystemPrompt: BOT_SYSTEM_PROMPT };
 
+      let hotReuseCount = -1 as number; // -1 = cold mode
       const onStreamJson = (jsonData: any) => {
+        if (hotReuseCount >= 0 && jsonData.type === "result") {
+          jsonData._hotReuse = hotReuseCount;
+        }
         const claudeMessages = convertToClaudeMessages(jsonData);
         if (claudeMessages.length > 0) {
           threadSender(claudeMessages).catch(() => {});
@@ -398,7 +449,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
       };
 
       try {
-        if (hotQueryConfig.enabled) {
+        const useHot = hotQueryOverrides.get(sessionId) ?? hotQueryConfig.enabled;
+        if (useHot) {
           let hot = hotQueryRegistry.get(sessionId);
           if (!hot) {
             console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
@@ -417,9 +469,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
             });
             await hotQueryRegistry.register(hot);
             console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
+            hotReuseCount = 0;
           } else {
             console.log(`[HotQuery] session=${sessionId} reused (skip cold-init)`);
             hotQueryRegistry.touch(sessionId);
+            hotReuseCount = hotQueryRegistry.getReuseCount(sessionId);
           }
           const result = await hot.runTurn(content, controller, {
             onStreamJson,

@@ -176,7 +176,7 @@ Deno.test("discord-sender: hidden completion with cost finalizes status line", a
   const lastTracked = mock.tracked[0];
   assertEquals(lastTracked.edited.length >= 1, true);
   const lastEdit = lastTracked.edited[lastTracked.edited.length - 1];
-  assertEquals(lastEdit.content!.includes("Complete"), true);
+  assertEquals(lastEdit.content!.includes("✅"), true);
   assertEquals(lastEdit.content!.includes("0.0500"), true);
 });
 

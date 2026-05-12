@@ -139,14 +139,17 @@ export function createClaudeSender(
             if (showCost && msg.metadata?.total_cost_usd !== undefined) {
               const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
               const costPart = sessionUsage && sessionUsage.queryCount > 1
-                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
+                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (Σ$${
                   sessionUsage.totalCost.toFixed(4)
-                } / ${sessionUsage.queryCount} queries)`
+                } ×${sessionUsage.queryCount})`
                 : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
               const durPart = msg.metadata?.duration_ms !== undefined
                 ? ` | ${(msg.metadata.duration_ms / 1000).toFixed(1)}s`
                 : "";
-              await finalizeStatus(`✅ Complete | ${costPart}${durPart}`);
+              const hotPart = msg.metadata?._hotReuse !== undefined
+                ? ` | 🔥${msg.metadata._hotReuse}`
+                : "";
+              await finalizeStatus(`✅ ${costPart}${durPart}${hotPart}`);
             } else {
               await clearStatus();
             }

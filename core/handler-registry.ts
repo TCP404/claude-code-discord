@@ -685,6 +685,17 @@ const hotQueriesCommand = new SlashCommandBuilder()
   .setName("hot-queries")
   .setDescription("List current active hot query sessions");
 
+const hotQueryCommand = new SlashCommandBuilder()
+  .setName("hot-query")
+  .setDescription("Toggle hot query mode for this thread")
+  .addSubcommand((sub) => sub.setName("enable").setDescription("Enable hot query for this thread"))
+  .addSubcommand((sub) =>
+    sub.setName("disable").setDescription("Disable hot query for this thread")
+  )
+  .addSubcommand((sub) =>
+    sub.setName("status").setDescription("Show hot query status for this thread")
+  );
+
 /**
  * Get all command definitions for bot registration.
  *
@@ -705,6 +716,7 @@ export function getAllCommands() {
     ...workspaceCommands,
     helpCommand,
     hotQueriesCommand,
+    hotQueryCommand,
     ...displayToggleCommands,
   ];
 }

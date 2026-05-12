@@ -294,19 +294,19 @@ export function renderSystem(msg: ClaudeMessage, ctx: RendererContext): MessageC
   if (showCost && msg.metadata?.total_cost_usd !== undefined) {
     const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
     const costStr = sessionUsage && sessionUsage.queryCount > 1
-      ? `$${msg.metadata.total_cost_usd.toFixed(4)} (session: $${
+      ? `$${msg.metadata.total_cost_usd.toFixed(4)} (Σ$${
         sessionUsage.totalCost.toFixed(4)
-      } / ${sessionUsage.queryCount} queries)`
+      } ×${sessionUsage.queryCount})`
       : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
     embedData.fields!.push({ name: "Cost", value: costStr, inline: true });
   }
   if (showCost && msg.metadata?.duration_ms !== undefined) {
     const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
     const durStr = sessionUsage && sessionUsage.queryCount > 1
-      ? `${(msg.metadata.duration_ms / 1000).toFixed(2)}s (session: ${
+      ? `${(msg.metadata.duration_ms / 1000).toFixed(1)}s (Σ${
         (sessionUsage.totalDuration / 1000).toFixed(1)
       }s)`
-      : `${(msg.metadata.duration_ms / 1000).toFixed(2)}s`;
+      : `${(msg.metadata.duration_ms / 1000).toFixed(1)}s`;
     embedData.fields!.push({ name: "Duration", value: durStr, inline: true });
   }
 

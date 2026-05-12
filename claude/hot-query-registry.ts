@@ -73,6 +73,10 @@ export class HotQueryRegistry {
     this.scheduleIdle(session.sessionId);
   }
 
+  getReuseCount(sessionId: string): number {
+    return this.reuseCounts.get(sessionId) ?? 0;
+  }
+
   touch(sessionId: string): void {
     if (!this.sessions.has(sessionId)) return;
     this.lastTouched.set(sessionId, Date.now());
