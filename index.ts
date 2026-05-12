@@ -418,8 +418,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         return;
       }
 
-      const thinkingMsg = await thread.send("`Claude is thinking...`");
       sessionThreadManager.recordActivity(sessionId);
+
+      const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
+      const isHotReuse = useHot && hotQueryRegistry.get(sessionId) !== undefined;
+
+      const thinkingMsg = isHotReuse ? null : await thread.send("`Claude is thinking...`");
 
       const { send: threadSender, setSessionId } = createClaudeSender(
         createChannelSenderAdapter(thread),
@@ -438,6 +442,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         if (hotReuseCount >= 0 && jsonData.type === "result") {
           jsonData._hotReuse = hotReuseCount;
         }
+        if (hotReuseCount > 0 && jsonData.type === "system" && jsonData.subtype === "init") {
+          return;
+        }
         const claudeMessages = convertToClaudeMessages(jsonData);
         if (claudeMessages.length > 0) {
           threadSender(claudeMessages).catch(() => {});
@@ -450,7 +457,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
       };
 
       try {
-        const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
         if (useHot) {
           let hot = hotQueryRegistry.get(sessionId);
           if (!hot) {
@@ -506,9 +512,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
       } finally {
         claudeSessionOps.setController(null, threadKey);
-        try {
-          await thinkingMsg.delete();
-        } catch { /* ignore */ }
+        if (thinkingMsg) {
+          try {
+            await thinkingMsg.delete();
+          } catch { /* ignore */ }
+        }
       }
     },
     setResponseChannel: (ch: any) => {
