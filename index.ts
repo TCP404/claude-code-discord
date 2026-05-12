@@ -163,9 +163,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
   });
 
-  // Per-session hot query overrides (enable/disable per thread)
-  const hotQueryOverrides = new Map<string, boolean>();
-
   // Per-channel routing maps
   const responseChannels = new Map<string, any>();
   const commandChannels = new Map<string, any>();
@@ -304,13 +301,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
 
       if (sub === "enable") {
-        hotQueryOverrides.set(sessionId, true);
+        sessionThreadManager.setHotQuery(sessionId, true);
         await ctx.reply({
           content: "🔥 Hot query enabled for this thread. Next message will use hot mode.",
           ephemeral: true,
         });
       } else if (sub === "disable") {
-        hotQueryOverrides.set(sessionId, false);
+        sessionThreadManager.setHotQuery(sessionId, false);
         const existing = hotQueryRegistry.get(sessionId);
         if (existing && !existing.busy) {
           await hotQueryRegistry.close(sessionId, "manual");
@@ -320,7 +317,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
           ephemeral: true,
         });
       } else {
-        const current = hotQueryOverrides.get(sessionId) ?? hotQueryConfig.enabled;
+        const current = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
         const active = hotQueryRegistry.get(sessionId);
         const status = current ? "🔥 enabled" : "🧊 disabled";
         const activeStr = active ? " (active session)" : "";
@@ -453,7 +450,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       };
 
       try {
-        const useHot = hotQueryOverrides.get(sessionId) ?? hotQueryConfig.enabled;
+        const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
         if (useHot) {
           let hot = hotQueryRegistry.get(sessionId);
           if (!hot) {

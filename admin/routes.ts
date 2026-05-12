@@ -179,6 +179,7 @@ export function listSessions(deps: AdminDeps): Response {
       createdAt: s.createdAt.toISOString(),
       lastActivity: s.lastActivity.toISOString(),
       messageCount: s.messageCount,
+      hotQuery: s.hotQuery,
       workspaceName: workspace?.name ?? null,
       workspacePath: workspace?.path ?? null,
       channelId: parentChannelId,
@@ -200,6 +201,21 @@ export async function cleanupSessions(deps: AdminDeps, req: Request): Promise<Re
 
   const removed = deps.sessionThreadManager.cleanup(maxAgeMs);
   return json({ ok: true, removed });
+}
+
+export async function toggleSessionHotQuery(
+  deps: AdminDeps,
+  sessionId: string,
+  req: Request,
+): Promise<Response> {
+  const session = deps.sessionThreadManager.getSessionThread(sessionId);
+  if (!session) {
+    return json({ error: "Session not found" }, 404);
+  }
+  const body = await req.json();
+  const enabled: boolean | undefined = body.enabled === null ? undefined : !!body.enabled;
+  deps.sessionThreadManager.setHotQuery(sessionId, enabled);
+  return json({ ok: true, sessionId, hotQuery: enabled });
 }
 
 export async function deleteSession(deps: AdminDeps, sessionId: string): Promise<Response> {

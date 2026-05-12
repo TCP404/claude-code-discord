@@ -26,6 +26,7 @@ interface PersistedSession {
   createdAt: string;
   lastActivity: string;
   messageCount: number;
+  hotQuery?: boolean;
 }
 
 const DATA_DIR = ".bot-data";
@@ -84,6 +85,7 @@ export class SessionThreadManager {
           createdAt: new Date(r.createdAt),
           lastActivity: new Date(r.lastActivity),
           messageCount: r.messageCount,
+          hotQuery: r.hotQuery,
         });
       }
       console.log(`SessionThreads: Restored ${this.threads.size} sessions from disk`);
@@ -157,6 +159,7 @@ export class SessionThreadManager {
           createdAt: meta.createdAt.toISOString(),
           lastActivity: meta.lastActivity.toISOString(),
           messageCount: meta.messageCount,
+          ...(meta.hotQuery !== undefined && { hotQuery: meta.hotQuery }),
         });
       }
       await Deno.writeTextFile(this.filePath, JSON.stringify(records, null, 2));
@@ -264,6 +267,25 @@ export class SessionThreadManager {
   }
 
   // ───────────────────── Update ─────────────────────
+
+  /**
+   * Set the hot query override for a session.
+   * Pass undefined to clear the override (revert to global default).
+   */
+  setHotQuery(sessionId: string, enabled: boolean | undefined): void {
+    const meta = this.threads.get(sessionId);
+    if (meta) {
+      meta.hotQuery = enabled;
+      this.schedulePersist();
+    }
+  }
+
+  /**
+   * Get the hot query override for a session (undefined = use global default).
+   */
+  getHotQuery(sessionId: string): boolean | undefined {
+    return this.threads.get(sessionId)?.hotQuery;
+  }
 
   /**
    * Record that a message was sent in a session thread.

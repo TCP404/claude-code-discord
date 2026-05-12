@@ -117,6 +117,8 @@ export interface SessionThread {
   lastActivity: Date;
   /** Number of messages sent in this thread */
   messageCount: number;
+  /** Per-session hot query override (undefined = use global default) */
+  hotQuery?: boolean;
 }
 
 export interface BotDependencies {

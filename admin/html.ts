@@ -249,14 +249,18 @@ async function loadSessions() {
     g.sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
     const headerName = g.name ? escapeHtml(g.name) : 'Unassigned';
     const headerPath = g.path ? '<span class="ws-path">' + escapeHtml(g.path) + '</span>' : '';
-    const rows = g.sessions.map(s => \`<tr>
+    const rows = g.sessions.map(s => {
+      const hotChecked = s.hotQuery ? 'checked' : '';
+      return \`<tr>
       <td>\${escapeHtml(s.threadName)}</td>
       <td class="mono">\${s.sessionId.substring(0, 8)}...</td>
       <td>\${timeAgo(s.createdAt)}</td>
       <td>\${timeAgo(s.lastActivity)}</td>
       <td>\${s.messageCount}</td>
+      <td><label class="switch"><input type="checkbox" \${hotChecked} onchange="toggleHotQuery('\${s.sessionId}', this.checked)"><span class="slider"></span></label></td>
       <td><button class="btn btn-danger btn-sm" onclick="deleteSession('\${s.sessionId}')">Delete</button></td>
-    </tr>\`).join('');
+    </tr>\`;
+    }).join('');
     return \`<div class="ws-group">
       <div class="ws-group-header">
         <span class="ws-name">\${headerName}</span>
@@ -264,11 +268,22 @@ async function loadSessions() {
         <span class="ws-count">\${g.sessions.length} session\${g.sessions.length === 1 ? '' : 's'}</span>
       </div>
       <table>
-        <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th></th></tr></thead>
+        <thead><tr><th>Thread</th><th>Session ID</th><th>Created</th><th>Last Activity</th><th>Messages</th><th>🔥 Hot</th><th></th></tr></thead>
         <tbody>\${rows}</tbody>
       </table>
     </div>\`;
   }).join('');
+}
+
+async function toggleHotQuery(sessionId, enabled) {
+  const res = await fetch('/api/sessions/' + encodeURIComponent(sessionId) + '/hot-query', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error, true); return; }
+  toast(enabled ? 'Hot query enabled' : 'Hot query disabled');
 }
 
 async function deleteSession(sessionId) {
