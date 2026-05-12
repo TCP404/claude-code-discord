@@ -150,12 +150,16 @@ export async function createClaudeCodeBot(config: BotConfig) {
     idleMs: hotQueryConfig.idleMs,
     onEvict: (sessionId, reason) => {
       console.log(`[HotQuery] session=${sessionId} closed (reason: ${reason})`);
-      if (reason === "lru") {
-        const thread = sessionThreadManager.getThread(sessionId);
-        thread?.send(
-          "🧊 会话已进入休眠以释放资源，下一条消息将正常处理（首条会多等 2-3s 冷启动）",
-        ).catch(() => {});
-      }
+      if (reason === "shutdown") return;
+      const thread = sessionThreadManager.getThread(sessionId);
+      if (!thread) return;
+      const messages: Record<string, string> = {
+        lru: "🧊 Hot session evicted (max sessions reached), next message will cold-start.",
+        idle: "🧊 Hot session expired (idle timeout), next message will cold-start.",
+        manual: "🧊 Hot session closed.",
+      };
+      const msg = messages[reason] ?? `🧊 Hot session closed (${reason}).`;
+      thread.send(msg).catch(() => {});
     },
   });
 
