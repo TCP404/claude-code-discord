@@ -773,7 +773,7 @@ export function createUtilityCommandHandlers(
         const child = new Deno.Command("bash", {
           args: [
             "-c",
-            `timeout 30 bash -c 'while kill -0 ${pid} 2>/dev/null; do sleep 0.5; done'; exec "${scriptPath}" start`,
+            `for i in $(seq 1 60); do kill -0 ${pid} 2>/dev/null || break; sleep 0.5; done; exec "${scriptPath}" start`,
           ],
           stdin: "null",
           stdout: "null",
