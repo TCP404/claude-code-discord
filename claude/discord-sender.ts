@@ -128,23 +128,27 @@ export function createClaudeSender(
         if (hiddenMessageTypes.has(subkey)) {
           if (msg.metadata?.subtype === "completion") {
             const activeSessionId = currentSessionId || msg.metadata?.session_id;
+            const isHot = msg.metadata?._hotReuse !== undefined;
             if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
               recordUsage(
                 activeSessionId,
                 msg.metadata.total_cost_usd,
                 msg.metadata?.duration_ms ?? 0,
+                isHot,
               );
             }
             const showCost = Deno.env.get("SHOW_COST") !== "false";
             if (showCost && msg.metadata?.total_cost_usd !== undefined) {
               const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
+              const turnCost = sessionUsage?.lastTurnCost ?? msg.metadata.total_cost_usd;
               const costPart = sessionUsage && sessionUsage.queryCount > 1
-                ? `$${msg.metadata.total_cost_usd.toFixed(4)} (Σ$${
+                ? `$${turnCost.toFixed(4)} (Σ$${
                   sessionUsage.totalCost.toFixed(4)
                 } ×${sessionUsage.queryCount})`
-                : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
-              const durPart = msg.metadata?.duration_ms !== undefined
-                ? ` | ${(msg.metadata.duration_ms / 1000).toFixed(1)}s`
+                : `$${turnCost.toFixed(4)}`;
+              const turnDur = sessionUsage?.lastTurnDuration ?? msg.metadata?.duration_ms;
+              const durPart = turnDur !== undefined
+                ? ` | ${(turnDur / 1000).toFixed(1)}s`
                 : "";
               const hotPart = msg.metadata?._hotReuse !== undefined
                 ? ` | 🔥${msg.metadata._hotReuse}`

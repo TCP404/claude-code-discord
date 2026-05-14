@@ -283,30 +283,34 @@ export function renderSystem(msg: ClaudeMessage, ctx: RendererContext): MessageC
   }
 
   const activeSessionId = ctx.currentSessionId || msg.metadata?.session_id;
+  const isHot = msg.metadata?._hotReuse !== undefined;
   if (activeSessionId && msg.metadata?.total_cost_usd !== undefined) {
     recordUsage(
       activeSessionId,
       msg.metadata.total_cost_usd,
       msg.metadata?.duration_ms ?? 0,
+      isHot,
     );
   }
   const showCost = Deno.env.get("SHOW_COST") !== "false";
   if (showCost && msg.metadata?.total_cost_usd !== undefined) {
     const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
+    const turnCost = sessionUsage?.lastTurnCost ?? msg.metadata.total_cost_usd;
     const costStr = sessionUsage && sessionUsage.queryCount > 1
-      ? `$${msg.metadata.total_cost_usd.toFixed(4)} (Σ$${
+      ? `$${turnCost.toFixed(4)} (Σ$${
         sessionUsage.totalCost.toFixed(4)
       } ×${sessionUsage.queryCount})`
-      : `$${msg.metadata.total_cost_usd.toFixed(4)}`;
+      : `$${turnCost.toFixed(4)}`;
     embedData.fields!.push({ name: "Cost", value: costStr, inline: true });
   }
   if (showCost && msg.metadata?.duration_ms !== undefined) {
     const sessionUsage = activeSessionId ? getUsage(activeSessionId) : undefined;
+    const turnDur = sessionUsage?.lastTurnDuration ?? msg.metadata.duration_ms;
     const durStr = sessionUsage && sessionUsage.queryCount > 1
-      ? `${(msg.metadata.duration_ms / 1000).toFixed(1)}s (Σ${
+      ? `${(turnDur / 1000).toFixed(1)}s (Σ${
         (sessionUsage.totalDuration / 1000).toFixed(1)
       }s)`
-      : `${(msg.metadata.duration_ms / 1000).toFixed(1)}s`;
+      : `${(turnDur / 1000).toFixed(1)}s`;
     embedData.fields!.push({ name: "Duration", value: durStr, inline: true });
   }
 
