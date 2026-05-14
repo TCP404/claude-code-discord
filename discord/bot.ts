@@ -721,27 +721,53 @@ export async function createDiscordBot(
         }
       }
 
-      // Append image attachments as temp files so Claude can read them
-      const imageAttachments = message.attachments.filter((a) =>
-        a.contentType?.startsWith("image/")
-      );
-      if (imageAttachments.size > 0) {
-        const imagePaths: string[] = [];
-        for (const img of imageAttachments.values()) {
+      // Process all attachments: images → temp files, text → inline, others → temp files
+      if (message.attachments.size > 0) {
+        const notes: string[] = [];
+        for (const att of message.attachments.values()) {
           try {
-            const resp = await fetch(img.url);
+            const resp = await fetch(att.url);
             const buf = await resp.arrayBuffer();
-            const ext = img.contentType?.split("/")[1]?.split(";")[0] ?? "png";
-            const tmpPath = `/tmp/discord-img-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-            await Deno.writeFile(tmpPath, new Uint8Array(buf));
-            imagePaths.push(tmpPath);
+            const ct = att.contentType ?? "";
+            const filename = att.name ?? "attachment";
+
+            if (ct.startsWith("image/")) {
+              const ext = ct.split("/")[1]?.split(";")[0] ?? "png";
+              const tmpPath =
+                `/tmp/discord-img-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+              await Deno.writeFile(tmpPath, new Uint8Array(buf));
+              notes.push(`[Image attached: ${tmpPath}]`);
+            } else if (
+              ct.startsWith("text/") ||
+              ct === "application/json" ||
+              ct === "application/xml" ||
+              /\.(txt|md|csv|json|xml|yaml|yml|toml|ini|log|sh|ts|js|py|rb|go|rs|java|c|cpp|h|css|html)$/i
+                .test(filename)
+            ) {
+              const text = new TextDecoder().decode(buf);
+              const MAX_INLINE = 8000;
+              if (text.length <= MAX_INLINE) {
+                notes.push(`[File: ${filename}]\n\`\`\`\n${text}\n\`\`\``);
+              } else {
+                const tmpPath =
+                  `/tmp/discord-file-${Date.now()}-${Math.random().toString(36).slice(2)}-${filename}`;
+                await Deno.writeFile(tmpPath, new Uint8Array(buf));
+                notes.push(`[File attached: ${tmpPath} (${filename})]`);
+              }
+            } else {
+              // Binary / ZIP / other — save to temp and tell Claude the path
+              const tmpPath =
+                `/tmp/discord-file-${Date.now()}-${Math.random().toString(36).slice(2)}-${filename}`;
+              await Deno.writeFile(tmpPath, new Uint8Array(buf));
+              notes.push(`[File attached: ${tmpPath} (${filename})]`);
+            }
           } catch (err) {
-            console.error("[Image] Failed to download attachment:", err);
+            console.error(`[Attachment] Failed to download ${att.name}:`, err);
+            notes.push(`[Attachment download failed: ${att.name}]`);
           }
         }
-        if (imagePaths.length > 0) {
-          const imageNote = imagePaths.map((p) => `[Image attached: ${p}]`).join("\n");
-          textContent = textContent ? `${textContent}\n${imageNote}` : imageNote;
+        if (notes.length > 0) {
+          textContent = textContent ? `${textContent}\n${notes.join("\n")}` : notes.join("\n");
         }
       }
 
