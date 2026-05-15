@@ -162,22 +162,56 @@ When AWS SSO credentials expire, use the `/refresh-bedrock` slash command in Dis
 
 ## Startup Options
 
+The bot ships with a **task runner** (Justfile + Makefile) that wraps a macOS LaunchAgent for production use. Pick whichever flow fits.
+
+### macOS — managed service (recommended)
+
+Registers the bot as a LaunchAgent so it auto-starts on login and restarts on crash. All logic lives in `scripts/*.sh`; `just` and `make` are thin wrappers — both work, pick whichever you have.
+
 ```bash
-# Production daemon (start / stop / restart)
+just setup       # copies .env.example → .env (if missing) and runs doctor
+# edit .env to fill DISCORD_TOKEN + APPLICATION_ID
+just install     # register the LaunchAgent
+just start       # start now
+
+just status      # pid + state
+just logs        # tail launchd stdout/stderr logs
+just restart
+just stop
+
+just update      # git pull (warns about .env.example drift, does NOT auto-restart)
+just doctor      # self-check: tooling, .env, service state
+just uninstall   # remove the LaunchAgent (keeps code/logs/.env)
+```
+
+No `just` installed? Use `make <target>` — same commands. No task runner at all? Call the scripts directly: `./scripts/service.sh install`, `./scripts/update.sh`, `./scripts/doctor.sh`.
+
+| Command     | What it does                                                                    |
+| ----------- | ------------------------------------------------------------------------------- |
+| `setup`     | Copy `.env.example` → `.env` if missing, then `doctor`                          |
+| `doctor`    | Verify Node/npx/git, `.env` tokens, plist registration, service state           |
+| `install`   | Render plist into `~/Library/LaunchAgents/` and bootstrap into launchd          |
+| `uninstall` | bootout + remove plist (preserves code, logs, `.env`)                           |
+| `reinstall` | `uninstall` + `install` — use after pulling plist template changes              |
+| `start` / `stop` / `restart` | `launchctl kickstart` / `kill` / `kickstart -k`                |
+| `status`    | `launchctl print` filtered to pid, state, last exit code                        |
+| `logs`      | `tail -F logs/launchd.{out,err}.log`                                            |
+| `update`    | `git fetch` → show incoming commits → warn on `.env.example` drift → `git pull` |
+
+> `update` deliberately does **not** restart the service — review the changes, then run `just restart` yourself.
+
+### Manual / lightweight
+
+Skip the LaunchAgent entirely and run with the bundled `start.sh` (nohup-based daemon, single PID file):
+
+```bash
 ./start.sh start
 ./start.sh stop
 ./start.sh restart
 
-# Standard start (uses npx deno — no global deno install required)
-npx deno task start
-
-# Development mode (hot reload)
-npx deno task dev
-
-# Direct with environment variables
-npx deno run --allow-all index.ts
-
-# With optional flags
+# Or run in the foreground (Ctrl+C to stop)
+npx deno task start    # uses npx deno — no global install required
+npx deno task dev      # hot reload
 npx deno run --allow-all index.ts --category myproject --user-id YOUR_DISCORD_ID
 ```
 
