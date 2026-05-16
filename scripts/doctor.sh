@@ -37,6 +37,12 @@ if command -v git >/dev/null 2>&1; then
 else
   fail "git not found"
 fi
+DENO_VER=$(npx --yes deno --version 2>/dev/null | head -1)
+if [ -n "$DENO_VER" ]; then
+  ok "deno available via npx ($DENO_VER)"
+else
+  fail "npx deno not working — bot cannot start"
+fi
 
 echo ""
 echo "Project files"

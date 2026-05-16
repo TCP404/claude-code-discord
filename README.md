@@ -171,8 +171,7 @@ Registers the bot as a LaunchAgent so it auto-starts on login and restarts on cr
 ```bash
 just setup       # copies .env.example → .env (if missing) and runs doctor
 # edit .env to fill DISCORD_TOKEN + APPLICATION_ID
-just install     # register the LaunchAgent
-just start       # start now
+just install     # register the LaunchAgent (starts automatically)
 
 just status      # pid + state
 just logs        # tail launchd stdout/stderr logs
@@ -190,7 +189,7 @@ No `just` installed? Use `make <target>` — same commands. No task runner at al
 | ----------- | ------------------------------------------------------------------------------- |
 | `setup`     | Copy `.env.example` → `.env` if missing, then `doctor`                          |
 | `doctor`    | Verify Node/npx/git, `.env` tokens, plist registration, service state           |
-| `install`   | Render plist into `~/Library/LaunchAgents/` and bootstrap into launchd          |
+| `install`   | Render plist into `~/Library/LaunchAgents/`, bootstrap into launchd, and start  |
 | `uninstall` | bootout + remove plist (preserves code, logs, `.env`)                           |
 | `reinstall` | `uninstall` + `install` — use after pulling plist template changes              |
 | `start` / `stop` / `restart` | `launchctl kickstart` / `kill` / `kickstart -k`                |

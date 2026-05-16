@@ -37,12 +37,13 @@ render_plist() {
     exit 1
   fi
   mkdir -p "$PLIST_DIR"
-  # Inherit current PATH so launchd can find npx/node (especially under nvm).
+  # Use SOH (0x01) as sed delimiter — cannot appear in PATH or file paths.
+  local D=$'\x01'
   sed \
-    -e "s|{{LABEL}}|$LABEL|g" \
-    -e "s|{{WORKDIR}}|$SCRIPT_DIR|g" \
-    -e "s|{{HOME}}|$HOME|g" \
-    -e "s|{{PATH}}|$PATH|g" \
+    -e "s${D}{{LABEL}}${D}${LABEL}${D}g" \
+    -e "s${D}{{WORKDIR}}${D}${SCRIPT_DIR}${D}g" \
+    -e "s${D}{{HOME}}${D}${HOME}${D}g" \
+    -e "s${D}{{PATH}}${D}${PATH}${D}g" \
     "$TEMPLATE" > "$PLIST_PATH"
   echo "Rendered: $PLIST_PATH"
 }
@@ -61,7 +62,7 @@ cmd_install() {
   launchctl bootstrap "$DOMAIN" "$PLIST_PATH"
   launchctl enable "$SERVICE_TARGET"
   echo "Installed: $LABEL (auto-starts on login + restarts on crash)"
-  echo "Run 'just start' (or '$0 start') to start now."
+  echo "Service is now running (RunAtLoad). Use 'just status' to verify."
 }
 
 cmd_uninstall() {

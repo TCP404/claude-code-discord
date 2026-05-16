@@ -33,7 +33,7 @@
     </dict>
 
     <key>ThrottleInterval</key>
-    <integer>10</integer>
+    <integer>30</integer>
 
     <key>StandardOutPath</key>
     <string>{{WORKDIR}}/logs/launchd.out.log</string>

@@ -67,7 +67,12 @@ case "$REPLY" in
   *) echo "Aborted."; exit 0 ;;
 esac
 
-git pull --ff-only
+if ! git pull --ff-only; then
+  echo ""
+  echo "ERROR: fast-forward merge failed (history has diverged)." >&2
+  echo "Try: git pull --rebase   (or resolve manually)" >&2
+  exit 1
+fi
 echo ""
 echo "Update complete. Service was NOT restarted."
 echo "Run 'just restart' (or './scripts/service.sh restart') to apply changes."
