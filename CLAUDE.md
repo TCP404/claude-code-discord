@@ -70,7 +70,7 @@ At session start, the SDK query loads:
 
 - **Runtime:** Deno (via `npx deno`, no global install required)
 - **Entry:** `index.ts`
-- **Start:** `./start.sh start` (production daemon) or `npx deno task start`
+- **Start:** `just start` (LaunchAgent, recommended) or `npx deno task start` (manual)
 - **Auth:** AWS Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`) or Anthropic API key
 - **Platform:** Linux / macOS only (no Windows support)
 
