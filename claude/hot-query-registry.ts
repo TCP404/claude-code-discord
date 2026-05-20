@@ -126,6 +126,11 @@ export class HotQueryRegistry {
         this.scheduleIdle(sessionId);
         return;
       }
+      if (session && session.pendingQueue.size() > 0) {
+        // Queued messages are waiting to be processed; defer eviction.
+        this.scheduleIdle(sessionId);
+        return;
+      }
       this.close(sessionId, "idle").catch((err) => {
         console.error(`[HotQueryRegistry] idle close failed for ${sessionId}:`, err);
       });

@@ -4,6 +4,7 @@ import { buildQueryOptions, extractPermissionDenials } from "./client.ts";
 import type { ClaudeModelOptions } from "./client.ts";
 import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { PromptQueue, type QueuedMessage } from "./queue.ts";
 
 /**
  * An async iterable driven by external `push()` calls. Pending `.next()` promises
@@ -101,11 +102,21 @@ export interface HotQueryCreateParams {
   workDir: string;
   options: ClaudeModelOptions | undefined;
   queryFactory: QueryFactory;
+  /** Max pending messages while a turn is in flight. */
+  queueMax: number;
 }
 
 export class HotQuerySession {
   readonly sessionId: string;
   readonly workDir: string;
+  /**
+   * Pending messages awaiting the next turn. Exposed as `readonly` so
+   * external readers can inspect `size()` / `items()` / `clearByUser()`.
+   * To **add** items, callers should use `enqueueWhenBusy()` (which checks
+   * busy state); direct `pendingQueue.enqueue()` bypasses that guard and
+   * is reserved for special cases.
+   */
+  readonly pendingQueue: PromptQueue;
   boundOptions: ClaudeModelOptions | undefined;
   lastActivityAt: number;
 
@@ -119,12 +130,14 @@ export class HotQuerySession {
   private currentTurn: ActiveTurn | null = null;
   private closed = false;
   private consumerPromise: Promise<void>;
+  private onTurnEndCb: (() => void) | null = null;
 
   private constructor(params: HotQueryCreateParams) {
     this.sessionId = params.sessionId;
     this.workDir = params.workDir;
     this.boundOptions = params.options;
     this.lastActivityAt = Date.now();
+    this.pendingQueue = new PromptQueue(params.queueMax);
     this.inputQueue = new AsyncPushQueue();
     this.query = params.queryFactory(this.inputQueue);
     this.consumerPromise = this.runConsumer();
@@ -148,6 +161,35 @@ export class HotQuerySession {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Register a callback fired whenever a turn ends (success, error, or close).
+   * Only one callback is held at a time — calling this multiple times overwrites
+   * the previous registration.
+   */
+  setOnTurnEnd(cb: () => void): void {
+    this.onTurnEndCb = cb;
+  }
+
+  /**
+   * Try to enqueue a message while a turn is in flight.
+   *
+   * Returns `false` in three cases (the caller should react accordingly):
+   *  - The session is idle — caller should `runTurn` directly.
+   *  - The queue is full — caller should signal "queue full" to the user.
+   *  - The session is closed — caller should give up on this session.
+   *
+   * Distinguish via `pendingQueue.size()` and `currentTurn` state if needed.
+   */
+  enqueueWhenBusy(m: QueuedMessage): boolean {
+    if (!this.currentTurn) return false;
+    return this.pendingQueue.enqueue(m);
+  }
+
+  /** Drain and return all pending messages. */
+  drainPending(): QueuedMessage[] {
+    return this.pendingQueue.drain();
   }
 
   private async runConsumer(): Promise<void> {
@@ -190,6 +232,7 @@ export class HotQuerySession {
           };
           this.endTurn(turn);
           turn.resolve(resolved);
+          this.fireOnTurnEnd();
         }
       }
     } catch (err) {
@@ -197,6 +240,7 @@ export class HotQuerySession {
       if (turn) {
         this.endTurn(turn);
         turn.reject(err instanceof Error ? err : new Error(String(err)));
+        this.fireOnTurnEnd();
       }
     }
   }
@@ -205,6 +249,25 @@ export class HotQuerySession {
     turn.controller.signal.removeEventListener("abort", turn.abortListener);
     if (turn.typingInterval !== undefined) clearInterval(turn.typingInterval);
     this.currentTurn = null;
+  }
+
+  /**
+   * Fire the registered onTurnEnd callback.
+   *
+   * Must be called AFTER `turn.resolve()`/`turn.reject()` so callers awaiting
+   * `runTurn` resume before the callback runs. Errors thrown by the callback
+   * are logged and swallowed.
+   */
+  private fireOnTurnEnd(): void {
+    const cb = this.onTurnEndCb;
+    if (!cb) return;
+    queueMicrotask(() => {
+      try {
+        cb();
+      } catch (err) {
+        console.error("[HotQuerySession] onTurnEnd callback threw:", err);
+      }
+    });
   }
 
   runTurn(
@@ -261,6 +324,7 @@ export class HotQuerySession {
     if (turn) {
       this.endTurn(turn);
       turn.reject(new Error(`HotQuerySession closed: ${reason}`));
+      this.fireOnTurnEnd();
     }
     this.inputQueue.close();
     try {

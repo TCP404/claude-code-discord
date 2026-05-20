@@ -24,11 +24,18 @@ import {
   createSessionThreadCallbacks,
   SessionThreadManager,
 } from "./discord/index.ts";
-import type { TextChannel } from "npm:discord.js@14.14.1";
+import type { TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
 
 import { getGitInfo } from "./git/index.ts";
 import { createClaudeSender, expandableContent } from "./claude/discord-sender.ts";
 import { sendToClaudeCode } from "./claude/client.ts";
+import { mergePrompts, type QueuedMessage } from "./claude/queue.ts";
+import {
+  clearActiveSender,
+  getActiveSender,
+  setActiveSender,
+} from "./claude/active-senders.ts";
+import { markProcessing, markQueued, unmarkAll } from "./discord/queue-reactions.ts";
 import { readHotQueryConfig } from "./claude/hot-query-config.ts";
 import { HotQueryRegistry } from "./claude/hot-query-registry.ts";
 import { HotQuerySession, makeSdkQueryFactory } from "./claude/hot-query.ts";
@@ -67,6 +74,86 @@ import { createWorkspaceHandlers } from "./workspace/index.ts";
 // Re-export for backward compatibility
 export { executeGitCommand, getGitInfo } from "./git/index.ts";
 export { sendToClaudeCode } from "./claude/client.ts";
+
+// ================================
+// Queue drain helper
+// ================================
+
+/**
+ * Build a function that drains pending queued messages on a HotQuerySession,
+ * runs them as a merged turn, and updates Discord reactions / status line.
+ * The returned function guards against re-entry: if it's already running
+ * (e.g., onTurnEnd fires again while we're still draining), the second call
+ * returns early.
+ */
+function makeDrainLoop(
+  hot: HotQuerySession,
+  thread: ThreadChannel,
+  sessionId: string,
+) {
+  let running = false;
+  return async () => {
+    if (running) return;
+    running = true;
+    try {
+      while (hot.pendingQueue.size() > 0) {
+        const pending: QueuedMessage[] = hot.drainPending();
+
+        // Build a fresh sender for the merged turn so agent output renders
+        // and status line updates are visible.
+        const drainSenderApi = createClaudeSender(
+          createChannelSenderAdapter(thread),
+          { isThread: true, sessionId },
+        );
+        const { send: drainSender } = drainSenderApi;
+
+        // Status line: queue is now empty from the user's perspective.
+        drainSenderApi.setQueueContext(null);
+        setActiveSender(sessionId, drainSenderApi);
+
+        // ⏳ → ▶️ on each pending message
+        for (const m of pending) {
+          await markProcessing(thread, m.messageId);
+        }
+
+        const merged = mergePrompts(pending);
+        const controller = new AbortController();
+
+        const onStreamJson = (jsonData: any) => {
+          const claudeMessages = convertToClaudeMessages(jsonData);
+          if (claudeMessages.length > 0) {
+            drainSender(claudeMessages).catch(() => {});
+          }
+        };
+        const onTyping = () => {
+          try {
+            thread.sendTyping();
+          } catch { /* ignore */ }
+        };
+
+        try {
+          await hot.runTurn(merged, controller, { onStreamJson, onTyping });
+        } catch (err) {
+          console.error(`[Queue] merged turn failed for ${sessionId}:`, err);
+          try {
+            await thread.send(
+              `⚠️ Failed to process queued messages: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          } catch { /* ignore */ }
+        } finally {
+          for (const m of pending) {
+            await unmarkAll(thread, m.messageId);
+          }
+          clearActiveSender(sessionId, drainSenderApi);
+        }
+      }
+    } finally {
+      running = false;
+    }
+  };
+}
 
 // ================================
 // Bot Creation
@@ -402,7 +489,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         },
       },
     }),
-    onThreadMessage: async (threadChannelId: string, content: string) => {
+    resolveHotSession: (sessionId: string) => hotQueryRegistry.get(sessionId),
+    onThreadMessage: async (
+      threadChannelId: string,
+      content: string,
+      meta?: { messageId?: string; userId?: string },
+    ) => {
       const sessionId = sessionThreadManager.findSessionByThreadId(threadChannelId);
       if (!sessionId) {
         console.warn(`[ThreadMessage] No session found for thread ${threadChannelId}, ignoring`);
@@ -424,15 +516,50 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
       sessionThreadManager.recordActivity(sessionId);
 
+      // ===== Queue branch: if a turn is already running for this session, enqueue =====
+      const existingHot = hotQueryRegistry.get(sessionId);
+      const hasDrainInFlight = existingHot && existingHot.pendingQueue.size() > 0;
+      if (
+        existingHot &&
+        (existingHot.busy || hasDrainInFlight) &&
+        meta?.messageId && meta?.userId
+      ) {
+        const enqueued = existingHot.enqueueWhenBusy({
+          prompt: content,
+          messageId: meta.messageId,
+          channelId: threadChannelId,
+          userId: meta.userId,
+          receivedAt: Date.now(),
+        });
+        if (!enqueued) {
+          try {
+            await thread.send(
+              `⚠️ Queue is full (${existingHot.pendingQueue.maxSize} messages). Please wait for the current turn to finish.`,
+            );
+          } catch { /* ignore */ }
+          return;
+        }
+        await markQueued(thread, meta.messageId);
+        const activeSender = getActiveSender(sessionId);
+        activeSender?.setQueueContext({
+          count: existingHot.pendingQueue.size(),
+          sessionId,
+        });
+        await activeSender?.refreshQueueStatus();
+        return;
+      }
+
+      // ===== Normal turn path =====
       const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
       const isHotReuse = useHot && hotQueryRegistry.get(sessionId) !== undefined;
 
       const thinkingMsg = isHotReuse ? null : await thread.send("`Claude is thinking...`");
 
-      const { send: threadSender, setSessionId } = createClaudeSender(
+      const senderApi = createClaudeSender(
         createChannelSenderAdapter(thread),
         { isThread: true, sessionId },
       );
+      const { send: threadSender, setSessionId } = senderApi;
       const controller = new AbortController();
       const threadKey = threadChannelId;
       claudeSessionOps.setController(controller, threadKey);
@@ -460,6 +587,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         } catch { /* ignore */ }
       };
 
+      // Register active sender BEFORE runTurn so concurrent enqueues see it.
+      setActiveSender(sessionId, senderApi);
+
       try {
         if (useHot) {
           let hot = hotQueryRegistry.get(sessionId);
@@ -477,10 +607,19 @@ export async function createClaudeCodeBot(config: BotConfig) {
               workDir: effectiveWorkDir,
               options: turnOptions,
               queryFactory: factory,
+              queueMax: hotQueryConfig.queueMax,
             });
             await hotQueryRegistry.register(hot);
             console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
             hotReuseCount = 0;
+
+            // Wire onTurnEnd drain loop ONCE per session.
+            const drainLoop = makeDrainLoop(hot, thread, sessionId);
+            hot.setOnTurnEnd(() => {
+              drainLoop().catch((err) =>
+                console.error(`[Queue] drain loop error for ${sessionId}:`, err)
+              );
+            });
           } else {
             console.log(`[HotQuery] session=${sessionId} reused (skip cold-init)`);
             hotQueryRegistry.touch(sessionId);
@@ -516,6 +655,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
       } finally {
         claudeSessionOps.setController(null, threadKey);
+        clearActiveSender(sessionId, senderApi);
         if (thinkingMsg) {
           try {
             await thinkingMsg.delete();

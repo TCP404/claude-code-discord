@@ -53,6 +53,7 @@ Deno.test("AsyncPushQueue: buffered items drained before done", async () => {
 
 import { HotQuerySession } from "./hot-query.ts";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { mergePrompts } from "./queue.ts";
 
 // Fake Query factory — captures pushed prompts, yields scripted messages.
 function makeFakeQuery(scripted: SDKMessage[][]) {
@@ -94,6 +95,7 @@ Deno.test("HotQuerySession: first turn resolves on result message", async () => 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("hello", new AbortController(), {});
   assertEquals(turn.sessionId, "sess-1");
@@ -108,6 +110,7 @@ Deno.test("HotQuerySession: second concurrent turn rejects with Busy", async () 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const first = session.runTurn("hello", new AbortController(), {});
   await assertRejects(
@@ -136,6 +139,7 @@ Deno.test("HotQuerySession: result.permission_denials populates TurnResult.permi
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("q", new AbortController(), {});
   assertEquals(turn.permissionDenials?.length, 2);
@@ -152,6 +156,7 @@ Deno.test("HotQuerySession: no denials → permissionDenials field omitted", asy
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("q", new AbortController(), {});
   assertEquals(turn.permissionDenials, undefined);
@@ -166,6 +171,7 @@ Deno.test("HotQuerySession: onTyping fires immediately on turn start", async () 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   let typingCalls = 0;
   await session.runTurn("q", new AbortController(), {
@@ -182,6 +188,7 @@ Deno.test("HotQuerySession: close during in-flight turn rejects the turn promise
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const pending = session.runTurn("hello", new AbortController(), {});
   await assertRejects(
@@ -202,6 +209,7 @@ Deno.test("HotQuerySession: runTurn after close rejects immediately", async () =
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   await session.close("shutdown");
   await assertRejects(
@@ -218,6 +226,7 @@ Deno.test("HotQuerySession: interrupt returns true when turn is active", async (
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const _pending = session.runTurn("hello", new AbortController(), {});
   assertEquals(session.busy, true);
@@ -238,6 +247,7 @@ Deno.test("HotQuerySession: interrupt returns false when no turn active", async 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   await session.runTurn("hello", new AbortController(), {});
   assertEquals(session.busy, false);
@@ -259,9 +269,159 @@ Deno.test("HotQuerySession: onChunk receives assistant text", async () => {
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const chunks: string[] = [];
   await session.runTurn("q", new AbortController(), { onChunk: (t) => chunks.push(t) });
   assertEquals(chunks, ["hi there"]);
   await session.close("test");
+});
+
+Deno.test("HotQuerySession: enqueueWhenBusy returns false when not busy", () => {
+  const { factory } = makeFakeQuery([[]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-eq1",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 10,
+  });
+  const ok = session.enqueueWhenBusy({
+    prompt: "p",
+    messageId: "m",
+    channelId: "c",
+    userId: "u",
+    receivedAt: Date.now(),
+  });
+  assertEquals(ok, false);
+  assertEquals(session.pendingQueue.size(), 0);
+  session.close("test");
+});
+
+Deno.test("HotQuerySession: enqueueWhenBusy returns true and grows queue when busy", async () => {
+  const { factory } = makeFakeQuery([[]]); // turn never finishes
+  const session = HotQuerySession.create({
+    sessionId: "sess-eq2",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 10,
+  });
+  const _pending = session.runTurn("first", new AbortController(), {});
+  assertEquals(session.busy, true);
+  const ok = session.enqueueWhenBusy({
+    prompt: "second",
+    messageId: "m2",
+    channelId: "c",
+    userId: "u",
+    receivedAt: Date.now(),
+  });
+  assertEquals(ok, true);
+  assertEquals(session.pendingQueue.size(), 1);
+  await session.close("test");
+  await _pending.catch(() => {});
+});
+
+Deno.test("HotQuerySession: enqueueWhenBusy returns false when queue is full (still busy)", async () => {
+  const { factory } = makeFakeQuery([[]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-eq3",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 1,
+  });
+  const _pending = session.runTurn("first", new AbortController(), {});
+  session.enqueueWhenBusy({
+    prompt: "x",
+    messageId: "m1",
+    channelId: "c",
+    userId: "u",
+    receivedAt: 1,
+  });
+  const ok = session.enqueueWhenBusy({
+    prompt: "y",
+    messageId: "m2",
+    channelId: "c",
+    userId: "u",
+    receivedAt: 2,
+  });
+  assertEquals(ok, false);
+  assertEquals(session.pendingQueue.size(), 1);
+  await session.close("test");
+  await _pending.catch(() => {});
+});
+
+Deno.test("HotQuerySession: onTurnEnd fires when turn resolves successfully", async () => {
+  const done = { type: "result", session_id: "sess-end1" } as unknown as SDKMessage;
+  const { factory } = makeFakeQuery([[done]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-end1",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 10,
+  });
+  let calls = 0;
+  session.setOnTurnEnd(() => {
+    calls++;
+  });
+  await session.runTurn("hi", new AbortController(), {});
+  // Allow microtask for callback to fire
+  await new Promise((r) => setTimeout(r, 0));
+  assertEquals(calls, 1);
+  await session.close("test");
+});
+
+Deno.test("HotQuerySession: onTurnEnd fires when turn rejects via close", async () => {
+  const { factory } = makeFakeQuery([[]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-end2",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 10,
+  });
+  let calls = 0;
+  session.setOnTurnEnd(() => {
+    calls++;
+  });
+  const turn = session.runTurn("hi", new AbortController(), {});
+  await session.close("shutdown");
+  await turn.catch(() => {});
+  await new Promise((r) => setTimeout(r, 0));
+  assertEquals(calls, 1);
+});
+
+Deno.test("HotQuerySession: drainPending returns all pending in insertion order", async () => {
+  const { factory } = makeFakeQuery([[]]);
+  const session = HotQuerySession.create({
+    sessionId: "sess-drain",
+    workDir: "/tmp",
+    options: {},
+    queryFactory: factory,
+    queueMax: 10,
+  });
+  const _pending = session.runTurn("first", new AbortController(), {});
+  session.enqueueWhenBusy({
+    prompt: "a",
+    messageId: "m1",
+    channelId: "c",
+    userId: "u",
+    receivedAt: 1,
+  });
+  session.enqueueWhenBusy({
+    prompt: "b",
+    messageId: "m2",
+    channelId: "c",
+    userId: "u",
+    receivedAt: 2,
+  });
+  const out = session.drainPending();
+  assertEquals(out.map((m) => m.messageId), ["m1", "m2"]);
+  assertEquals(session.pendingQueue.size(), 0);
+  // Verify mergePrompts integrates correctly
+  assertEquals(mergePrompts(out), "a\n\nb");
+  await session.close("test");
+  await _pending.catch(() => {});
 });

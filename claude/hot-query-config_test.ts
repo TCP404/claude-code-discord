@@ -34,3 +34,20 @@ Deno.test("readHotQueryConfig: invalid numbers fall back to defaults", () => {
   assertEquals(cfg.idleMs, 900_000);
   assertEquals(cfg.maxSessions, 3);
 });
+
+Deno.test("readHotQueryConfig: queueMax defaults to 20", () => {
+  const cfg = readHotQueryConfig(() => undefined);
+  assertEquals(cfg.queueMax, 20);
+});
+
+Deno.test("readHotQueryConfig: queueMax reads HOT_QUERY_QUEUE_MAX", () => {
+  const env: Record<string, string> = { HOT_QUERY_QUEUE_MAX: "5" };
+  const cfg = readHotQueryConfig((k) => env[k]);
+  assertEquals(cfg.queueMax, 5);
+});
+
+Deno.test("readHotQueryConfig: queueMax falls back on invalid value", () => {
+  const env: Record<string, string> = { HOT_QUERY_QUEUE_MAX: "-1" };
+  const cfg = readHotQueryConfig((k) => env[k]);
+  assertEquals(cfg.queueMax, 20);
+});

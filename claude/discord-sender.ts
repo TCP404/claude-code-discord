@@ -45,14 +45,34 @@ export function createClaudeSender(
   let statusMsg: TrackedMessage | null = null;
   let statusStartTime = 0;
   let visibleSentSinceStatus = false;
+  let lastStatusLine: string | null = null;
+  let queueContext: { count: number; sessionId: string } | null = null;
+
+  function buildStatusPayload(line: string): MessageContent {
+    const elapsed = ((Date.now() - statusStartTime) / 1000).toFixed(0);
+    let content = `${line}  \`${elapsed}s\``;
+    const components: NonNullable<MessageContent["components"]> = [];
+    if (queueContext && queueContext.count > 0) {
+      content += `\n📥 Queued: ${queueContext.count} message${queueContext.count === 1 ? "" : "s"}`;
+      components.push({
+        type: "actionRow",
+        components: [{
+          type: "button",
+          customId: `queue-clear:${queueContext.sessionId}`,
+          label: `❌ Clear queue (${queueContext.count})`,
+          style: "danger",
+        }],
+      });
+    }
+    return components.length > 0 ? { content, components } : { content };
+  }
 
   async function updateStatus(line: string) {
     if (!sender.sendTracked) return;
-    const elapsed = ((Date.now() - statusStartTime) / 1000).toFixed(0);
-    const content = `${line}  \`${elapsed}s\``;
+    lastStatusLine = line;
     try {
       if (statusMsg && !visibleSentSinceStatus) {
-        await statusMsg.edit({ content });
+        await statusMsg.edit(buildStatusPayload(line));
       } else {
         if (statusMsg) {
           try {
@@ -60,17 +80,32 @@ export function createClaudeSender(
           } catch { /* ignore */ }
         }
         statusStartTime = Date.now();
-        statusMsg = await sender.sendTracked({ content: line });
+        statusMsg = await sender.sendTracked(buildStatusPayload(line));
         visibleSentSinceStatus = false;
       }
     } catch { /* message may have been deleted */ }
   }
 
+  async function refreshQueueStatus(): Promise<void> {
+    if (!sender.sendTracked || !lastStatusLine) return;
+    if (statusMsg && !visibleSentSinceStatus) {
+      try {
+        await statusMsg.edit(buildStatusPayload(lastStatusLine));
+      } catch { /* ignore */ }
+    }
+  }
+
+  function setQueueContext(ctx: { count: number; sessionId: string } | null): void {
+    queueContext = ctx;
+  }
+
   async function finalizeStatus(content: string) {
     if (!sender.sendTracked) return;
+    queueContext = null;
+    lastStatusLine = null;
     try {
       if (statusMsg && !visibleSentSinceStatus) {
-        await statusMsg.edit({ content });
+        await statusMsg.edit({ content, components: [] });
       } else {
         if (statusMsg) {
           try {
@@ -84,6 +119,8 @@ export function createClaudeSender(
   }
 
   async function clearStatus() {
+    queueContext = null;
+    lastStatusLine = null;
     if (statusMsg) {
       try {
         await statusMsg.delete();
@@ -246,5 +283,7 @@ export function createClaudeSender(
     setSessionId: (id: string) => {
       currentSessionId = id;
     },
+    refreshQueueStatus,
+    setQueueContext,
   };
 }
