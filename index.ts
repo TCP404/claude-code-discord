@@ -29,13 +29,13 @@ import type { TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
 import { getGitInfo } from "./git/index.ts";
 import { createClaudeSender, expandableContent } from "./claude/discord-sender.ts";
 import { sendToClaudeCode } from "./claude/client.ts";
-import { mergePrompts, type QueuedMessage } from "./claude/queue.ts";
 import {
   clearActiveSender,
   getActiveSender,
   setActiveSender,
 } from "./claude/active-senders.ts";
-import { markProcessing, markQueued, unmarkAll } from "./discord/queue-reactions.ts";
+import { markQueued } from "./discord/queue-reactions.ts";
+import { QueueConsumer } from "./claude/queue-consumer.ts";
 import { readHotQueryConfig } from "./claude/hot-query-config.ts";
 import { HotQueryRegistry } from "./claude/hot-query-registry.ts";
 import { HotQuerySession, makeSdkQueryFactory } from "./claude/hot-query.ts";
@@ -74,86 +74,6 @@ import { createWorkspaceHandlers } from "./workspace/index.ts";
 // Re-export for backward compatibility
 export { executeGitCommand, getGitInfo } from "./git/index.ts";
 export { sendToClaudeCode } from "./claude/client.ts";
-
-// ================================
-// Queue drain helper
-// ================================
-
-/**
- * Build a function that drains pending queued messages on a HotQuerySession,
- * runs them as a merged turn, and updates Discord reactions / status line.
- * The returned function guards against re-entry: if it's already running
- * (e.g., onTurnEnd fires again while we're still draining), the second call
- * returns early.
- */
-function makeDrainLoop(
-  hot: HotQuerySession,
-  thread: ThreadChannel,
-  sessionId: string,
-) {
-  let running = false;
-  return async () => {
-    if (running) return;
-    running = true;
-    try {
-      while (hot.pendingQueue.size() > 0) {
-        const pending: QueuedMessage[] = hot.drainPending();
-
-        // Build a fresh sender for the merged turn so agent output renders
-        // and status line updates are visible.
-        const drainSenderApi = createClaudeSender(
-          createChannelSenderAdapter(thread),
-          { isThread: true, sessionId },
-        );
-        const { send: drainSender } = drainSenderApi;
-
-        // Status line: queue is now empty from the user's perspective.
-        drainSenderApi.setQueueContext(null);
-        setActiveSender(sessionId, drainSenderApi);
-
-        // ⏳ → ▶️ on each pending message
-        for (const m of pending) {
-          await markProcessing(thread, m.messageId);
-        }
-
-        const merged = mergePrompts(pending);
-        const controller = new AbortController();
-
-        const onStreamJson = (jsonData: any) => {
-          const claudeMessages = convertToClaudeMessages(jsonData);
-          if (claudeMessages.length > 0) {
-            drainSender(claudeMessages).catch(() => {});
-          }
-        };
-        const onTyping = () => {
-          try {
-            thread.sendTyping();
-          } catch { /* ignore */ }
-        };
-
-        try {
-          await hot.runTurn(merged, controller, { onStreamJson, onTyping });
-        } catch (err) {
-          console.error(`[Queue] merged turn failed for ${sessionId}:`, err);
-          try {
-            await thread.send(
-              `⚠️ Failed to process queued messages: ${
-                err instanceof Error ? err.message : String(err)
-              }`,
-            );
-          } catch { /* ignore */ }
-        } finally {
-          for (const m of pending) {
-            await unmarkAll(thread, m.messageId);
-          }
-          clearActiveSender(sessionId, drainSenderApi);
-        }
-      }
-    } finally {
-      running = false;
-    }
-  };
-}
 
 // ================================
 // Bot Creation
@@ -253,6 +173,149 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   // Register hot query interrupt as fallback for /stop when no cold-mode activeQuery
   setFallbackInterrupt(() => hotQueryRegistry.interruptBusy());
+
+  // sessionId → QueueConsumer. Owns the only call site of hot.runTurn for
+  // queued messages, eliminating the busy-check race between concurrent
+  // onThreadMessage invocations.
+  const queueConsumers = new Map<string, QueueConsumer>();
+
+  /**
+   * Build a per-session QueueConsumer with the right Discord wiring.
+   * Captures the createClaudeCodeBot closure (claudeSessionOps,
+   * sessionThreadManager, etc.).
+   */
+  function makeQueueConsumer(
+    hot: HotQuerySession,
+    thread: ThreadChannel,
+    sessionId: string,
+    isFreshCold: boolean,
+  ): QueueConsumer {
+    let hotReuseCount = isFreshCold ? 0 : -1;
+    return new QueueConsumer({
+      hot,
+      thread,
+      sessionId,
+      buildSender: () => {
+        const senderApi = createClaudeSender(
+          createChannelSenderAdapter(thread),
+          { isThread: true, sessionId },
+        );
+        const { send: threadSender, setSessionId: senderSetSessionId } = senderApi;
+
+        // Bug 1 fix: ensure a status line exists immediately, even if the
+        // turn never produces hidden tool messages. Without this, refreshQueueStatus
+        // is a no-op (lastStatusLine === null) and queue badges never show.
+        senderApi.setQueueContext(null);
+        // Discord typing + a placeholder status line via updateStatus is owned
+        // by the sender; we trigger it through the first onStreamJson on the
+        // synthetic init message below. Here we just register the sender so
+        // concurrent enqueues during this turn can refresh the status line.
+        setActiveSender(sessionId, senderApi);
+
+        const onStreamJson = (jsonData: any) => {
+          if (hotReuseCount >= 0 && jsonData?.type === "result") {
+            jsonData._hotReuse = hotReuseCount;
+          }
+          if (
+            hotReuseCount > 0 &&
+            jsonData?.type === "system" && jsonData?.subtype === "init"
+          ) {
+            return;
+          }
+          const claudeMessages = convertToClaudeMessages(jsonData);
+          if (claudeMessages.length > 0) {
+            threadSender(claudeMessages).catch(() => {});
+          }
+        };
+        const onTyping = () => {
+          try {
+            thread.sendTyping();
+          } catch { /* ignore */ }
+        };
+
+        return {
+          senderApi: { ...senderApi, setSessionId: senderSetSessionId },
+          onStreamJson,
+          onTyping,
+          cleanup: () => {
+            clearActiveSender(sessionId, senderApi);
+            // After this turn finishes, future turns are reuses.
+            hotReuseCount = Math.max(0, hotReuseCount) + 1;
+            if (hotReuseCount > 0) {
+              hotQueryRegistry.touch(sessionId);
+            }
+          },
+        };
+      },
+      setController: (c) => {
+        claudeSessionOps.setController(c, thread.id);
+      },
+      onSessionIdResolved: (sid) => {
+        claudeSessionOps.setSessionId(sid, thread.id);
+      },
+    });
+  }
+
+  /**
+   * Cold-path runner for sessions where hot query is disabled. Mirrors the
+   * pre-queue-feature behaviour: each user message triggers a fresh
+   * sendToClaudeCode call. No queueing — the bot's existing AbortController
+   * semantics ("new message aborts old turn") still apply for cold path.
+   */
+  async function runColdTurn(
+    thread: ThreadChannel,
+    sessionId: string,
+    threadChannelId: string,
+    content: string,
+  ): Promise<void> {
+    const thinkingMsg = await thread.send("`Claude is thinking...`");
+    const senderApi = createClaudeSender(
+      createChannelSenderAdapter(thread),
+      { isThread: true, sessionId },
+    );
+    const { send: threadSender, setSessionId } = senderApi;
+    const controller = new AbortController();
+    claudeSessionOps.setController(controller, threadChannelId);
+
+    const parentChannelId = (thread as any).parentId ?? threadChannelId;
+    const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
+    const turnOptions = { appendSystemPrompt: BOT_SYSTEM_PROMPT };
+
+    try {
+      const result = await sendToClaudeCode(
+        effectiveWorkDir,
+        content,
+        controller,
+        sessionId,
+        undefined,
+        (jsonData) => {
+          const claudeMessages = convertToClaudeMessages(jsonData);
+          if (claudeMessages.length > 0) {
+            threadSender(claudeMessages).catch(() => {});
+          }
+        },
+        turnOptions,
+        () => {
+          try {
+            thread.sendTyping();
+          } catch { /* ignore */ }
+        },
+      );
+      if (result.sessionId) {
+        claudeSessionOps.setSessionId(result.sessionId, threadChannelId);
+        setSessionId(result.sessionId);
+      }
+    } catch (error) {
+      console.error(`[ColdTurn] Failed to resume session ${sessionId}:`, error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
+    } finally {
+      claudeSessionOps.setController(null, threadChannelId);
+      try {
+        await thinkingMsg.delete();
+      } catch { /* ignore */ }
+    }
+  }
 
   // Per-channel routing maps
   const responseChannels = new Map<string, any>();
@@ -516,152 +579,85 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
       sessionThreadManager.recordActivity(sessionId);
 
-      // ===== Queue branch: if a turn is already running for this session, enqueue =====
-      const existingHot = hotQueryRegistry.get(sessionId);
-      const hasDrainInFlight = existingHot && existingHot.pendingQueue.size() > 0;
-      if (
-        existingHot &&
-        (existingHot.busy || hasDrainInFlight) &&
-        meta?.messageId && meta?.userId
-      ) {
-        const enqueued = existingHot.enqueueWhenBusy({
-          prompt: content,
-          messageId: meta.messageId,
-          channelId: threadChannelId,
-          userId: meta.userId,
-          receivedAt: Date.now(),
-        });
-        if (!enqueued) {
-          try {
-            await thread.send(
-              `⚠️ Queue is full (${existingHot.pendingQueue.maxSize} messages). Please wait for the current turn to finish.`,
-            );
-          } catch { /* ignore */ }
-          return;
-        }
-        await markQueued(thread, meta.messageId);
-        const activeSender = getActiveSender(sessionId);
-        activeSender?.setQueueContext({
-          count: existingHot.pendingQueue.size(),
-          sessionId,
-        });
-        await activeSender?.refreshQueueStatus();
+      // Cold path: when hot query is disabled, fall back to the per-message
+      // cold runner. No queue for cold path — by design (see spec).
+      const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
+      if (!useHot) {
+        await runColdTurn(thread, sessionId, threadChannelId, content);
         return;
       }
 
-      // ===== Normal turn path =====
-      const useHot = sessionThreadManager.getHotQuery(sessionId) ?? hotQueryConfig.enabled;
-      const isHotReuse = useHot && hotQueryRegistry.get(sessionId) !== undefined;
-
-      const thinkingMsg = isHotReuse ? null : await thread.send("`Claude is thinking...`");
-
-      const senderApi = createClaudeSender(
-        createChannelSenderAdapter(thread),
-        { isThread: true, sessionId },
-      );
-      const { send: threadSender, setSessionId } = senderApi;
-      const controller = new AbortController();
-      const threadKey = threadChannelId;
-      claudeSessionOps.setController(controller, threadKey);
-
+      // Hot path: ensure session + consumer exist, enqueue, kick consumer.
       const parentChannelId = (thread as any).parentId ?? threadChannelId;
       const effectiveWorkDir = workspaceManager.resolve(parentChannelId);
       const turnOptions = { appendSystemPrompt: BOT_SYSTEM_PROMPT };
 
-      let hotReuseCount = -1 as number; // -1 = cold mode
-      const onStreamJson = (jsonData: any) => {
-        if (hotReuseCount >= 0 && jsonData.type === "result") {
-          jsonData._hotReuse = hotReuseCount;
-        }
-        if (hotReuseCount > 0 && jsonData.type === "system" && jsonData.subtype === "init") {
-          return;
-        }
-        const claudeMessages = convertToClaudeMessages(jsonData);
-        if (claudeMessages.length > 0) {
-          threadSender(claudeMessages).catch(() => {});
-        }
-      };
-      const onTyping = () => {
-        try {
-          thread.sendTyping();
-        } catch { /* ignore */ }
-      };
-
-      // Register active sender BEFORE runTurn so concurrent enqueues see it.
-      setActiveSender(sessionId, senderApi);
-
-      try {
-        if (useHot) {
-          let hot = hotQueryRegistry.get(sessionId);
-          if (!hot) {
-            console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
-            const t0 = Date.now();
-            const factory = await makeSdkQueryFactory(
-              effectiveWorkDir,
-              turnOptions,
-              sessionId,
-              controller,
-            );
-            hot = HotQuerySession.create({
-              sessionId,
-              workDir: effectiveWorkDir,
-              options: turnOptions,
-              queryFactory: factory,
-              queueMax: hotQueryConfig.queueMax,
-            });
-            await hotQueryRegistry.register(hot);
-            console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
-            hotReuseCount = 0;
-
-            // Wire onTurnEnd drain loop ONCE per session.
-            const drainLoop = makeDrainLoop(hot, thread, sessionId);
-            hot.setOnTurnEnd(() => {
-              drainLoop().catch((err) =>
-                console.error(`[Queue] drain loop error for ${sessionId}:`, err)
-              );
-            });
-          } else {
-            console.log(`[HotQuery] session=${sessionId} reused (skip cold-init)`);
-            hotQueryRegistry.touch(sessionId);
-            hotReuseCount = hotQueryRegistry.getReuseCount(sessionId);
-          }
-          const result = await hot.runTurn(content, controller, {
-            onStreamJson,
-            onTyping,
-          });
-          if (result.sessionId) {
-            claudeSessionOps.setSessionId(result.sessionId, threadKey);
-            setSessionId(result.sessionId);
-          }
-        } else {
-          const result = await sendToClaudeCode(
-            effectiveWorkDir,
-            content,
-            controller,
-            sessionId,
-            undefined,
-            onStreamJson,
-            turnOptions,
-            onTyping,
-          );
-          if (result.sessionId) {
-            claudeSessionOps.setSessionId(result.sessionId, threadKey);
-            setSessionId(result.sessionId);
-          }
-        }
-      } catch (error) {
-        console.error(`[ThreadMessage] Failed to resume session ${sessionId}:`, error);
-        const errMsg = error instanceof Error ? error.message : String(error);
-        await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
-      } finally {
-        claudeSessionOps.setController(null, threadKey);
-        clearActiveSender(sessionId, senderApi);
-        if (thinkingMsg) {
-          try {
-            await thinkingMsg.delete();
-          } catch { /* ignore */ }
-        }
+      let hot = hotQueryRegistry.get(sessionId);
+      let isFreshCold = false;
+      if (!hot) {
+        console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
+        const t0 = Date.now();
+        // Use a session-scoped controller for the SDK construction; the
+        // consumer creates per-turn controllers separately.
+        const initController = new AbortController();
+        const factory = await makeSdkQueryFactory(
+          effectiveWorkDir,
+          turnOptions,
+          sessionId,
+          initController,
+        );
+        hot = HotQuerySession.create({
+          sessionId,
+          workDir: effectiveWorkDir,
+          options: turnOptions,
+          queryFactory: factory,
+          queueMax: hotQueryConfig.queueMax,
+        });
+        await hotQueryRegistry.register(hot);
+        console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
+        isFreshCold = true;
+      } else {
+        hotQueryRegistry.touch(sessionId);
       }
+
+      // Build / reuse the per-session consumer.
+      let consumer = queueConsumers.get(sessionId);
+      if (!consumer) {
+        consumer = makeQueueConsumer(hot, thread, sessionId, isFreshCold);
+        queueConsumers.set(sessionId, consumer);
+      }
+
+      // Try to enqueue this message. The consumer (and only the consumer)
+      // calls runTurn — onThreadMessage never does.
+      const enqueued = hot.pendingQueue.enqueue({
+        prompt: content,
+        messageId: meta?.messageId ?? "",
+        channelId: threadChannelId,
+        userId: meta?.userId ?? "",
+        receivedAt: Date.now(),
+      });
+      if (!enqueued) {
+        try {
+          await thread.send(
+            `⚠️ Queue is full (${hot.pendingQueue.maxSize} messages). Please wait for the current message to finish.`,
+          );
+        } catch { /* ignore */ }
+        return;
+      }
+
+      // Visual: ⏳ on the queued message + queue badge in status line.
+      if (meta?.messageId) {
+        await markQueued(thread, meta.messageId);
+      }
+      const activeSender = getActiveSender(sessionId);
+      activeSender?.setQueueContext({
+        count: hot.pendingQueue.size(),
+        sessionId,
+      });
+      await activeSender?.refreshQueueStatus();
+
+      // Start (or wake) the consumer. Idempotent.
+      consumer.kick();
     },
     setResponseChannel: (ch: any) => {
       const chId = ch?.id;

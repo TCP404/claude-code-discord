@@ -86,13 +86,32 @@ export function createClaudeSender(
     } catch { /* message may have been deleted */ }
   }
 
+  /**
+   * Re-render the status line so that any queue-context change becomes visible.
+   *
+   * If no status line exists yet (e.g. the current turn hasn't produced a
+   * single hidden tool message), we create one with a placeholder so the
+   * queue badge + clear button can be shown. Without this, queueing during
+   * a "talk-only" turn would silently fail to surface in the UI.
+   */
   async function refreshQueueStatus(): Promise<void> {
-    if (!sender.sendTracked || !lastStatusLine) return;
-    if (statusMsg && !visibleSentSinceStatus) {
-      try {
-        await statusMsg.edit(buildStatusPayload(lastStatusLine));
-      } catch { /* ignore */ }
-    }
+    if (!sender.sendTracked) return;
+    const line = lastStatusLine ?? "⏸️ Agent busy";
+    try {
+      if (statusMsg && !visibleSentSinceStatus) {
+        await statusMsg.edit(buildStatusPayload(line));
+      } else {
+        if (statusMsg) {
+          try {
+            await statusMsg.delete();
+          } catch { /* ignore */ }
+        }
+        statusStartTime = Date.now();
+        statusMsg = await sender.sendTracked(buildStatusPayload(line));
+        visibleSentSinceStatus = false;
+        if (lastStatusLine === null) lastStatusLine = line;
+      }
+    } catch { /* ignore — message may have been deleted */ }
   }
 
   function setQueueContext(ctx: { count: number; sessionId: string } | null): void {
