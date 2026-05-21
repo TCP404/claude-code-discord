@@ -9,15 +9,21 @@ import type { MessageContent } from "./types.ts";
 import type { DiscordSender } from "../claude/types.ts";
 
 /**
- * Build a Discord.js payload from a MessageContent object and send it to a channel.
+ * Build a Discord.js payload object from our internal MessageContent type.
+ * Handles `content`, `embeds`, `components` (button ActionRows), and `files`.
+ *
+ * Exported so callers that need to `edit` an existing Message — not just
+ * `send` a new one — can reuse the same conversion (e.g. status-line edits
+ * that include a clear-queue button must convert components, otherwise
+ * the button gets silently dropped).
  */
-export async function sendMessageContent(channel: any, content: MessageContent): Promise<void> {
+export async function buildDiscordPayload(content: MessageContent): Promise<any> {
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } =
     await import("npm:discord.js@14.14.1");
 
   const payload: any = {};
 
-  if (content.content) payload.content = content.content;
+  if (content.content !== undefined) payload.content = content.content;
 
   if (content.embeds) {
     payload.embeds = content.embeds.map((e) => {
@@ -74,6 +80,14 @@ export async function sendMessageContent(channel: any, content: MessageContent):
     );
   }
 
+  return payload;
+}
+
+/**
+ * Build a Discord.js payload from a MessageContent object and send it to a channel.
+ */
+export async function sendMessageContent(channel: any, content: MessageContent): Promise<void> {
+  const payload = await buildDiscordPayload(content);
   await channel.send(payload);
 }
 
@@ -82,14 +96,7 @@ export async function sendMessageContentTracked(
   channel: any,
   content: MessageContent,
 ): Promise<any> {
-  const { AttachmentBuilder } = await import("npm:discord.js@14.14.1");
-  const payload: any = {};
-  if (content.content) payload.content = content.content;
-  if (content.files && content.files.length > 0) {
-    payload.files = content.files.map((f) =>
-      new AttachmentBuilder(f.path, { name: f.name || "attachment", description: f.description })
-    );
-  }
+  const payload = await buildDiscordPayload(content);
   return await channel.send(payload);
 }
 
@@ -126,8 +133,7 @@ export function createChannelSenderAdapter(channel: any): DiscordSender {
       const msg = await sendMessageContentTracked(channel, content);
       return {
         async edit(newContent) {
-          const payload: any = {};
-          if (newContent.content) payload.content = newContent.content;
+          const payload = await buildDiscordPayload(newContent);
           await msg.edit(payload);
         },
         async delete() {
