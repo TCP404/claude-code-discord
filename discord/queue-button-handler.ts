@@ -11,7 +11,7 @@
 
 import type { ButtonInteraction, ThreadChannel } from "npm:discord.js@14.14.1";
 import type { HotQuerySession } from "../claude/hot-query.ts";
-import { unmarkAll } from "./queue-reactions.ts";
+import { markCancelled } from "./queue-reactions.ts";
 import { getActiveSender } from "../claude/active-senders.ts";
 
 export const QUEUE_CLEAR_PREFIX = "queue-clear:";
@@ -50,11 +50,12 @@ export function createQueueClearHandler(deps: QueueClearDeps) {
       await interaction.deferUpdate();
     } catch { /* ignore */ }
 
-    // Remove ⏳ from each cleared message
+    // Replace ⏳ with 🚫 on each cleared message — keeps the message in
+    // place but signals it was cancelled.
     const channel = interaction.channel as ThreadChannel | null;
     if (channel) {
       for (const m of cleared) {
-        await unmarkAll(channel, m.messageId);
+        await markCancelled(channel, m.messageId);
       }
     }
 

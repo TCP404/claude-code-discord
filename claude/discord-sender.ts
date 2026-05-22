@@ -76,7 +76,10 @@ export function createClaudeSender(
         }],
       });
     }
-    return components.length > 0 ? { content, components } : { content };
+    // Always return `components` (even empty) so Discord's `edit` clears
+    // any stale ActionRow attached to this message. Without this, a stale
+    // "Clear queue" button lingers after the queue is drained.
+    return { content, components };
   }
 
   function updateStatus(line: string): Promise<void> {

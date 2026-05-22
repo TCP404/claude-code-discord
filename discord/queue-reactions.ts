@@ -1,5 +1,5 @@
 /**
- * @module discord/queue-reactions — Add/remove ⏳ ▶️ reactions on Discord messages.
+ * @module discord/queue-reactions — Add/remove ⏳ ▶️ ❌ reactions on Discord messages.
  *
  * Failures are logged and swallowed: reactions are best-effort UX; a missing one
  * must never crash the queue logic. Discord.js may throw "Unknown Message" when
@@ -10,6 +10,7 @@ import type { ThreadChannel } from "npm:discord.js@14.14.1";
 
 export const QUEUED_EMOJI = "⏳";
 export const PROCESSING_EMOJI = "▶️";
+export const CANCELLED_EMOJI = "🚫";
 
 async function fetchMessage(channel: ThreadChannel, messageId: string) {
   try {
@@ -74,4 +75,14 @@ export async function unmarkAll(
 ): Promise<void> {
   await safeRemoveOwn(channel, messageId, QUEUED_EMOJI);
   await safeRemoveOwn(channel, messageId, PROCESSING_EMOJI);
+  await safeRemoveOwn(channel, messageId, CANCELLED_EMOJI);
+}
+
+/** Replace ⏳ with 🚫 when the user cancels their queued message. */
+export async function markCancelled(
+  channel: ThreadChannel,
+  messageId: string,
+): Promise<void> {
+  await safeRemoveOwn(channel, messageId, QUEUED_EMOJI);
+  await safeReact(channel, messageId, CANCELLED_EMOJI);
 }
