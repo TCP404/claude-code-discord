@@ -85,6 +85,8 @@ export interface QueryLike {
   [Symbol.asyncIterator](): AsyncIterator<SDKMessage>;
   interrupt(): Promise<void>;
   close(): void;
+  mcpServerStatus?(): Promise<Array<{ name: string; status: string }>>;
+  reconnectMcpServer?(serverName: string): Promise<void>;
 }
 
 export type QueryFactory = (
@@ -207,6 +209,23 @@ export class HotQuerySession {
     this.currentTurn = null;
   }
 
+  private async reconnectFailedMcpServers(): Promise<void> {
+    if (!this.query.mcpServerStatus || !this.query.reconnectMcpServer) return;
+    try {
+      const statuses = await this.query.mcpServerStatus();
+      for (const s of statuses) {
+        if (s.status === "failed") {
+          console.log(`[HotQuery] Reconnecting failed MCP server: ${s.name}`);
+          try {
+            await this.query.reconnectMcpServer(s.name);
+          } catch (e) {
+            console.error(`[HotQuery] Failed to reconnect ${s.name}:`, e);
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
   runTurn(
     prompt: string,
     controller: AbortController,
@@ -218,24 +237,24 @@ export class HotQuerySession {
     }
     this.lastActivityAt = Date.now();
 
-    return new Promise<TurnResult>((resolve, reject) => {
-      const abortListener = () => {
-        this.query.interrupt().catch(() => {});
-      };
-      controller.signal.addEventListener("abort", abortListener, { once: true });
+    const abortListener = () => {
+      this.query.interrupt().catch(() => {});
+    };
+    controller.signal.addEventListener("abort", abortListener, { once: true });
 
-      let typingInterval: ReturnType<typeof setInterval> | undefined;
-      if (callbacks.onTyping) {
+    let typingInterval: ReturnType<typeof setInterval> | undefined;
+    if (callbacks.onTyping) {
+      try {
+        callbacks.onTyping();
+      } catch { /* non-critical */ }
+      typingInterval = setInterval(() => {
         try {
-          callbacks.onTyping();
+          callbacks.onTyping!();
         } catch { /* non-critical */ }
-        typingInterval = setInterval(() => {
-          try {
-            callbacks.onTyping!();
-          } catch { /* non-critical */ }
-        }, TYPING_REFRESH_MS);
-      }
+      }, TYPING_REFRESH_MS);
+    }
 
+    return new Promise<TurnResult>((resolve, reject) => {
       this.currentTurn = {
         controller,
         callbacks,
@@ -245,11 +264,13 @@ export class HotQuerySession {
         abortListener,
         typingInterval,
       };
-      this.inputQueue.push({
-        type: "user",
-        message: { role: "user", content: prompt },
-        parent_tool_use_id: null,
-        session_id: this.sessionId,
+      this.reconnectFailedMcpServers().then(() => {
+        this.inputQueue.push({
+          type: "user",
+          message: { role: "user", content: prompt },
+          parent_tool_use_id: null,
+          session_id: this.sessionId,
+        });
       });
     });
   }

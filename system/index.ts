@@ -272,20 +272,12 @@ ${systemInfoOutput}`;
 
     async onRefreshBedrock(_ctx: any) {
       try {
-        const cmd = new Deno.Command("aws", {
-          args: ["sso", "login", "--profile", "enterprise-ai"],
-          stdout: "piped",
-          stderr: "piped",
-        });
-        const output = await cmd.output();
-        if (!output.success) {
-          const stderr = new TextDecoder().decode(output.stderr);
-          throw new Error(stderr || "AWS SSO login failed");
-        }
-        return { data: "AWS SSO login completed — Bedrock credentials refreshed successfully." };
+        const { refreshBedrockViaCdp } = await import("./cdp-sso.ts");
+        const result = await refreshBedrockViaCdp("enterprise-ai");
+        return { data: result };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to launch SSO login: ${message}`);
+        throw new Error(`Bedrock credential refresh failed: ${message}`);
       }
     },
   };

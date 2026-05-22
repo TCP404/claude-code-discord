@@ -25,20 +25,24 @@ async function loadMcpServers(
     const servers = parsed?.mcpServers;
     if (!servers || typeof servers !== "object") return undefined;
 
-    // Clean configs to match SDK's McpStdioServerConfig shape and resolve placeholders
     const result: Record<string, McpServerConfig> = {};
     for (const [name, cfg] of Object.entries(servers)) {
       const raw = cfg as any;
-      // Resolve ${workspaceFolder:-.} placeholder in args
-      const args = Array.isArray(raw.args)
-        ? raw.args.map((a: string) => a.replace(/\$\{workspaceFolder:-\.?\}/g, workDir))
-        : undefined;
-      result[name] = {
-        type: "stdio" as const,
-        command: raw.command,
-        ...(args && { args }),
-        ...(raw.env && { env: raw.env }),
-      };
+      if (raw.type === "http" && raw.url) {
+        result[name] = { type: "http" as const, url: raw.url, ...(raw.headers && { headers: raw.headers }) };
+      } else if (raw.type === "sse" && raw.url) {
+        result[name] = { type: "sse" as const, url: raw.url, ...(raw.headers && { headers: raw.headers }) };
+      } else {
+        const args = Array.isArray(raw.args)
+          ? raw.args.map((a: string) => a.replace(/\$\{workspaceFolder:-\.?\}/g, workDir))
+          : undefined;
+        result[name] = {
+          type: "stdio" as const,
+          command: raw.command,
+          ...(args && { args }),
+          ...(raw.env && { env: raw.env }),
+        };
+      }
     }
     console.log(
       `[MCP] Loaded ${Object.keys(result).length} MCP server(s): ${Object.keys(result).join(", ")}`,
