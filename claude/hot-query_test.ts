@@ -94,6 +94,7 @@ Deno.test("HotQuerySession: first turn resolves on result message", async () => 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("hello", new AbortController(), {});
   assertEquals(turn.sessionId, "sess-1");
@@ -108,6 +109,7 @@ Deno.test("HotQuerySession: second concurrent turn rejects with Busy", async () 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const first = session.runTurn("hello", new AbortController(), {});
   await assertRejects(
@@ -136,6 +138,7 @@ Deno.test("HotQuerySession: result.permission_denials populates TurnResult.permi
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("q", new AbortController(), {});
   assertEquals(turn.permissionDenials?.length, 2);
@@ -152,6 +155,7 @@ Deno.test("HotQuerySession: no denials → permissionDenials field omitted", asy
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const turn = await session.runTurn("q", new AbortController(), {});
   assertEquals(turn.permissionDenials, undefined);
@@ -166,6 +170,7 @@ Deno.test("HotQuerySession: onTyping fires immediately on turn start", async () 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   let typingCalls = 0;
   await session.runTurn("q", new AbortController(), {
@@ -182,6 +187,7 @@ Deno.test("HotQuerySession: close during in-flight turn rejects the turn promise
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const pending = session.runTurn("hello", new AbortController(), {});
   await assertRejects(
@@ -202,6 +208,7 @@ Deno.test("HotQuerySession: runTurn after close rejects immediately", async () =
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   await session.close("shutdown");
   await assertRejects(
@@ -218,6 +225,7 @@ Deno.test("HotQuerySession: interrupt returns true when turn is active", async (
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const _pending = session.runTurn("hello", new AbortController(), {});
   assertEquals(session.busy, true);
@@ -238,6 +246,7 @@ Deno.test("HotQuerySession: interrupt returns false when no turn active", async 
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   await session.runTurn("hello", new AbortController(), {});
   assertEquals(session.busy, false);
@@ -259,9 +268,11 @@ Deno.test("HotQuerySession: onChunk receives assistant text", async () => {
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
   const chunks: string[] = [];
   await session.runTurn("q", new AbortController(), { onChunk: (t) => chunks.push(t) });
   assertEquals(chunks, ["hi there"]);
   await session.close("test");
 });
+

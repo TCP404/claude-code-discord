@@ -129,7 +129,11 @@ export interface BotDependencies {
   /** Optional channel monitoring config for auto-responding to messages */
   monitorConfig?: MonitorConfig;
   /** Callback for plain text messages in session threads (auto-resume) */
-  onThreadMessage?: (channelId: string, content: string) => Promise<void>;
+  onThreadMessage?: (
+    channelId: string,
+    content: string,
+    meta?: { messageId?: string; userId?: string },
+  ) => Promise<void>;
   /** Set the channel where Claude output should be sent (multi-channel support) */
   setResponseChannel?: (channel: any) => void;
   /** Returns set of channel IDs managed by workspace system (checked by isOurChannel) */
@@ -138,4 +142,6 @@ export interface BotDependencies {
   isAutoThreadChannel?: (channelId: string) => boolean;
   /** Callback for plain text messages in auto-thread-enabled workspace channels */
   onWorkspaceMessage?: (channelId: string, content: string) => Promise<void>;
+  /** Resolve a HotQuerySession by sessionId — used by the queue-clear button handler. */
+  resolveHotSession?: (sessionId: string) => unknown;
 }

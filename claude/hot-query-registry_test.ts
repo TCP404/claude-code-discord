@@ -19,6 +19,7 @@ function makeFakeSession(sessionId: string): HotQuerySession {
     workDir: "/tmp",
     options: {},
     queryFactory: factory,
+    queueMax: 10,
   });
 }
 
@@ -139,4 +140,49 @@ Deno.test("HotQueryRegistry: stats tracks created and reused counts", async () =
   const summary = reg.list().find((r) => r.sessionId === "a");
   assertEquals(summary?.reuseCount, 2);
   await reg.closeAll("test");
+});
+
+Deno.test("HotQueryRegistry: idle eviction is skipped when pendingQueue is non-empty", async () => {
+  const evicted: string[] = [];
+  const reg = new HotQueryRegistry({
+    maxSessions: 3,
+    idleMs: 50,
+    onEvict: (sid, reason) => evicted.push(`${sid}:${reason}`),
+  });
+  const s = makeFakeSession("queued");
+  await reg.register(s);
+  // Push something into the queue (no turn running, but enqueue directly via PromptQueue)
+  s.pendingQueue.enqueue({
+    prompt: "hi",
+    messageId: "m1",
+    channelId: "c",
+    userId: "u",
+    receivedAt: Date.now(),
+  });
+  await new Promise((r) => setTimeout(r, 120));
+  assertEquals(evicted, []); // not evicted while queue non-empty
+  // Drain and wait again — now eviction should fire on the next scheduled tick
+  s.pendingQueue.drain();
+  await new Promise((r) => setTimeout(r, 80));
+  assertEquals(evicted, ["queued:idle"]);
+  await reg.closeAll("test");
+});
+
+Deno.test("HotQueryRegistry: bumpActivity resets idle timer without changing reuseCount", async () => {
+  const reg = new HotQueryRegistry({ maxSessions: 3, idleMs: 60 });
+  await reg.register(makeFakeSession("bump"));
+  await new Promise((r) => setTimeout(r, 30));
+  reg.bumpActivity("bump"); // resets timer
+  await new Promise((r) => setTimeout(r, 40)); // 70ms elapsed; without bump would have evicted
+  assertEquals(reg.get("bump") !== undefined, true); // still alive
+  assertEquals(reg.stats(), { createdTotal: 1, reusedTotal: 0 });
+  const summary = reg.list().find((r) => r.sessionId === "bump");
+  assertEquals(summary?.reuseCount, 0);
+  await reg.closeAll("test");
+});
+
+Deno.test("HotQueryRegistry: bumpActivity on unknown session is a no-op", () => {
+  const reg = new HotQueryRegistry({ maxSessions: 3, idleMs: 1000 });
+  reg.bumpActivity("ghost"); // must not throw
+  assertEquals(reg.stats(), { createdTotal: 0, reusedTotal: 0 });
 });

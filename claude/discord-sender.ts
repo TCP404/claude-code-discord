@@ -45,51 +45,133 @@ export function createClaudeSender(
   let statusMsg: TrackedMessage | null = null;
   let statusStartTime = 0;
   let visibleSentSinceStatus = false;
+  let lastStatusLine: string | null = null;
+  let queueContext: { count: number; sessionId: string } | null = null;
 
-  async function updateStatus(line: string) {
-    if (!sender.sendTracked) return;
+  // Serializes the four status-line writers (updateStatus / refreshQueueStatus
+  // / finalizeStatus / clearStatus). Without this, two concurrent calls can
+  // both enter the "delete + sendTracked" branch and produce duplicate status
+  // messages on Discord (only the latest reference is kept locally; the older
+  // ones become orphaned and never get cleaned up).
+  let statusLock: Promise<void> = Promise.resolve();
+  function withStatusLock<T>(fn: () => Promise<T>): Promise<T> {
+    const next = statusLock.then(fn, fn);
+    statusLock = next.then(() => {}, () => {});
+    return next;
+  }
+
+  function buildStatusPayload(line: string): MessageContent {
     const elapsed = ((Date.now() - statusStartTime) / 1000).toFixed(0);
-    const content = `${line}  \`${elapsed}s\``;
-    try {
-      if (statusMsg && !visibleSentSinceStatus) {
-        await statusMsg.edit({ content });
-      } else {
-        if (statusMsg) {
-          try {
-            await statusMsg.delete();
-          } catch { /* ignore */ }
-        }
-        statusStartTime = Date.now();
-        statusMsg = await sender.sendTracked({ content: line });
-        visibleSentSinceStatus = false;
-      }
-    } catch { /* message may have been deleted */ }
-  }
-
-  async function finalizeStatus(content: string) {
-    if (!sender.sendTracked) return;
-    try {
-      if (statusMsg && !visibleSentSinceStatus) {
-        await statusMsg.edit({ content });
-      } else {
-        if (statusMsg) {
-          try {
-            await statusMsg.delete();
-          } catch { /* ignore */ }
-        }
-        statusMsg = await sender.sendTracked({ content });
-        visibleSentSinceStatus = false;
-      }
-    } catch { /* ignore */ }
-  }
-
-  async function clearStatus() {
-    if (statusMsg) {
-      try {
-        await statusMsg.delete();
-      } catch { /* ignore */ }
-      statusMsg = null;
+    let content = `${line}  \`${elapsed}s\``;
+    const components: NonNullable<MessageContent["components"]> = [];
+    if (queueContext && queueContext.count > 0) {
+      content += `\n📥 Queued: ${queueContext.count} message${queueContext.count === 1 ? "" : "s"}`;
+      components.push({
+        type: "actionRow",
+        components: [{
+          type: "button",
+          customId: `queue-clear:${queueContext.sessionId}`,
+          label: `❌ Clear queue (${queueContext.count})`,
+          style: "danger",
+        }],
+      });
     }
+    // Always return `components` (even empty) so Discord's `edit` clears
+    // any stale ActionRow attached to this message. Without this, a stale
+    // "Clear queue" button lingers after the queue is drained.
+    return { content, components };
+  }
+
+  function updateStatus(line: string): Promise<void> {
+    if (!sender.sendTracked) return Promise.resolve();
+    return withStatusLock(async () => {
+      lastStatusLine = line;
+      try {
+        if (statusMsg && !visibleSentSinceStatus) {
+          await statusMsg.edit(buildStatusPayload(line));
+        } else {
+          if (statusMsg) {
+            try {
+              await statusMsg.delete();
+            } catch { /* ignore */ }
+            statusMsg = null;
+          }
+          statusStartTime = Date.now();
+          statusMsg = await sender.sendTracked!(buildStatusPayload(line));
+          visibleSentSinceStatus = false;
+        }
+      } catch { /* message may have been deleted */ }
+    });
+  }
+
+  /**
+   * Re-render the status line so that any queue-context change becomes visible.
+   *
+   * If no status line exists yet (e.g. the current turn hasn't produced a
+   * single hidden tool message), we create one with a placeholder so the
+   * queue badge + clear button can be shown. Without this, queueing during
+   * a "talk-only" turn would silently fail to surface in the UI.
+   */
+  function refreshQueueStatus(): Promise<void> {
+    if (!sender.sendTracked) return Promise.resolve();
+    return withStatusLock(async () => {
+      const line = lastStatusLine ?? "⏸️ Agent busy";
+      try {
+        if (statusMsg && !visibleSentSinceStatus) {
+          await statusMsg.edit(buildStatusPayload(line));
+        } else {
+          if (statusMsg) {
+            try {
+              await statusMsg.delete();
+            } catch { /* ignore */ }
+            statusMsg = null;
+          }
+          statusStartTime = Date.now();
+          statusMsg = await sender.sendTracked!(buildStatusPayload(line));
+          visibleSentSinceStatus = false;
+          if (lastStatusLine === null) lastStatusLine = line;
+        }
+      } catch { /* ignore — message may have been deleted */ }
+    });
+  }
+
+  function setQueueContext(ctx: { count: number; sessionId: string } | null): void {
+    queueContext = ctx;
+  }
+
+  function finalizeStatus(content: string): Promise<void> {
+    if (!sender.sendTracked) return Promise.resolve();
+    return withStatusLock(async () => {
+      queueContext = null;
+      lastStatusLine = null;
+      try {
+        if (statusMsg && !visibleSentSinceStatus) {
+          await statusMsg.edit({ content, components: [] });
+        } else {
+          if (statusMsg) {
+            try {
+              await statusMsg.delete();
+            } catch { /* ignore */ }
+            statusMsg = null;
+          }
+          statusMsg = await sender.sendTracked!({ content });
+          visibleSentSinceStatus = false;
+        }
+      } catch { /* ignore */ }
+    });
+  }
+
+  function clearStatus(): Promise<void> {
+    return withStatusLock(async () => {
+      queueContext = null;
+      lastStatusLine = null;
+      if (statusMsg) {
+        try {
+          await statusMsg.delete();
+        } catch { /* ignore */ }
+        statusMsg = null;
+      }
+    });
   }
 
   // Renderer context shared across all renderers
@@ -246,5 +328,7 @@ export function createClaudeSender(
     setSessionId: (id: string) => {
       currentSessionId = id;
     },
+    refreshQueueStatus,
+    setQueueContext,
   };
 }

@@ -4,10 +4,12 @@ export interface HotQueryConfig {
   enabled: boolean;
   idleMs: number;
   maxSessions: number;
+  queueMax: number;
 }
 
 const DEFAULT_IDLE_MS = 900_000; // 15 min
 const DEFAULT_MAX = 3;
+const DEFAULT_QUEUE_MAX = 20;
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
@@ -25,5 +27,6 @@ export function readHotQueryConfig(
     enabled,
     idleMs: parsePositiveInt(getEnv("HOT_QUERY_IDLE_MS"), DEFAULT_IDLE_MS),
     maxSessions: parsePositiveInt(getEnv("HOT_QUERY_MAX_SESSIONS"), DEFAULT_MAX),
+    queueMax: parsePositiveInt(getEnv("HOT_QUERY_QUEUE_MAX"), DEFAULT_QUEUE_MAX),
   };
 }

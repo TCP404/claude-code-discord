@@ -21,6 +21,10 @@ import {
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
+import {
+  createQueueClearHandler,
+  QUEUE_CLEAR_PREFIX,
+} from "./queue-button-handler.ts";
 import { pendingFileUploads } from "../claude/discord-sender.ts";
 import { isVoiceTranscriptionEnabled, transcribeAudio } from "../voice/transcribe.ts";
 import { checkCommandPermission } from "../core/rbac.ts";
@@ -414,6 +418,22 @@ export async function createDiscordBot(
       }
     }
 
+    if (interaction.customId.startsWith(QUEUE_CLEAR_PREFIX)) {
+      if (!dependencies.resolveHotSession) return;
+      const handler = createQueueClearHandler({
+        resolveSession: (sid) =>
+          dependencies.resolveHotSession!(sid) as
+            | import("../claude/hot-query.ts").HotQuerySession
+            | undefined,
+      });
+      try {
+        await handler(interaction);
+      } catch (err) {
+        console.error("[queue-clear] handler error:", err);
+      }
+      return;
+    }
+
     const handler = buttonHandlers.get(interaction.customId);
 
     if (handler) {
@@ -721,8 +741,9 @@ export async function createDiscordBot(
         }
       }
 
-      // Process all attachments: images → temp files, text → inline, others → temp files
-      if (message.attachments.size > 0) {
+      // Process all attachments: images → temp files, text → inline, others → temp files.
+      // Skip for voice messages — the .ogg is already transcribed; saving it to /tmp would just leak.
+      if (message.attachments.size > 0 && !isVoiceMessage) {
         const notes: string[] = [];
         for (const att of message.attachments.values()) {
           try {
@@ -775,7 +796,10 @@ export async function createDiscordBot(
 
       try {
         if (inThread) {
-          await onThreadMessage!(message.channelId, textContent);
+          await onThreadMessage!(message.channelId, textContent, {
+            messageId: message.id,
+            userId: message.author.id,
+          });
         } else {
           await onWorkspaceMessage!(message.channelId, textContent);
         }

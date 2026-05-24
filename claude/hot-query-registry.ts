@@ -77,6 +77,23 @@ export class HotQueryRegistry {
     return this.reuseCounts.get(sessionId) ?? 0;
   }
 
+  /**
+   * Bump activity timestamp + reset idle timer WITHOUT incrementing reuse
+   * counters. Use this for any user-facing activity that prolongs session
+   * life but isn't itself a "reuse" (e.g. queueing a follow-up message,
+   * a turn just finishing).
+   */
+  bumpActivity(sessionId: string): void {
+    if (!this.sessions.has(sessionId)) return;
+    this.lastTouched.set(sessionId, Date.now());
+    this.scheduleIdle(sessionId);
+  }
+
+  /**
+   * Mark this session as reused: increment counters AND bump activity.
+   * Call this exactly once per genuine "reuse event" — i.e. when a new
+   * user message arrives and finds an already-warm session.
+   */
   touch(sessionId: string): void {
     if (!this.sessions.has(sessionId)) return;
     this.lastTouched.set(sessionId, Date.now());
@@ -123,6 +140,11 @@ export class HotQueryRegistry {
     const timer = setTimeout(() => {
       const session = this.sessions.get(sessionId);
       if (session?.busy) {
+        this.scheduleIdle(sessionId);
+        return;
+      }
+      if (session && session.pendingQueue.size() > 0) {
+        // Queued messages are waiting to be processed; defer eviction.
         this.scheduleIdle(sessionId);
         return;
       }

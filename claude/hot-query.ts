@@ -4,6 +4,7 @@ import { buildQueryOptions, extractPermissionDenials } from "./client.ts";
 import type { ClaudeModelOptions } from "./client.ts";
 import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { PromptQueue } from "./queue.ts";
 
 /**
  * An async iterable driven by external `push()` calls. Pending `.next()` promises
@@ -103,11 +104,21 @@ export interface HotQueryCreateParams {
   workDir: string;
   options: ClaudeModelOptions | undefined;
   queryFactory: QueryFactory;
+  /** Max pending messages while a turn is in flight. */
+  queueMax: number;
 }
 
 export class HotQuerySession {
   readonly sessionId: string;
   readonly workDir: string;
+  /**
+   * Pending user prompts awaiting processing. The single owner of `runTurn`
+   * (a `QueueConsumer` in `claude/queue-consumer.ts`) drains and merges
+   * these into one new turn after the current one ends. Callers enqueue
+   * directly via `pendingQueue.enqueue(...)`; the consumer takes over
+   * processing on a `kick()`.
+   */
+  readonly pendingQueue: PromptQueue;
   boundOptions: ClaudeModelOptions | undefined;
   lastActivityAt: number;
 
@@ -127,6 +138,7 @@ export class HotQuerySession {
     this.workDir = params.workDir;
     this.boundOptions = params.options;
     this.lastActivityAt = Date.now();
+    this.pendingQueue = new PromptQueue(params.queueMax);
     this.inputQueue = new AsyncPushQueue();
     this.query = params.queryFactory(this.inputQueue);
     this.consumerPromise = this.runConsumer();
