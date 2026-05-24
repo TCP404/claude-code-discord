@@ -153,11 +153,30 @@ export async function createClaudeCodeBot(config: BotConfig) {
   await workspaceManager.loadFromDisk();
 
   const hotQueryConfig = readHotQueryConfig((k) => Deno.env.get(k));
+
+  // sessionId → QueueConsumer. Owns the only call site of hot.runTurn for
+  // queued messages, eliminating the busy-check race between concurrent
+  // onThreadMessage invocations.
+  // Declared BEFORE hotQueryRegistry so the onEvict callback can prune
+  // stale consumers when a session is closed.
+  const queueConsumers = new Map<string, QueueConsumer>();
+
+  // sessionId → in-flight Promise<HotQuerySession>. Coalesces concurrent
+  // cold-start attempts on the same session: if message A is mid-creation
+  // when message B arrives, B awaits the same Promise instead of triggering
+  // a duplicate SDK init (which would leak A's session and silently drop
+  // either A's or B's messages depending on dispatch order).
+  const inFlightColdStarts = new Map<string, Promise<HotQuerySession>>();
+
   const hotQueryRegistry = new HotQueryRegistry({
     maxSessions: hotQueryConfig.maxSessions,
     idleMs: hotQueryConfig.idleMs,
     onEvict: (sessionId, reason) => {
       console.log(`[HotQuery] session=${sessionId} closed (reason: ${reason})`);
+      // The consumer holds a reference to the now-closed HotQuerySession
+      // (and its now-empty pendingQueue). Drop it so the next cold-start
+      // builds a fresh consumer wired to the new session.
+      queueConsumers.delete(sessionId);
       if (reason === "shutdown") return;
       const thread = sessionThreadManager.getThread(sessionId);
       if (!thread) return;
@@ -173,11 +192,6 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   // Register hot query interrupt as fallback for /stop when no cold-mode activeQuery
   setFallbackInterrupt(() => hotQueryRegistry.interruptBusy());
-
-  // sessionId → QueueConsumer. Owns the only call site of hot.runTurn for
-  // queued messages, eliminating the busy-check race between concurrent
-  // onThreadMessage invocations.
-  const queueConsumers = new Map<string, QueueConsumer>();
 
   /**
    * Build a per-session QueueConsumer with the right Discord wiring.
@@ -595,32 +609,73 @@ export async function createClaudeCodeBot(config: BotConfig) {
       let hot = hotQueryRegistry.get(sessionId);
       let isFreshCold = false;
       if (!hot) {
-        console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
-        const t0 = Date.now();
-        // Use a session-scoped controller for the SDK construction; the
-        // consumer creates per-turn controllers separately.
-        const initController = new AbortController();
-        const factory = await makeSdkQueryFactory(
-          effectiveWorkDir,
-          turnOptions,
-          sessionId,
-          initController,
-        );
-        hot = HotQuerySession.create({
-          sessionId,
-          workDir: effectiveWorkDir,
-          options: turnOptions,
-          queryFactory: factory,
-          queueMax: hotQueryConfig.queueMax,
-        });
-        await hotQueryRegistry.register(hot);
-        console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
+        // Coalesce concurrent cold-starts: if another message is already
+        // mid-creation for this session, wait on the same Promise. This
+        // prevents duplicate SDK initialization and the resulting
+        // queueConsumer/HotQuerySession reference mismatch.
+        let coldStart = inFlightColdStarts.get(sessionId);
+        const isOriginator = !coldStart;
+        if (!coldStart) {
+          coldStart = (async () => {
+            console.log(`[HotQuery] session=${sessionId} creating (cold init)`);
+            const t0 = Date.now();
+            const initController = new AbortController();
+            const factory = await makeSdkQueryFactory(
+              effectiveWorkDir,
+              turnOptions,
+              sessionId,
+              initController,
+            );
+            const created = HotQuerySession.create({
+              sessionId,
+              workDir: effectiveWorkDir,
+              options: turnOptions,
+              queryFactory: factory,
+              queueMax: hotQueryConfig.queueMax,
+            });
+            await hotQueryRegistry.register(created);
+            console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
+            return created;
+          })();
+          inFlightColdStarts.set(sessionId, coldStart);
+          // Always clear the in-flight entry once settled (success or
+          // failure), so a subsequent attempt can retry. The trailing
+          // .catch swallows the rejection on this side-chain so it doesn't
+          // become an unhandled rejection — the originating awaiter will
+          // still see the original error via its own `await coldStart`.
+          coldStart.finally(() => {
+            if (inFlightColdStarts.get(sessionId) === coldStart) {
+              inFlightColdStarts.delete(sessionId);
+            }
+          }).catch(() => {});
+        }
+        try {
+          hot = await coldStart;
+        } catch (err) {
+          console.error(
+            `[ThreadMessage] Cold-start failed for session ${sessionId}:`,
+            err,
+          );
+          // Only the originating message reports the failure to the user —
+          // followers awaiting the same Promise would otherwise spam the
+          // thread with duplicate ⚠️ messages.
+          if (isOriginator) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            await thread.send(
+              `⚠️ Failed to start hot session: ${errMsg}`,
+            ).catch(() => {});
+          }
+          return;
+        }
         isFreshCold = true;
       } else {
         hotQueryRegistry.touch(sessionId);
       }
 
       // Build / reuse the per-session consumer.
+      // Note: consumer is dropped from the map on session eviction (see
+      // hotQueryRegistry.onEvict above), so a stale entry pointing to a
+      // closed HotQuerySession is impossible here.
       let consumer = queueConsumers.get(sessionId);
       if (!consumer) {
         consumer = makeQueueConsumer(hot, thread, sessionId, isFreshCold);
