@@ -253,11 +253,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
           onTyping,
           cleanup: () => {
             clearActiveSender(sessionId, senderApi);
-            // After this turn finishes, future turns are reuses.
+            // After this turn finishes, future turns are reuses (for
+            // _hotReuse stamping on result messages). bumpActivity resets
+            // the idle timer without inflating the reuseCount counter —
+            // the counter is incremented by `touch()` on the next user
+            // message, which is the actual "reuse event".
             hotReuseCount = Math.max(0, hotReuseCount) + 1;
-            if (hotReuseCount > 0) {
-              hotQueryRegistry.touch(sessionId);
-            }
+            hotQueryRegistry.bumpActivity(sessionId);
           },
         };
       },
@@ -633,7 +635,15 @@ export async function createClaudeCodeBot(config: BotConfig) {
               queryFactory: factory,
               queueMax: hotQueryConfig.queueMax,
             });
-            await hotQueryRegistry.register(created);
+            // If register() fails (e.g. LRU eviction throws in an edge
+            // case), the just-created session would otherwise leak its
+            // SDK process. Close it explicitly before re-throwing.
+            try {
+              await hotQueryRegistry.register(created);
+            } catch (err) {
+              await created.close("manual").catch(() => {});
+              throw err;
+            }
             console.log(`[HotQuery] session=${sessionId} created in ${Date.now() - t0}ms`);
             return created;
           })();
