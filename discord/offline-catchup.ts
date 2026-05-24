@@ -7,7 +7,7 @@
  * @module discord/offline-catchup
  */
 
-import type { Client, TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
+import type { ButtonInteraction, Client, TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
 import type { SessionThreadManager } from "./session-threads.ts";
 import type { WorkspaceManager } from "../core/workspace-manager.ts";
 
@@ -369,4 +369,109 @@ export class OfflineCatchupManager {
       }
     }
   }
+}
+
+export interface CatchupHandlerDeps extends OfflineCatchupDeps {
+  onThreadMessage?: (
+    channelId: string,
+    content: string,
+    meta?: { messageId?: string; userId?: string },
+  ) => Promise<void>;
+  onWorkspaceMessage?: (
+    channelId: string,
+    content: string,
+    meta?: { messageId?: string; userId?: string },
+  ) => Promise<void>;
+}
+
+export function createCatchupButtonHandler(deps: CatchupHandlerDeps) {
+  return async function handle(interaction: ButtonInteraction): Promise<void> {
+    const decoded = decodeCatchupCustomId(interaction.customId);
+    if (!decoded) return;
+
+    if (decoded.action === "ignore") {
+      const sessionId = deps.sessionThreads.findSessionByThreadId(decoded.channelId);
+      if (sessionId) {
+        deps.sessionThreads.setLastSeenMessageId(sessionId, decoded.newestId);
+      } else {
+        deps.workspaceManager.setLastSeenMessageId(decoded.channelId, decoded.newestId);
+        await deps.workspaceManager.saveToDisk();
+      }
+      await interaction.update({
+        embeds: [{
+          color: 0x808080,
+          title: "🚫 已忽略",
+          description: "下次启动不会再提示这批消息。",
+        }],
+        components: [],
+      });
+      return;
+    }
+
+    await interaction.update({
+      embeds: [{
+        color: 0xFAA61A,
+        title: "⏳ 正在处理…",
+        description: "已读取离线期间的消息，正在转交给 Claude。",
+      }],
+      components: [],
+    });
+
+    const channel = interaction.channel;
+    if (!channel || !("messages" in channel)) {
+      await interaction.followUp({ content: "❌ 无法访问此频道的消息。", ephemeral: true });
+      return;
+    }
+
+    let collected;
+    try {
+      const afterCursor = (BigInt(decoded.oldestId) - 1n).toString();
+      collected = await (channel as TextChannel | ThreadChannel).messages.fetch({
+        after: afterCursor,
+        limit: FETCH_LIMIT,
+      });
+    } catch (err) {
+      console.error("[OfflineCatchup] Re-fetch on Process failed:", err);
+      await interaction.followUp({ content: "❌ 拉取离线消息失败，请稍后再试。", ephemeral: true });
+      return;
+    }
+
+    const ourBotId = deps.client.user?.id;
+    const messages: CatchupMessage[] = Array.from(collected.values())
+      .filter((m) => !m.author.bot && !m.content.startsWith("/"))
+      .filter((m) => {
+        if (m.mentions.users.size === 0) return true;
+        const mentionsMe = ourBotId ? m.mentions.users.has(ourBotId) : false;
+        const mentionsOtherBot = m.mentions.users.some((u) => u.bot && u.id !== ourBotId);
+        return !(mentionsOtherBot && !mentionsMe);
+      })
+      .filter((m) => BigInt(m.id) <= BigInt(decoded.newestId))
+      .sort((a, b) => Number(BigInt(a.id) - BigInt(b.id)))
+      .map((m) => ({ id: m.id, content: m.content, createdAt: m.createdAt }));
+
+    if (messages.length === 0) {
+      await interaction.followUp({
+        content: "ℹ️ 没有可处理的消息（可能已被删除）。",
+        ephemeral: true,
+      });
+      const sessionId = deps.sessionThreads.findSessionByThreadId(decoded.channelId);
+      if (sessionId) {
+        deps.sessionThreads.setLastSeenMessageId(sessionId, decoded.newestId);
+      } else {
+        deps.workspaceManager.setLastSeenMessageId(decoded.channelId, decoded.newestId);
+        await deps.workspaceManager.saveToDisk();
+      }
+      return;
+    }
+
+    const prompt = formatMergedPrompt(messages);
+    const sessionId = deps.sessionThreads.findSessionByThreadId(decoded.channelId);
+    if (sessionId && deps.onThreadMessage) {
+      await deps.onThreadMessage(decoded.channelId, prompt, { messageId: decoded.newestId });
+    } else if (deps.onWorkspaceMessage) {
+      await deps.onWorkspaceMessage(decoded.channelId, prompt, { messageId: decoded.newestId });
+    } else {
+      console.warn("[OfflineCatchup] No handler for " + decoded.channelId);
+    }
+  };
 }
