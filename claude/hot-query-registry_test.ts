@@ -186,3 +186,79 @@ Deno.test("HotQueryRegistry: bumpActivity on unknown session is a no-op", () => 
   reg.bumpActivity("ghost"); // must not throw
   assertEquals(reg.stats(), { createdTotal: 0, reusedTotal: 0 });
 });
+
+Deno.test("HotQueryRegistry: LRU skips busy session and picks the next oldest", async () => {
+  const evicted: string[] = [];
+  const reg = new HotQueryRegistry({
+    maxSessions: 2,
+    idleMs: 10_000,
+    onEvict: (sid, reason) => evicted.push(`${sid}:${reason}`),
+  });
+  const a = makeFakeSession("a");
+  const b = makeFakeSession("b");
+  const c = makeFakeSession("c");
+  await reg.register(a);
+  await new Promise((r) => setTimeout(r, 2));
+  await reg.register(b);
+  // 'a' is the absolute LRU but make it busy; 'b' should be evicted instead.
+  const _pending = a.runTurn("running", new AbortController(), {});
+  assertEquals(a.busy, true);
+  await reg.register(c);
+  assertEquals(evicted, ["b:lru"]);
+  assertEquals(reg.get("a") !== undefined, true); // busy 'a' preserved
+  assertEquals(reg.get("b"), undefined);
+  assertEquals(reg.get("c") !== undefined, true);
+  await reg.closeAll("test");
+  await _pending.catch(() => {});
+});
+
+Deno.test("HotQueryRegistry: LRU skips session with non-empty pendingQueue", async () => {
+  const evicted: string[] = [];
+  const reg = new HotQueryRegistry({
+    maxSessions: 2,
+    idleMs: 10_000,
+    onEvict: (sid, reason) => evicted.push(`${sid}:${reason}`),
+  });
+  const a = makeFakeSession("a");
+  const b = makeFakeSession("b");
+  const c = makeFakeSession("c");
+  await reg.register(a);
+  await new Promise((r) => setTimeout(r, 2));
+  await reg.register(b);
+  // 'a' is LRU but has pending messages; should be skipped.
+  a.pendingQueue.enqueue({
+    prompt: "wait",
+    messageId: "m1",
+    channelId: "c",
+    userId: "u",
+    receivedAt: Date.now(),
+  });
+  await reg.register(c);
+  assertEquals(evicted, ["b:lru"]);
+  assertEquals(reg.get("a") !== undefined, true);
+  assertEquals(reg.get("b"), undefined);
+  await reg.closeAll("test");
+});
+
+Deno.test("HotQueryRegistry: LRU falls back to absolute LRU when every session is busy/queued", async () => {
+  const evicted: string[] = [];
+  const reg = new HotQueryRegistry({
+    maxSessions: 2,
+    idleMs: 10_000,
+    onEvict: (sid, reason) => evicted.push(`${sid}:${reason}`),
+  });
+  const a = makeFakeSession("a");
+  const b = makeFakeSession("b");
+  const c = makeFakeSession("c");
+  await reg.register(a);
+  await new Promise((r) => setTimeout(r, 2));
+  await reg.register(b);
+  const _pa = a.runTurn("a-running", new AbortController(), {});
+  const _pb = b.runTurn("b-running", new AbortController(), {});
+  // Both busy; oldest 'a' is the forced victim.
+  await reg.register(c);
+  assertEquals(evicted, ["a:lru"]);
+  await reg.closeAll("test");
+  await _pa.catch(() => {});
+  await _pb.catch(() => {});
+});

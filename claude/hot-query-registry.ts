@@ -156,19 +156,42 @@ export class HotQueryRegistry {
   }
 
   private async evictLRU(): Promise<void> {
-    let oldestId: string | undefined;
-    let oldestT = Infinity;
+    // Pick the oldest session that is NOT busy and has NO pending queue.
+    // Killing a busy session aborts its in-flight turn (HotQuerySession
+    // closed: lru); killing one with pending messages drops them silently.
+    // Either is much worse UX than letting the cap creep over briefly,
+    // so we skip such sessions and pick the next oldest. Only if every
+    // session is busy/queued do we fall back to the absolute LRU as a
+    // last resort.
+    let evictableId: string | undefined;
+    let evictableT = Infinity;
+    let absoluteId: string | undefined;
+    let absoluteT = Infinity;
     for (const [id, t] of this.lastTouched.entries()) {
-      if (t < oldestT) {
-        oldestT = t;
-        oldestId = id;
+      if (t < absoluteT) {
+        absoluteT = t;
+        absoluteId = id;
+      }
+      const session = this.sessions.get(id);
+      if (!session) continue;
+      if (session.busy) continue;
+      if (session.pendingQueue.size() > 0) continue;
+      if (t < evictableT) {
+        evictableT = t;
+        evictableId = id;
       }
     }
-    if (oldestId) {
+    const target = evictableId ?? absoluteId;
+    if (target) {
+      if (!evictableId && absoluteId) {
+        console.warn(
+          `[HotQueryRegistry] LRU eviction forced on busy/queued session ${absoluteId} (no idle session available)`,
+        );
+      }
       try {
-        await this.close(oldestId, "lru");
+        await this.close(target, "lru");
       } catch (err) {
-        console.error(`[HotQueryRegistry] LRU close failed for ${oldestId}:`, err);
+        console.error(`[HotQueryRegistry] LRU close failed for ${target}:`, err);
       }
     }
   }
