@@ -14,6 +14,7 @@ import {
   GatewayIntentBits,
   Message,
   MessageFlags,
+  MessageType,
   REST,
   Routes,
   TextChannel,
@@ -688,6 +689,10 @@ export async function createDiscordBot(
 
     client.on(Events.MessageCreate, async (message: Message) => {
       if (message.author.bot) return;
+      // Skip system messages (channel name change, pin, member add, etc.).
+      // Their author is the user who triggered the action, so author.bot won't filter them.
+      // The `content` of a ChannelNameChange is the new name itself, which would otherwise be sent to Claude.
+      if (message.type !== MessageType.Default && message.type !== MessageType.Reply) return;
       if (message.content.startsWith("/")) return;
 
       const inThread = message.channel.isThread();
