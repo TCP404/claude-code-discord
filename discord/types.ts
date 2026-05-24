@@ -119,6 +119,8 @@ export interface SessionThread {
   messageCount: number;
   /** Per-session hot query override (undefined = use global default) */
   hotQuery?: boolean;
+  /** ID of the last user message the bot processed in this thread (offline catch-up bookmark). */
+  lastSeenMessageId?: string;
 }
 
 export interface BotDependencies {
