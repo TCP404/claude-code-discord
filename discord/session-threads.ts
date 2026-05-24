@@ -27,6 +27,7 @@ interface PersistedSession {
   lastActivity: string;
   messageCount: number;
   hotQuery?: boolean;
+  lastSeenMessageId?: string;
 }
 
 const DATA_DIR = ".bot-data";
@@ -86,6 +87,7 @@ export class SessionThreadManager {
           lastActivity: new Date(r.lastActivity),
           messageCount: r.messageCount,
           hotQuery: r.hotQuery,
+          lastSeenMessageId: r.lastSeenMessageId,
         });
       }
       console.log(`SessionThreads: Restored ${this.threads.size} sessions from disk`);
@@ -160,6 +162,7 @@ export class SessionThreadManager {
           lastActivity: meta.lastActivity.toISOString(),
           messageCount: meta.messageCount,
           ...(meta.hotQuery !== undefined && { hotQuery: meta.hotQuery }),
+          ...(meta.lastSeenMessageId !== undefined && { lastSeenMessageId: meta.lastSeenMessageId }),
         });
       }
       await Deno.writeTextFile(this.filePath, JSON.stringify(records, null, 2));
@@ -289,14 +292,35 @@ export class SessionThreadManager {
 
   /**
    * Record that a message was sent in a session thread.
+   * If `messageId` is provided, also advances the offline catch-up bookmark.
    */
-  recordActivity(sessionId: string): void {
+  recordActivity(sessionId: string, messageId?: string): void {
     const meta = this.threads.get(sessionId);
     if (meta) {
       meta.lastActivity = new Date();
       meta.messageCount++;
+      if (messageId) {
+        meta.lastSeenMessageId = messageId;
+      }
       this.schedulePersist();
     }
+  }
+
+  /**
+   * Explicitly advance the offline catch-up bookmark without bumping activity counters.
+   * Used by the catch-up flow when ignoring or batch-processing offline messages.
+   */
+  setLastSeenMessageId(sessionId: string, messageId: string): void {
+    const meta = this.threads.get(sessionId);
+    if (meta) {
+      meta.lastSeenMessageId = messageId;
+      this.schedulePersist();
+    }
+  }
+
+  /** Get the offline catch-up bookmark for a session (undefined if never seen). */
+  getLastSeenMessageId(sessionId: string): string | undefined {
+    return this.threads.get(sessionId)?.lastSeenMessageId;
   }
 
   /**
