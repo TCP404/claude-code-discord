@@ -235,4 +235,138 @@ export class OfflineCatchupManager {
     const results = await Promise.all(tasks);
     return results.filter((r): r is MissedBatch => r !== null);
   }
+
+  /**
+   * Delete any leftover catch-up prompts from previous startups in this channel.
+   * Returns the union of [oldest, newest] ranges decoded from those prompts so
+   * caller can extend the new prompt's range to cover them.
+   */
+  async cleanupStalePrompts(
+    channel: TextChannel | ThreadChannel,
+  ): Promise<{ olderThanCurrent: { oldestId: string; newestId: string } | null }> {
+    const ourBotId = this.deps.client.user?.id;
+    if (!ourBotId) return { olderThanCurrent: null };
+
+    let recent;
+    try {
+      recent = await channel.messages.fetch({ limit: 20 });
+    } catch {
+      return { olderThanCurrent: null };
+    }
+
+    let oldestIdSeen: string | null = null;
+    let newestIdSeen: string | null = null;
+    for (const msg of recent.values()) {
+      if (msg.author.id !== ourBotId) continue;
+      const row = msg.components?.[0] as any;
+      const button = row?.components?.[0];
+      const customId = button?.customId ?? button?.custom_id;
+      if (typeof customId !== "string") continue;
+      const decoded = decodeCatchupCustomId(customId);
+      if (!decoded) continue;
+      if (decoded.oldestId) {
+        if (!oldestIdSeen || BigInt(decoded.oldestId) < BigInt(oldestIdSeen)) {
+          oldestIdSeen = decoded.oldestId;
+        }
+      }
+      if (!newestIdSeen || BigInt(decoded.newestId) > BigInt(newestIdSeen)) {
+        newestIdSeen = decoded.newestId;
+      }
+      try {
+        await msg.delete();
+      } catch {
+        // ignore — message may have been deleted already
+      }
+    }
+
+    return {
+      olderThanCurrent: oldestIdSeen && newestIdSeen
+        ? { oldestId: oldestIdSeen, newestId: newestIdSeen }
+        : null,
+    };
+  }
+
+  async postInboxPrompt(batch: MissedBatch): Promise<void> {
+    const stale = await this.cleanupStalePrompts(batch.channel);
+    let oldestId = batch.oldestId;
+    let newestId = batch.newestId;
+    let count = batch.messages.length;
+
+    if (stale.olderThanCurrent) {
+      if (BigInt(stale.olderThanCurrent.oldestId) < BigInt(oldestId)) {
+        oldestId = stale.olderThanCurrent.oldestId;
+      }
+      if (BigInt(stale.olderThanCurrent.newestId) > BigInt(newestId)) {
+        newestId = stale.olderThanCurrent.newestId;
+      }
+      // Re-count by re-fetching the union range
+      try {
+        const cursor = (BigInt(oldestId) - 1n).toString();
+        const refetched = await batch.channel.messages.fetch({ after: cursor, limit: FETCH_LIMIT });
+        const ourBotId = this.deps.client.user?.id;
+        count = Array.from(refetched.values())
+          .filter((m) => !m.author.bot && !m.content.startsWith("/"))
+          .filter((m) => {
+            if (m.mentions.users.size === 0) return true;
+            const mentionsMe = ourBotId ? m.mentions.users.has(ourBotId) : false;
+            const mentionsOtherBot = m.mentions.users.some((u) => u.bot && u.id !== ourBotId);
+            return !(mentionsOtherBot && !mentionsMe);
+          })
+          .filter((m) => BigInt(m.id) <= BigInt(newestId)).length;
+      } catch {
+        // keep batch.messages count if refetch fails
+      }
+    }
+
+    const truncationNote = batch.messages.length >= FETCH_LIMIT
+      ? `\n\n_（仅含最近 ${FETCH_LIMIT} 条）_`
+      : "";
+
+    await batch.channel.send({
+      embeds: [{
+        color: 0x5865F2,
+        title: "👋 我刚回来",
+        description: `发现这里有 **${count}** 条新消息没处理。${truncationNote}`,
+      }],
+      components: [{
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 3,
+            label: "▶️ 处理",
+            custom_id: encodeCatchupCustomId("process", batch.target.channelId, oldestId, newestId),
+          },
+          {
+            type: 2,
+            style: 4,
+            label: "🚫 忽略",
+            custom_id: encodeCatchupCustomId("ignore", batch.target.channelId, "", newestId),
+          },
+        ],
+      }] as any,
+    });
+  }
+
+  async runOnStartup(): Promise<void> {
+    console.log("[OfflineCatchup] Starting scan...");
+    let batches: MissedBatch[];
+    try {
+      batches = await this.scanAll();
+    } catch (err) {
+      console.error("[OfflineCatchup] Scan failed:", err);
+      return;
+    }
+    console.log(`[OfflineCatchup] Found ${batches.length} channels with missed messages`);
+    for (const batch of batches) {
+      try {
+        await this.postInboxPrompt(batch);
+      } catch (err) {
+        console.error(
+          "[OfflineCatchup] Failed to post inbox in " + batch.target.channelId + ":",
+          err,
+        );
+      }
+    }
+  }
 }
