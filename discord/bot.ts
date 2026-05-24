@@ -806,7 +806,10 @@ export async function createDiscordBot(
             userId: message.author.id,
           });
         } else {
-          await onWorkspaceMessage!(message.channelId, textContent);
+          await onWorkspaceMessage!(message.channelId, textContent, {
+            messageId: message.id,
+            userId: message.author.id,
+          });
         }
       } catch (error) {
         console.error("[MessageCreate] Error handling message:", error);
