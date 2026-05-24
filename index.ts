@@ -593,7 +593,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         return;
       }
 
-      sessionThreadManager.recordActivity(sessionId);
+      sessionThreadManager.recordActivity(sessionId, meta?.messageId);
 
       // Cold path: when hot query is disabled, fall back to the per-message
       // cold runner. No queue for cold path — by design (see spec).
@@ -732,12 +732,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
     },
     isAutoThreadChannel: (channelId: string) => workspaceManager.isAutoThreadChannel(channelId),
-    onWorkspaceMessage: async (channelId: string, content: string) => {
+    onWorkspaceMessage: async (
+      channelId: string,
+      content: string,
+      meta?: { messageId?: string; userId?: string },
+    ) => {
       const channel = commandChannels.get(channelId) ??
         bot?.getGuild?.()?.channels.cache.get(channelId);
       if (!channel) {
         console.warn(`[WorkspaceMessage] Channel ${channelId} not found, ignoring`);
         return;
+      }
+
+      if (meta?.messageId) {
+        workspaceManager.setLastSeenMessageId(channelId, meta.messageId);
+        await workspaceManager.saveToDisk();
       }
 
       // Register the channel for routing

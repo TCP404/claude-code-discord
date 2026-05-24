@@ -143,7 +143,11 @@ export interface BotDependencies {
   /** Returns true when the given channel has the auto-thread workspace option enabled */
   isAutoThreadChannel?: (channelId: string) => boolean;
   /** Callback for plain text messages in auto-thread-enabled workspace channels */
-  onWorkspaceMessage?: (channelId: string, content: string) => Promise<void>;
+  onWorkspaceMessage?: (
+    channelId: string,
+    content: string,
+    meta?: { messageId?: string; userId?: string },
+  ) => Promise<void>;
   /** Resolve a HotQuerySession by sessionId — used by the queue-clear button handler. */
   resolveHotSession?: (sessionId: string) => unknown;
 }
