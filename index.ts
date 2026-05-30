@@ -1046,7 +1046,7 @@ function setupSignalHandlers(ctx: {
   actualCategoryName: string;
   repoName: string;
   branchName: string;
-  cleanupInterval: number;
+  cleanupInterval: ReturnType<typeof setInterval>;
   closeHotQueries?: () => Promise<void>;
   bot: any;
 }) {
