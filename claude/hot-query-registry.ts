@@ -32,7 +32,7 @@ export interface HotQueryStats {
 
 export class HotQueryRegistry {
   private sessions = new Map<string, HotQuerySession>();
-  private timers = new Map<string, number>();
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private lastTouched = new Map<string, number>();
   private reuseCounts = new Map<string, number>();
   private config: HotQueryRegistryConfig;
