@@ -1,5 +1,5 @@
 /** @module discord/types — Shared type definitions for the Discord layer. */
-import type { TextChannel } from "npm:discord.js@14.14.1";
+import type { ButtonInteraction, TextChannel } from "npm:discord.js@14.14.1";
 import type { BotSettings } from "../types/shared.ts";
 
 export interface EmbedData {
@@ -150,4 +150,6 @@ export interface BotDependencies {
   ) => Promise<void>;
   /** Resolve a HotQuerySession by sessionId — used by the queue-clear button handler. */
   resolveHotSession?: (sessionId: string) => unknown;
+  /** Routes offline-catchup:* button interactions. */
+  catchupButtonHandler?: (interaction: ButtonInteraction) => Promise<void>;
 }
