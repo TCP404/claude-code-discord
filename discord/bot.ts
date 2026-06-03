@@ -435,6 +435,16 @@ export async function createDiscordBot(
       return;
     }
 
+    if (interaction.customId.startsWith("offline-catchup:")) {
+      if (!dependencies.catchupButtonHandler) return;
+      try {
+        await dependencies.catchupButtonHandler(interaction);
+      } catch (err) {
+        console.error("[offline-catchup] handler error:", err);
+      }
+      return;
+    }
+
     const handler = buttonHandlers.get(interaction.customId);
 
     if (handler) {

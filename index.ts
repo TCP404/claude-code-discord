@@ -24,6 +24,10 @@ import {
   createSessionThreadCallbacks,
   SessionThreadManager,
 } from "./discord/index.ts";
+import {
+  createCatchupButtonHandler,
+  OfflineCatchupManager,
+} from "./discord/offline-catchup.ts";
 import type { TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
 
 import { getGitInfo } from "./git/index.ts";
@@ -881,6 +885,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
   });
   const taskScheduler = new TaskScheduler(scheduledTaskStore, schedulerExecutor);
   taskScheduler.start();
+
+  // Wire offline message catch-up: scan managed channels for messages sent
+  // while bot was offline, post inbox prompts, route Process / Ignore buttons.
+  const offlineCatchup = new OfflineCatchupManager({
+    client: bot.client,
+    sessionThreads: sessionThreadManager,
+    workspaceManager,
+  });
+  dependencies.catchupButtonHandler = createCatchupButtonHandler({
+    client: bot.client,
+    sessionThreads: sessionThreadManager,
+    workspaceManager,
+    onThreadMessage: dependencies.onThreadMessage,
+    onWorkspaceMessage: dependencies.onWorkspaceMessage,
+  });
+  offlineCatchup.runOnStartup().catch((err) =>
+    console.error("[OfflineCatchup] runOnStartup error:", err)
+  );
 
   // Start admin web UI
   const { startAdminServer } = await import("./admin/index.ts");
