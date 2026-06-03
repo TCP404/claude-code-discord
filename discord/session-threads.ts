@@ -203,6 +203,10 @@ export class SessionThreadManager {
       createdAt: new Date(),
       lastActivity: new Date(),
       messageCount: 0,
+      // Discord thread IDs equal their starter message ID; using it as the
+      // baseline guarantees every subsequent user message has a strictly
+      // greater snowflake and will be picked up by offline catch-up.
+      lastSeenMessageId: thread.id,
     };
 
     this.threads.set(sessionId, meta);
