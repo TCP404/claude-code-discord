@@ -164,21 +164,29 @@ export class OfflineCatchupManager {
     const sessionId = target.kind === "thread"
       ? this.deps.sessionThreads.findSessionByThreadId(target.channelId)
       : undefined;
-    const bookmark = target.kind === "thread"
+    let bookmark = target.kind === "thread"
       ? (sessionId ? this.deps.sessionThreads.getLastSeenMessageId(sessionId) : undefined)
       : this.deps.workspaceManager.getLastSeenMessageId(target.channelId);
 
     if (!bookmark) {
-      try {
-        const latest = await channel.messages.fetch({ limit: 1 });
-        const newest = latest.first();
-        if (newest) {
-          await this.advanceBookmark(target, newest.id);
+      // Threads: fall back to threadId (a snowflake equal to the starter
+      // message ID) so the entire thread's user messages get picked up.
+      // Workspace channels: keep the baseline-and-skip behavior to avoid
+      // dumping unrelated historical messages on first startup.
+      if (target.kind === "thread") {
+        bookmark = target.channelId;
+      } else {
+        try {
+          const latest = await channel.messages.fetch({ limit: 1 });
+          const newest = latest.first();
+          if (newest) {
+            await this.advanceBookmark(target, newest.id);
+          }
+        } catch (err) {
+          console.warn("[OfflineCatchup] Baseline fetch failed for " + target.channelId + ":", err);
         }
-      } catch (err) {
-        console.warn("[OfflineCatchup] Baseline fetch failed for " + target.channelId + ":", err);
+        return null;
       }
-      return null;
     }
 
     let fetched;
