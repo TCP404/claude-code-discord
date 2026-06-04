@@ -33,6 +33,7 @@ import type { TextChannel, ThreadChannel } from "npm:discord.js@14.14.1";
 import { getGitInfo } from "./git/index.ts";
 import { createClaudeSender, expandableContent } from "./claude/discord-sender.ts";
 import { sendToClaudeCode } from "./claude/client.ts";
+import { formatClaudeError } from "./claude/error-formatter.ts";
 import {
   clearActiveSender,
   getActiveSender,
@@ -327,8 +328,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
     } catch (error) {
       console.error(`[ColdTurn] Failed to resume session ${sessionId}:`, error);
-      const errMsg = error instanceof Error ? error.message : String(error);
-      await thread.send(`⚠️ Failed to resume session: ${errMsg}`).catch(() => {});
+      const friendly = formatClaudeError(error);
+      const hint = friendly.retryable ? "" : "\n\n_该会话仍然可用，可以再发一条消息继续。_";
+      await thread.send(`⚠️ ${friendly.summary}${hint}`).catch(() => {});
     } finally {
       claudeSessionOps.setController(null, threadChannelId);
       try {
@@ -828,12 +830,19 @@ export async function createClaudeCodeBot(config: BotConfig) {
         }
       } catch (error) {
         console.error("[WorkspaceMessage] Claude run failed:", error);
-        if (threadSessionKey.startsWith("pending_")) {
-          sessionThreadManager.updateSessionId(threadSessionKey, `failed_${threadSessionKey}`);
+        // Placeholder never got upgraded to a real session ID — the thread
+        // can't be resumed, so drop the record instead of leaving a
+        // `failed_*` zombie that silently swallows future user messages.
+        const placeholderUnresolved = threadSessionKey.startsWith("pending_");
+        if (placeholderUnresolved) {
+          sessionThreadManager.deleteSession(threadSessionKey);
         }
-        const errMsg = error instanceof Error ? error.message : String(error);
+        const friendly = formatClaudeError(error);
+        const hint = placeholderUnresolved
+          ? "\n\n此会话未能建立，请到原频道**重新发起一次**。"
+          : (friendly.retryable ? "" : "");
         try {
-          await thread?.send(`⚠️ Claude failed: ${errMsg}`);
+          await thread?.send(`⚠️ ${friendly.summary}${hint}`);
         } catch { /* ignore */ }
       } finally {
         claudeSessionOps.setController(null, threadChannelId);
