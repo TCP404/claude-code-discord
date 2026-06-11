@@ -36,7 +36,8 @@ Run Claude Code through Discord without giving up anything you've already config
 | Role-based access control         | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles      |
 | Interactive permission prompts    | Allow/Deny buttons when Claude wants to use unapproved tools                                  |
 | Multi-workspace                   | Single bot instance manages multiple project channels, each with its own working directory    |
-| Admin UI                          | Local HTTP server (localhost:7860) for workspace management                                   |
+| Scheduled tasks                   | Run workspace-bound Claude commands on daily, weekly, or interval schedules                   |
+| Admin UI                          | Local HTTP server (localhost:7860) for workspace, session, and schedule management            |
 | Channel monitoring                | Watch a channel for bot/webhook messages and auto-investigate in a thread                     |
 | Audit trail                       | Channel history provides a searchable record of who ran what and when                         |
 
@@ -103,29 +104,29 @@ MONITOR_CHANNEL_ID=123456789012345678    # Channel to monitor for alerts
 MONITOR_BOT_IDS=987654321,111111111      # Bot/webhook user IDs to trigger auto-investigation
 ```
 
-| Variable                  | Required | Description                                                                                |
-| ------------------------- | :------: | ------------------------------------------------------------------------------------------ |
-| `DISCORD_TOKEN`           | **Yes**  | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
-| `APPLICATION_ID`          | **Yes**  | Application ID from the Developer Portal                                                   |
-| `GUILD_ID`                |    No    | Server ID for instant slash command registration                                           |
-| `ANTHROPIC_API_KEY`       |    No    | Enables dynamic model discovery; refreshes hourly                                          |
-| `USER_ID`                 |    No    | Your Discord user ID — bot @mentions you when tasks finish                                 |
-| `CATEGORY_NAME`           |    No    | Discord category name for channels (default: repo name)                                    |
-| `WORK_DIR`                |    No    | Working directory for Claude operations (default: current dir)                             |
-| `CLAUDE_CODE_USE_BEDROCK` |    No    | Set to `1` to use AWS Bedrock instead of Anthropic API                                     |
-| `AWS_PROFILE`             |    No    | AWS SSO profile name (for Bedrock auth)                                                    |
-| `AWS_REGION`              |    No    | AWS region for Bedrock                                                                     |
-| `ANTHROPIC_MODEL`         |    No    | Override default model (Bedrock ARN or Anthropic model ID)                                 |
-| `ADMIN_ROLE_IDS`          |    No    | Comma-separated role IDs for RBAC (shell, git, system, admin)                              |
-| `ADMIN_USER_IDS`          |    No    | Comma-separated user IDs for RBAC — grants access regardless of roles                      |
-| `MONITOR_CHANNEL_ID`      |    No    | Discord channel ID to watch for bot/webhook messages                                       |
-| `MONITOR_BOT_IDS`         |    No    | Comma-separated bot/webhook user IDs that trigger auto-investigation                       |
-| `ALLOW_ANY_CHANNEL`       |    No    | Set to `true` to allow slash commands in any channel (default: false)                      |
-| `DEFAULT_PERMISSION_MODE` |    No    | Default SDK permission mode for new sessions (`acceptEdits`, `bypassPermissions`, etc)     |
-| `THREAD_MENTION_ONLY`     |    No    | Set to `true` to only respond in threads when @mentioned (default: false)                  |
-| `HOT_QUERY_ENABLED`       |    No    | Enable session reuse in threads for faster responses (default: true)                       |
-| `HOT_QUERY_MAX_SESSIONS`  |    No    | Max concurrent hot query sessions in LRU (default: 20)                                     |
-| `HOT_QUERY_IDLE_TIMEOUT_MS` |  No   | Idle timeout before evicting a hot query session (default: 300000 = 5 min)                 |
+| Variable                    | Required | Description                                                                                |
+| --------------------------- | :------: | ------------------------------------------------------------------------------------------ |
+| `DISCORD_TOKEN`             | **Yes**  | Bot token from the [Discord Developer Portal](https://discord.com/developers/applications) |
+| `APPLICATION_ID`            | **Yes**  | Application ID from the Developer Portal                                                   |
+| `GUILD_ID`                  |    No    | Server ID for instant slash command registration                                           |
+| `ANTHROPIC_API_KEY`         |    No    | Enables dynamic model discovery; refreshes hourly                                          |
+| `USER_ID`                   |    No    | Your Discord user ID — bot @mentions you when tasks finish                                 |
+| `CATEGORY_NAME`             |    No    | Discord category name for channels (default: repo name)                                    |
+| `WORK_DIR`                  |    No    | Working directory for Claude operations (default: current dir)                             |
+| `CLAUDE_CODE_USE_BEDROCK`   |    No    | Set to `1` to use AWS Bedrock instead of Anthropic API                                     |
+| `AWS_PROFILE`               |    No    | AWS SSO profile name (for Bedrock auth)                                                    |
+| `AWS_REGION`                |    No    | AWS region for Bedrock                                                                     |
+| `ANTHROPIC_MODEL`           |    No    | Override default model (Bedrock ARN or Anthropic model ID)                                 |
+| `ADMIN_ROLE_IDS`            |    No    | Comma-separated role IDs for RBAC (shell, git, system, admin)                              |
+| `ADMIN_USER_IDS`            |    No    | Comma-separated user IDs for RBAC — grants access regardless of roles                      |
+| `MONITOR_CHANNEL_ID`        |    No    | Discord channel ID to watch for bot/webhook messages                                       |
+| `MONITOR_BOT_IDS`           |    No    | Comma-separated bot/webhook user IDs that trigger auto-investigation                       |
+| `ALLOW_ANY_CHANNEL`         |    No    | Set to `true` to allow slash commands in any channel (default: false)                      |
+| `DEFAULT_PERMISSION_MODE`   |    No    | Default SDK permission mode for new sessions (`acceptEdits`, `bypassPermissions`, etc)     |
+| `THREAD_MENTION_ONLY`       |    No    | Set to `true` to only respond in threads when @mentioned (default: false)                  |
+| `HOT_QUERY_ENABLED`         |    No    | Enable session reuse in threads for faster responses (default: true)                       |
+| `HOT_QUERY_MAX_SESSIONS`    |    No    | Max concurrent hot query sessions in LRU (default: 20)                                     |
+| `HOT_QUERY_IDLE_TIMEOUT_MS` |    No    | Idle timeout before evicting a hot query session (default: 300000 = 5 min)                 |
 
 > CLI flags override environment variables. Environment variables override `.env` file values.
 
@@ -185,17 +186,17 @@ just uninstall   # remove the LaunchAgent (keeps code/logs/.env)
 
 No `just` installed? Use `make <target>` — same commands. No task runner at all? Call the scripts directly: `./scripts/service.sh install`, `./scripts/update.sh`, `./scripts/doctor.sh`.
 
-| Command     | What it does                                                                    |
-| ----------- | ------------------------------------------------------------------------------- |
-| `setup`     | Copy `.env.example` → `.env` if missing, then `doctor`                          |
-| `doctor`    | Verify Node/npx/git, `.env` tokens, plist registration, service state           |
-| `install`   | Render plist into `~/Library/LaunchAgents/`, bootstrap into launchd, and start  |
-| `uninstall` | bootout + remove plist (preserves code, logs, `.env`)                           |
-| `reinstall` | `uninstall` + `install` — use after pulling plist template changes              |
-| `start` / `stop` / `restart` | `launchctl kickstart` / `kill` / `kickstart -k`                |
-| `status`    | `launchctl print` filtered to pid, state, last exit code                        |
-| `logs`      | `tail -F logs/launchd.{out,err}.log`                                            |
-| `update`    | `git fetch` → show incoming commits → warn on `.env.example` drift → `git pull` |
+| Command                      | What it does                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| `setup`                      | Copy `.env.example` → `.env` if missing, then `doctor`                          |
+| `doctor`                     | Verify Node/npx/git, `.env` tokens, plist registration, service state           |
+| `install`                    | Render plist into `~/Library/LaunchAgents/`, bootstrap into launchd, and start  |
+| `uninstall`                  | bootout + remove plist (preserves code, logs, `.env`)                           |
+| `reinstall`                  | `uninstall` + `install` — use after pulling plist template changes              |
+| `start` / `stop` / `restart` | `launchctl kickstart` / `kill` / `kickstart -k`                                 |
+| `status`                     | `launchctl print` filtered to pid, state, last exit code                        |
+| `logs`                       | `tail -F logs/launchd.{out,err}.log`                                            |
+| `update`                     | `git fetch` → show incoming commits → warn on `.env.example` drift → `git pull` |
 
 > `update` deliberately does **not** restart the service — review the changes, then run `just restart` yourself.
 
@@ -254,4 +255,16 @@ Adding a workspace creates a dedicated Discord channel under the bot's category.
 
 ### Admin UI
 
-A local HTTP server runs on `localhost:7860` for workspace management (create, delete, list workspaces, view sessions). No authentication — accessible only from localhost.
+A local HTTP server runs on `localhost:7860` for workspace management, session inspection, and scheduled task management. No authentication — accessible only from localhost.
+
+## Scheduled Tasks
+
+Scheduled tasks run saved Claude commands against a selected workspace on a daily, weekly, or every-N-hours cadence. Each run creates its own Discord thread in the workspace channel and records a run log in `.bot-data/scheduled-tasks-log.json`.
+
+Use the Admin UI Schedules tab to:
+
+- create tasks for a workspace and command
+- enable or disable tasks
+- trigger a task immediately
+- edit the command used by future runs
+- inspect run history with time, status, and thread ID

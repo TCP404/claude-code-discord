@@ -82,9 +82,15 @@ claude-code-discord/
 ├── workspace/                  # Multi-workspace management
 │   └── command.ts              # /workspace add|remove|list
 │
+├── cron/                       # Scheduled task management
+│   ├── types.ts                # ScheduledTask, TaskSchedule, TaskRunLog
+│   ├── persistence.ts          # .bot-data scheduled task/run log storage
+│   ├── scheduler.ts            # Tick-based scheduler and runNow support
+│   └── executor.ts             # Workspace/thread creation + Claude execution bridge
+│
 ├── admin/                      # Admin HTTP server (localhost:7860)
 │   ├── server.ts               # HTTP listener, CORS
-│   ├── routes.ts               # REST endpoints
+│   ├── routes.ts               # REST endpoints for workspaces, sessions, schedules
 │   └── html.ts                 # Embedded admin UI
 │
 ├── util/                       # Utilities
@@ -128,6 +134,8 @@ claude-code-discord/
 │   # core/config-loader_test.ts
 │   # core/workspace-manager_test.ts
 │   # core/rbac_test.ts
+│   # cron/scheduler_test.ts
+│   # cron/executor_test.ts
 ```
 
 ## SDK Integration

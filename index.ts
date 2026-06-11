@@ -855,6 +855,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }
   }
 
+  // Start scheduled task scheduler
+  const { createSchedulerExecutor, ScheduledTaskStore, TaskScheduler } = await import(
+    "./cron/index.ts"
+  );
+  const scheduledTaskStore = new ScheduledTaskStore(workDir);
+  await scheduledTaskStore.load();
+  const schedulerExecutor = createSchedulerExecutor({
+    workspaceManager,
+    sessionThreadCallbacks,
+    sessionThreadManager,
+    setSessionForChannel: (channelId, sessionId) => {
+      claudeSessionOps.setSessionId(sessionId, channelId);
+    },
+    getQueryOptions: () => settingsOps.getSettings().unified as any,
+  });
+  const taskScheduler = new TaskScheduler(scheduledTaskStore, schedulerExecutor);
+  taskScheduler.start();
+
   // Start admin web UI
   const { startAdminServer } = await import("./admin/index.ts");
   startAdminServer({
@@ -863,6 +881,26 @@ export async function createClaudeCodeBot(config: BotConfig) {
     discordClient: bot.client,
     botStartTime: Date.now(),
     hotQueryConfig,
+    scheduledTaskStore,
+    taskScheduler,
+    stopSessionByThreadId: async (threadId: string) => {
+      const sessionId = sessionThreadManager.findSessionByThreadId(threadId);
+      if (!sessionId) return false;
+      // Interrupt hot query session if active
+      const hotSession = hotQueryRegistry.get(sessionId);
+      if (hotSession?.busy) {
+        await hotSession.interrupt();
+        return true;
+      }
+      // Abort the controller for the thread channel
+      const controller = claudeSessionOps.getController(threadId);
+      if (controller) {
+        controller.abort();
+        claudeSessionOps.setController(null, threadId);
+        return true;
+      }
+      return false;
+    },
   });
 
   // Create Discord sender for Claude messages
@@ -947,6 +985,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     branchName,
     cleanupInterval,
     closeHotQueries: () => hotQueryRegistry.closeAll("shutdown"),
+    stopScheduler: () => taskScheduler.stop(),
     bot: bot as any,
   });
 
@@ -1048,6 +1087,7 @@ function setupSignalHandlers(ctx: {
   branchName: string;
   cleanupInterval: ReturnType<typeof setInterval>;
   closeHotQueries?: () => Promise<void>;
+  stopScheduler?: () => void;
   bot: any;
 }) {
   const {
@@ -1061,6 +1101,7 @@ function setupSignalHandlers(ctx: {
     branchName,
     cleanupInterval,
     closeHotQueries,
+    stopScheduler,
     bot,
   } = ctx;
   const { crashHandler, healthMonitor } = managers;
@@ -1105,6 +1146,7 @@ function setupSignalHandlers(ctx: {
         }]);
       }
 
+      if (stopScheduler) stopScheduler();
       healthMonitor.stopAll();
       crashHandler.cleanup();
       cleanupPaginationStates();

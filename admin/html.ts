@@ -65,6 +65,7 @@ input:checked + .slider:before { transform: translateX(18px); }
   <button class="tab active" data-tab="status">Status</button>
   <button class="tab" data-tab="workspaces">Workspaces</button>
   <button class="tab" data-tab="sessions">Sessions</button>
+  <button class="tab" data-tab="schedules">Schedules</button>
 </div>
 
 <!-- Status Panel -->
@@ -93,6 +94,59 @@ input:checked + .slider:before { transform: translateX(18px); }
     <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup (>72h)</button>
   </div>
   <div id="sess-groups"></div>
+</div>
+
+<!-- Schedules Panel -->
+<div id="schedules" class="panel">
+  <div style="margin-bottom: 16px; padding: 12px; background: #16213e; border-radius: 6px;">
+    <div style="font-size: 0.85rem; color: #7289da; font-weight: 600; margin-bottom: 10px;">New Scheduled Task</div>
+    <div class="form-row">
+      <select id="sched-ws" style="min-width: 150px;"><option value="">Select workspace...</option></select>
+      <input id="sched-cmd" placeholder="Command (e.g. /cs-review 昨天数据)" style="flex: 2;" />
+    </div>
+    <div class="form-row" style="margin-top: 8px;">
+      <select id="sched-type" onchange="updateSchedForm()">
+        <option value="daily">Daily</option>
+        <option value="interval">Every N hours</option>
+        <option value="weekly">Weekly</option>
+      </select>
+      <input id="sched-time" type="time" value="09:00" style="width: 120px;" />
+      <input id="sched-interval" type="number" min="1" max="72" value="6" placeholder="Hours" style="width: 80px; display: none;" />
+      <div id="sched-weekdays" style="display: none; align-items: center; gap: 4px; font-size: 0.8rem;">
+        <label><input type="checkbox" value="1" checked> Mon</label>
+        <label><input type="checkbox" value="2" checked> Tue</label>
+        <label><input type="checkbox" value="3" checked> Wed</label>
+        <label><input type="checkbox" value="4" checked> Thu</label>
+        <label><input type="checkbox" value="5" checked> Fri</label>
+        <label><input type="checkbox" value="6"> Sat</label>
+        <label><input type="checkbox" value="0"> Sun</label>
+      </div>
+      <input id="sched-thread-name" placeholder="Thread name (optional)" style="flex: 1;" />
+      <button class="btn btn-primary" onclick="addSchedule()">Add</button>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Workspace</th><th>Command</th><th>Schedule</th><th>Enabled</th><th>Last Run</th><th></th></tr></thead>
+    <tbody id="sched-tbody"></tbody>
+  </table>
+  <div id="sched-detail" style="margin-top: 16px; display: none; padding: 12px; background: #16213e; border-radius: 6px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+      <span style="font-size: 0.85rem; color: #7289da; font-weight: 600;">Task Detail</span>
+      <button class="btn btn-sm" onclick="$('#sched-detail').style.display='none'">Close</button>
+    </div>
+    <div id="sched-detail-body"></div>
+  </div>
+  <div id="sched-logs" style="margin-top: 16px; display: none;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 0.85rem; color: #7289da; font-weight: 600;">Run History</span>
+      <button class="btn btn-sm" onclick="refreshSchedLogs()">Refresh</button>
+      <button class="btn btn-sm" onclick="$('#sched-logs').style.display='none'">Close</button>
+    </div>
+    <table>
+      <thead><tr><th>Time</th><th>Status</th><th>Thread</th></tr></thead>
+      <tbody id="sched-logs-tbody"></tbody>
+    </table>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -325,10 +379,177 @@ async function cleanupSessions() {
   loadSessions();
 }
 
+// ─── Schedules ───
+function updateSchedForm() {
+  const type = $('#sched-type').value;
+  $('#sched-time').style.display = (type === 'daily' || type === 'weekly') ? '' : 'none';
+  $('#sched-interval').style.display = type === 'interval' ? '' : 'none';
+  $('#sched-weekdays').style.display = type === 'weekly' ? 'flex' : 'none';
+}
+
+function describeSchedule(s) {
+  if (!s) return '—';
+  if (s.type === 'daily') return 'Daily at ' + (s.time || '??:??');
+  if (s.type === 'interval') return 'Every ' + s.intervalHours + 'h' + (s.time ? ' (start ' + s.time + ')' : '');
+  if (s.type === 'weekly') {
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const names = (s.weekdays || []).map(d => days[d]).join(',');
+    return names + ' at ' + (s.time || '??:??');
+  }
+  return JSON.stringify(s);
+}
+
+async function loadSchedules() {
+  const [res, wsRes] = await Promise.all([fetch('/api/schedules'), fetch('/api/workspaces')]);
+  const list = await res.json();
+  const workspaces = await wsRes.json();
+
+  // Always populate workspace dropdown
+  const sel = $('#sched-ws');
+  sel.innerHTML = '<option value="">Select workspace...</option>' +
+    workspaces.map(w => '<option value="' + escapeHtml(w.name) + '">' + escapeHtml(w.name) + '</option>').join('');
+
+  const tbody = $('#sched-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No scheduled tasks</td></tr>'; return; }
+  tbody.innerHTML = list.map(t => {
+    const checked = t.enabled ? 'checked' : '';
+    const lastRun = t.lastRunAt ? timeAgo(t.lastRunAt) + ' <span class="badge" style="' + (t.lastRunStatus === 'failed' ? 'background:#5a2727;color:#ff6e6e' : '') + '">' + (t.lastRunStatus || '—') + '</span>' : '—';
+    return \`<tr>
+      <td>\${escapeHtml(t.workspaceName)}</td>
+      <td class="mono" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="\${escapeHtml(t.command)}">\${escapeHtml(t.command)}</td>
+      <td>\${describeSchedule(t.schedule)}</td>
+      <td><label class="switch"><input type="checkbox" \${checked} onchange="toggleSchedule('\${t.id}', this.checked)"><span class="slider"></span></label></td>
+      <td>\${lastRun}</td>
+      <td>
+        <button class="btn btn-sm" onclick="showSchedDetail('\${t.id}')" title="Details">⚙</button>
+        <button class="btn btn-primary btn-sm" onclick="runSchedule('\${t.id}')" title="Run now">▶</button>
+        <button class="btn btn-sm" onclick="showSchedLogs('\${t.id}')" title="Logs">📋</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSchedule('\${t.id}')">✕</button>
+      </td>
+    </tr>\`;
+  }).join('');
+}
+
+async function addSchedule() {
+  const workspaceName = $('#sched-ws').value;
+  const command = $('#sched-cmd').value.trim();
+  const type = $('#sched-type').value;
+  const threadName = $('#sched-thread-name').value.trim() || undefined;
+
+  if (!workspaceName || !command) { toast('Workspace and command are required', true); return; }
+
+  const schedule = { type };
+  if (type === 'daily' || type === 'weekly') schedule.time = $('#sched-time').value;
+  if (type === 'interval') {
+    schedule.intervalHours = parseInt($('#sched-interval').value) || 6;
+    schedule.time = $('#sched-time').value || undefined;
+  }
+  if (type === 'weekly') {
+    schedule.weekdays = [...$$('#sched-weekdays input:checked')].map(el => parseInt(el.value));
+  }
+
+  const res = await fetch('/api/schedules', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ workspaceName, command, schedule, threadName })
+  });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error, true); return; }
+  toast('Scheduled task created');
+  $('#sched-cmd').value = '';
+  $('#sched-thread-name').value = '';
+  loadSchedules();
+}
+
+async function toggleSchedule(id, enabled) {
+  const res = await fetch('/api/schedules/' + id, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ enabled })
+  });
+  if (!res.ok) { const d = await res.json(); toast(d.error, true); loadSchedules(); return; }
+  toast(enabled ? 'Task enabled' : 'Task disabled');
+}
+
+async function runSchedule(id) {
+  toast('Triggering task...');
+  const res = await fetch('/api/schedules/' + id + '/run', { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error, true); return; }
+  toast(d.status === 'success' ? 'Task triggered successfully' : 'Task failed: ' + (d.error || 'unknown'), d.status === 'failed');
+  loadSchedules();
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Delete this scheduled task?')) return;
+  const res = await fetch('/api/schedules/' + id, { method: 'DELETE' });
+  if (!res.ok) { const d = await res.json(); toast(d.error, true); return; }
+  toast('Task deleted');
+  loadSchedules();
+}
+
+let currentLogsTaskId = null;
+
+async function showSchedLogs(taskId) {
+  currentLogsTaskId = taskId;
+  const res = await fetch('/api/schedules/' + taskId + '/logs');
+  const logs = await res.json();
+  const tbody = $('#sched-logs-tbody');
+  if (!logs.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No run history</td></tr>'; }
+  else {
+    tbody.innerHTML = logs.slice().reverse().map(l => \`<tr>
+      <td>\${new Date(l.runAt).toLocaleString()}</td>
+      <td><span class="badge" style="\${l.status === 'failed' ? 'background:#5a2727;color:#ff6e6e' : ''}">\${l.status}</span></td>
+      <td class="mono">\${escapeHtml(l.threadId || '—')}</td>
+    </tr>\`).join('');
+  }
+  $('#sched-logs').style.display = 'block';
+}
+
+function refreshSchedLogs() {
+  if (currentLogsTaskId) showSchedLogs(currentLogsTaskId);
+}
+
+async function showSchedDetail(taskId) {
+  const res = await fetch('/api/schedules/' + taskId + '/detail');
+  if (!res.ok) { toast('Failed to load detail', true); return; }
+  const d = await res.json();
+  const nextRun = d.nextRunAt ? new Date(d.nextRunAt).toLocaleString() : '—';
+  const body = $('#sched-detail-body');
+  body.innerHTML = \`
+    <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 0.85rem;">
+      <span style="color: #888;">Workspace</span><span>\${escapeHtml(d.workspaceName)}</span>
+      <span style="color: #888;">Work Dir</span><span class="mono">\${escapeHtml(d.workspacePath || '—')}</span>
+      <span style="color: #888;">Schedule</span><span>\${describeSchedule(d.schedule)}</span>
+      <span style="color: #888;">Next Run</span><span>\${nextRun}</span>
+      <span style="color: #888;">Total Runs</span><span>\${d.totalRuns} (\${d.successRuns} ok, \${d.failedRuns} failed)</span>
+      <span style="color: #888;">Created</span><span>\${new Date(d.createdAt).toLocaleString()}</span>
+      <span style="color: #888;">Enabled</span><span>\${d.enabled ? '✅ Yes' : '❌ No'}</span>
+      <span style="color: #888;">Command</span>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <input id="detail-cmd" value="\${escapeHtml(d.command)}" style="flex: 1; padding: 6px 10px; border: 1px solid #3d3d5c; border-radius: 4px; background: #1a1a2e; color: #e0e0e0; font-family: 'SF Mono', monospace; font-size: 0.82rem;" />
+        <button class="btn btn-primary btn-sm" onclick="saveSchedCommand('\${d.id}')">Save</button>
+      </div>
+    </div>
+  \`;
+  $('#sched-detail').style.display = 'block';
+}
+
+async function saveSchedCommand(taskId) {
+  const command = $('#detail-cmd').value.trim();
+  if (!command) { toast('Command cannot be empty', true); return; }
+  const res = await fetch('/api/schedules/' + taskId, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ command })
+  });
+  if (!res.ok) { const d = await res.json(); toast(d.error, true); return; }
+  toast('Command updated (takes effect on next run)');
+  loadSchedules();
+}
+
 // Init
 loadStatus();
 loadChannels().then(loadWorkspaces);
 loadSessions();
+loadSchedules();
 // Auto-refresh status every 30s
 setInterval(loadStatus, 30000);
 </script>

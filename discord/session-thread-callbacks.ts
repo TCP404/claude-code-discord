@@ -29,8 +29,21 @@ export function createSessionThreadCallbacks(
       threadName?: string,
       channelId?: string,
     ) {
-      const channel = (channelId && commandChannels.get(channelId)) ||
-        getBot()?.getChannel() as TextChannel | null;
+      let channel: TextChannel | null = (channelId && commandChannels.get(channelId)) ||
+        null;
+      // Fallback: fetch from Discord client cache (e.g. scheduled tasks where
+      // no prior slash command has populated commandChannels for this channel)
+      if (!channel && channelId) {
+        const bot = getBot();
+        const fetched = bot?.client?.channels?.cache?.get(channelId) ?? null;
+        if (fetched) {
+          channel = fetched as TextChannel;
+          commandChannels.set(channelId, channel);
+        }
+      }
+      if (!channel) {
+        channel = getBot()?.getChannel() as TextChannel | null;
+      }
       if (!channel) throw new Error("Bot channel not ready");
 
       if (sessionId) {

@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1.0
+
+### Scheduled Tasks
+
+- feat: add scheduled task persistence, run history, and tick-based execution
+- feat: add Admin UI schedule management for creating, editing, running, enabling, and deleting scheduled tasks
+- feat: run scheduled tasks in workspace-bound Discord threads
+- fix: scheduled task threads remain resumable after `/stop` by binding the session as soon as the SDK streams `session_id`
+- docs: add Codex-friendly `AGENTS.md` and update scheduler/admin documentation
+
 ## v3.0.0
 
 ### Breaking Changes

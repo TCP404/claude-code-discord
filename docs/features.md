@@ -54,6 +54,7 @@ Set via `/settings` > `claude` > `set-effort`.
 | Session Persistence             | Sessions survive bot restarts — threads restored with full context                     |
 | Thread Auto-Resume              | Post plain text in a session thread to automatically resume Claude                     |
 | Hot Query Reuse                 | Reuse SDK query instance across messages in a thread — skip cold start after first msg |
+| Scheduled Tasks                 | Run saved workspace commands daily, weekly, or on interval schedules                   |
 | Multi-Bot Coexistence           | Skip messages that @mention another bot — prevents accidental auto-resume              |
 | Mention-Only Mode               | `THREAD_MENTION_ONLY=true` — only respond when explicitly @mentioned                   |
 | Live Status Indicator           | Compact, auto-updating status line for hidden tool/system activity                     |
@@ -222,6 +223,23 @@ MONITOR_BOT_IDS=987654321,111111111      # Bot/webhook user IDs to respond to
 ```
 
 Requires the **Message Content** privileged intent enabled in the Discord Developer Portal. The bot needs Read Messages, Create Public Threads, and Send Messages in Threads permissions in the monitored channel.
+
+## Scheduled Tasks
+
+Scheduled tasks let you save recurring Claude commands per workspace. Each run:
+
+1. Resolves the selected workspace to its working directory and Discord channel
+2. Creates a new Discord thread for the run
+3. Streams Claude output into that thread
+4. Stores a run log with time, status, and thread ID
+
+Schedules are managed from the local Admin UI at `http://localhost:7860`:
+
+- **Daily** — run at a specific `HH:mm`
+- **Weekly** — run on selected weekdays at a specific `HH:mm`
+- **Interval** — run every N hours, optionally after a start time
+
+Thread auto-resume works in scheduled task threads after the initial run has received a Claude session ID. If `/stop` interrupts the initial run, the scheduler binds the thread as soon as the SDK streams `session_id`, so follow-up messages in the same thread can continue the conversation.
 
 ## Role-Based Access Control (RBAC)
 

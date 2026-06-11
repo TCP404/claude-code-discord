@@ -55,7 +55,8 @@ Key directories:
 - `shell/` — Shell command execution via Discord
 - `agent/` — Built-in agent personas (code-review, debug, architect, etc.)
 - `workspace/` — Multi-workspace slash command handlers (`/workspace add|remove|list`)
-- `admin/` — Local HTTP admin server (localhost:7860) for workspace management UI
+- `cron/` — Scheduled tasks: tick-based scheduler, workspace-bound execution, persistence
+- `admin/` — Local HTTP admin server (localhost:7860) for workspace/schedule management UI
 
 ## Config Injection
 
@@ -70,7 +71,11 @@ At session start, the SDK query loads:
 
 - **Runtime:** Deno (via `npx deno`, no global install required)
 - **Entry:** `index.ts`
-- **Start:** `just start` (LaunchAgent, recommended) or `npx deno task start` (manual)
+- **Service:** macOS LaunchAgent (`com.github.imAkaka.claude-code-discord`), managed via `just`
+- **Start/Stop/Restart:** `just start` / `just stop` / `just restart`
+- **Logs:** `just logs`
+- **Status:** `just status`
+- **Manual (dev):** `npx deno task start` or `npx deno task dev` (hot reload)
 - **Auth:** AWS Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`) or Anthropic API key
 - **Platform:** Linux / macOS only (no Windows support)
 
