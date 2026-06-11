@@ -132,7 +132,7 @@ input:checked + .slider:before { transform: translateX(18px); }
   <div id="sched-detail" style="margin-top: 16px; display: none; padding: 12px; background: #16213e; border-radius: 6px;">
     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
       <span style="font-size: 0.85rem; color: #7289da; font-weight: 600;">Task Detail</span>
-      <button class="btn btn-sm" onclick="$('#sched-detail').style.display='none'">Close</button>
+      <button class="btn btn-sm" onclick="hideSchedDetail()">Close</button>
     </div>
     <div id="sched-detail-body"></div>
   </div>
@@ -140,7 +140,7 @@ input:checked + .slider:before { transform: translateX(18px); }
     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
       <span style="font-size: 0.85rem; color: #7289da; font-weight: 600;">Run History</span>
       <button class="btn btn-sm" onclick="refreshSchedLogs()">Refresh</button>
-      <button class="btn btn-sm" onclick="$('#sched-logs').style.display='none'">Close</button>
+      <button class="btn btn-sm" onclick="hideSchedLogs()">Close</button>
     </div>
     <table>
       <thead><tr><th>Time</th><th>Status</th><th>Thread</th></tr></thead>
@@ -486,9 +486,24 @@ async function deleteSchedule(id) {
   loadSchedules();
 }
 
+let currentDetailTaskId = null;
 let currentLogsTaskId = null;
 
+function hideSchedDetail() {
+  currentDetailTaskId = null;
+  $('#sched-detail').style.display = 'none';
+}
+
+function hideSchedLogs() {
+  currentLogsTaskId = null;
+  $('#sched-logs').style.display = 'none';
+}
+
 async function showSchedLogs(taskId) {
+  if (currentLogsTaskId === taskId && $('#sched-logs').style.display !== 'none') {
+    hideSchedLogs();
+    return;
+  }
   currentLogsTaskId = taskId;
   const res = await fetch('/api/schedules/' + taskId + '/logs');
   const logs = await res.json();
@@ -508,18 +523,28 @@ function refreshSchedLogs() {
   if (currentLogsTaskId) showSchedLogs(currentLogsTaskId);
 }
 
+function formatUtcDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+}
+
 async function showSchedDetail(taskId) {
+  if (currentDetailTaskId === taskId && $('#sched-detail').style.display !== 'none') {
+    hideSchedDetail();
+    return;
+  }
+  currentDetailTaskId = taskId;
   const res = await fetch('/api/schedules/' + taskId + '/detail');
   if (!res.ok) { toast('Failed to load detail', true); return; }
   const d = await res.json();
-  const nextRun = d.nextRunAt ? new Date(d.nextRunAt).toLocaleString() : '—';
+  const nextRun = formatUtcDateTime(d.nextRunAt);
   const body = $('#sched-detail-body');
   body.innerHTML = \`
     <div style="display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 0.85rem;">
       <span style="color: #888;">Workspace</span><span>\${escapeHtml(d.workspaceName)}</span>
       <span style="color: #888;">Work Dir</span><span class="mono">\${escapeHtml(d.workspacePath || '—')}</span>
       <span style="color: #888;">Schedule</span><span>\${describeSchedule(d.schedule)}</span>
-      <span style="color: #888;">Next Run</span><span>\${nextRun}</span>
+      <span style="color: #888;">Next Run (UTC)</span><span>\${nextRun}</span>
       <span style="color: #888;">Total Runs</span><span>\${d.totalRuns} (\${d.successRuns} ok, \${d.failedRuns} failed)</span>
       <span style="color: #888;">Created</span><span>\${new Date(d.createdAt).toLocaleString()}</span>
       <span style="color: #888;">Enabled</span><span>\${d.enabled ? '✅ Yes' : '❌ No'}</span>
